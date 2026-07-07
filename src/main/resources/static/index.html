@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interview Reader</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; color: #17202a; background: #f7f9fb; }
+    main { max-width: 860px; margin: 12vh auto; padding: 0 24px; }
+    h1 { font-size: 34px; margin-bottom: 12px; }
+    code { background: #e8eef5; padding: 2px 6px; border-radius: 4px; }
+    .status { margin-top: 28px; font-weight: 650; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Interview Reader</h1>
+  <p>Jar 模式已启动。核心 API 位于 <code>/api</code>，开发数据库使用 H2 PostgreSQL 兼容模式。</p>
+  <p class="status" id="status">Checking API...</p>
+</main>
+<script>
+  fetch('/api/health')
+    .then(function (response) { return response.json(); })
+    .then(function (body) { document.getElementById('status').textContent = 'API status: ' + body.status; })
+    .catch(function () { document.getElementById('status').textContent = 'API status: unavailable'; });
+</script>
+</body>
+</html>
