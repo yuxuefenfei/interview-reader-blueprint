@@ -66,6 +66,11 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
       </table>
     </div>
 
+    <figure v-else-if="block.blockType === 'table_snapshot'" class="table-snapshot">
+      <figcaption>table snapshot</figcaption>
+      <pre>{{ textFromPayload(block.payload, block.plainText) }}</pre>
+    </figure>
+
     <blockquote v-else-if="block.blockType === 'quote'">
       {{ textFromPayload(block.payload, block.plainText) }}
     </blockquote>

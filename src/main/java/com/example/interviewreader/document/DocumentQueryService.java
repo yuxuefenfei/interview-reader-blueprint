@@ -8,117 +8,141 @@ import com.example.interviewreader.document.DocumentDtos.NodeContent;
 import com.example.interviewreader.document.DocumentDtos.ReadingProgress;
 import com.example.interviewreader.document.DocumentDtos.SearchHit;
 import com.example.interviewreader.document.DocumentDtos.TocNode;
+import com.example.interviewreader.persistence.entity.ContentBlockEntity;
+import com.example.interviewreader.persistence.entity.ContentNodeEntity;
+import com.example.interviewreader.persistence.entity.DocumentEntity;
+import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
+import com.example.interviewreader.persistence.entity.ReadingProgressEntity;
+import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
+import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
+import com.example.interviewreader.persistence.mapper.DocumentMapper;
+import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
+import com.example.interviewreader.persistence.mapper.ReadingProgressMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.ContentNodeEntityTableDef.CONTENT_NODE_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.DocumentEntityTableDef.DOCUMENT_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.DocumentVersionEntityTableDef.DOCUMENT_VERSION_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.ReadingProgressEntityTableDef.READING_PROGRESS_ENTITY;
+
 @Service
 public class DocumentQueryService {
-    private final JdbcTemplate jdbc;
+    private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
+
+    private final DocumentMapper documentMapper;
+    private final DocumentVersionMapper documentVersionMapper;
+    private final ContentNodeMapper contentNodeMapper;
+    private final ContentBlockMapper contentBlockMapper;
+    private final ReadingProgressMapper readingProgressMapper;
     private final ObjectMapper objectMapper;
 
-    public DocumentQueryService(JdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.jdbc = jdbc;
+    public DocumentQueryService(
+            DocumentMapper documentMapper,
+            DocumentVersionMapper documentVersionMapper,
+            ContentNodeMapper contentNodeMapper,
+            ContentBlockMapper contentBlockMapper,
+            ReadingProgressMapper readingProgressMapper,
+            ObjectMapper objectMapper
+    ) {
+        this.documentMapper = documentMapper;
+        this.documentVersionMapper = documentVersionMapper;
+        this.contentNodeMapper = contentNodeMapper;
+        this.contentBlockMapper = contentBlockMapper;
+        this.readingProgressMapper = readingProgressMapper;
         this.objectMapper = objectMapper;
     }
 
     public List<DocumentSummary> listDocuments(String query) {
-        var normalizedQuery = query == null ? "" : query.trim().toLowerCase();
-        if (normalizedQuery.isBlank()) {
-            return jdbc.query("""
-                    SELECT d.id, d.code, d.title, d.description, d.current_version_id,
-                           COALESCE(rp.progress_ratio, 0) AS progress_ratio
-                    FROM document d
-                    LEFT JOIN reading_progress rp ON rp.document_id = d.id AND rp.user_id = ?
-                    WHERE d.owner_id = ?
-                    ORDER BY d.updated_at DESC, d.title
-                    """, this::mapDocumentSummary, AppConstants.LOCAL_USER_ID, AppConstants.LOCAL_USER_ID);
-        }
-        var like = "%" + normalizedQuery + "%";
-        return jdbc.query("""
-                SELECT d.id, d.code, d.title, d.description, d.current_version_id,
-                       COALESCE(rp.progress_ratio, 0) AS progress_ratio
-                FROM document d
-                LEFT JOIN reading_progress rp ON rp.document_id = d.id AND rp.user_id = ?
-                WHERE d.owner_id = ? AND (LOWER(d.title) LIKE ? OR LOWER(d.code) LIKE ?)
-                ORDER BY d.updated_at DESC, d.title
-                """, this::mapDocumentSummary, AppConstants.LOCAL_USER_ID, AppConstants.LOCAL_USER_ID, like, like);
+        var normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        var documents = documentMapper.selectListByQuery(QueryWrapper.create()
+                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .orderBy(DOCUMENT_ENTITY.UPDATED_AT.desc(), DOCUMENT_ENTITY.TITLE.asc()));
+        return documents.stream()
+                .filter(document -> normalizedQuery.isBlank()
+                        || lower(document.title).contains(normalizedQuery)
+                        || lower(document.code).contains(normalizedQuery))
+                .map(this::mapDocumentSummary)
+                .toList();
     }
 
     public DocumentSummary getDocument(UUID documentId) {
-        try {
-            return jdbc.queryForObject("""
-                    SELECT d.id, d.code, d.title, d.description, d.current_version_id,
-                           COALESCE(rp.progress_ratio, 0) AS progress_ratio
-                    FROM document d
-                    LEFT JOIN reading_progress rp ON rp.document_id = d.id AND rp.user_id = ?
-                    WHERE d.owner_id = ? AND d.id = ?
-                    """, this::mapDocumentSummary, AppConstants.LOCAL_USER_ID, AppConstants.LOCAL_USER_ID, documentId);
-        } catch (EmptyResultDataAccessException exception) {
+        var document = documentMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.ID.eq(id(documentId))));
+        if (document == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
         }
+        return mapDocumentSummary(document);
     }
 
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
-        var count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM document_version
-                WHERE id = ? AND document_id = ?
-                """, Integer.class, versionId, documentId);
-        if (count == null || count == 0) {
+        var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(versionId)))
+                .and(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId))));
+        if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Version not found");
         }
         var previousVersionId = previousPublishedVersionId(documentId, versionId);
-        jdbc.update("""
-                UPDATE document_version
-                SET status = 'RETIRED'
-                WHERE document_id = ? AND status = 'PUBLISHED' AND id <> ?
-                """, documentId, versionId);
-        jdbc.update("""
-                UPDATE document_version
-                SET status = 'PUBLISHED', published_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """, versionId);
-        jdbc.update("""
-                UPDATE document
-                SET status = 'PUBLISHED', current_version_id = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """, versionId, documentId);
+        var now = OffsetDateTime.now();
+        for (var published : publishedVersions(documentId)) {
+            if (!published.id.equals(id(versionId))) {
+                published.status = "RETIRED";
+                documentVersionMapper.update(published);
+            }
+        }
+        version.status = "PUBLISHED";
+        version.publishedAt = now;
+        documentVersionMapper.update(version);
+
+        var document = documentMapper.selectOneById(id(documentId));
+        if (document != null) {
+            document.status = "PUBLISHED";
+            document.currentVersionId = id(versionId);
+            document.updatedAt = now;
+            documentMapper.update(document);
+        }
         migrateReadingProgress(documentId, previousVersionId, versionId);
     }
 
     public List<TocNode> toc(UUID versionId) {
-        var rows = jdbc.query("""
-                SELECT id, parent_id, title, level, node_type, semantic_role, anchor, source_page_start, sort_order
-                FROM content_node
-                WHERE version_id = ?
-                ORDER BY path
-                """, this::mapMutableTocNode, versionId);
+        var rows = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(versionId)))
+                .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
         if (rows.isEmpty()) {
             ensureVersionExists(versionId);
             return List.of();
         }
-        var byId = new LinkedHashMap<UUID, MutableTocNode>();
-        rows.forEach(row -> byId.put(row.id, row));
+        var byId = new LinkedHashMap<String, MutableTocNode>();
+        var mutableRows = rows.stream().map(this::mapMutableTocNode).toList();
+        mutableRows.forEach(row -> byId.put(row.id, row));
         var roots = new ArrayList<MutableTocNode>();
-        for (var row : rows) {
+        for (var row : mutableRows) {
             if (row.parentId == null) {
                 roots.add(row);
             } else {
@@ -135,19 +159,20 @@ public class DocumentQueryService {
     public NodeContent content(UUID versionId, UUID nodeId, Integer afterSeq, Integer limit) {
         var node = node(versionId, nodeId);
         var safeLimit = Math.max(1, Math.min(limit == null ? 50 : limit, 100));
-        var rows = jdbc.query("""
-                SELECT id, block_key, seq, block_type, payload, plain_text, source_page, confidence
-                FROM content_block
-                WHERE version_id = ? AND node_id = ? AND seq > ?
-                ORDER BY seq
-                LIMIT ?
-                """, this::mapContentBlock, versionId, nodeId, afterSeq == null ? 0 : afterSeq, safeLimit + 1);
+        var rows = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(versionId)))
+                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(id(nodeId)))
+                .and(CONTENT_BLOCK_ENTITY.SEQ.gt(afterSeq == null ? 0 : afterSeq))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc())
+                .limit(safeLimit + 1));
         Integer nextAfterSeq = null;
         if (rows.size() > safeLimit) {
-            nextAfterSeq = rows.get(safeLimit - 1).seq();
+            nextAfterSeq = rows.get(safeLimit - 1).seq;
             rows = rows.subList(0, safeLimit);
         }
-        return new NodeContent(node, rows, nextAfterSeq);
+        return new NodeContent(node, rows.stream().map(this::mapContentBlock).toList(), nextAfterSeq);
     }
 
     public List<SearchHit> search(String q, UUID documentId, Integer limit) {
@@ -155,352 +180,331 @@ public class DocumentQueryService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "q is required");
         }
         var safeLimit = Math.max(1, Math.min(limit == null ? 20 : limit, 100));
-        var like = "%" + q.trim().toLowerCase() + "%";
-        var params = new ArrayList<Object>();
-        params.add(AppConstants.LOCAL_USER_ID);
-        params.add(like);
-        params.add(like);
-
-        var documentFilter = "";
-        if (documentId != null) {
-            documentFilter = " AND d.id = ?";
-            params.add(documentId);
+        var needle = q.trim().toLowerCase(Locale.ROOT);
+        var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()));
+        var hits = new ArrayList<SearchHit>();
+        for (var block : blocks) {
+            var node = contentNodeMapper.selectOneById(block.nodeId);
+            var version = node == null ? null : documentVersionMapper.selectOneById(block.versionId);
+            var document = version == null ? null : documentMapper.selectOneById(version.documentId);
+            if (node == null || version == null || document == null || !LOCAL_USER_ID.equals(document.ownerId)) {
+                continue;
+            }
+            if (documentId != null && !id(documentId).equals(document.id)) {
+                continue;
+            }
+            if (!lower(block.plainText).contains(needle) && !lower(node.title).contains(needle)) {
+                continue;
+            }
+            hits.add(new SearchHit(
+                    uuid(document.id),
+                    uuid(version.id),
+                    uuid(node.id),
+                    uuid(block.id),
+                    node.title,
+                    List.of(node.title),
+                    snippet(block.plainText),
+                    BigDecimal.ONE));
+            if (hits.size() >= safeLimit) {
+                break;
+            }
         }
-        params.add(safeLimit);
-
-        return jdbc.query("""
-                SELECT d.id AS document_id, v.id AS version_id, n.id AS node_id, b.id AS block_id,
-                       n.title, b.plain_text
-                FROM content_block b
-                JOIN content_node n ON n.id = b.node_id
-                JOIN document_version v ON v.id = b.version_id
-                JOIN document d ON d.id = v.document_id
-                WHERE d.owner_id = ?
-                  AND (LOWER(b.plain_text) LIKE ? OR LOWER(n.title) LIKE ?)
-                """ + documentFilter + """
-                ORDER BY d.updated_at DESC, n.path, b.seq
-                LIMIT ?
-                """, this::mapSearchHit, params.toArray());
+        return hits;
     }
 
     public ReadingProgress getProgress(UUID documentId) {
-        var rows = jdbc.query("""
-                SELECT version_id, section_id, block_id, char_offset, block_viewport_offset,
-                       progress_ratio, client_updated_at, device_id, revision
-                FROM reading_progress
-                WHERE user_id = ? AND document_id = ?
-                """, this::mapReadingProgress, AppConstants.LOCAL_USER_ID, documentId);
-        return rows.isEmpty() ? null : rows.getFirst();
+        var progress = progress(documentId);
+        return progress == null ? null : mapReadingProgress(progress);
     }
 
     @Transactional
     public ReadingProgress upsertProgress(UUID documentId, ReadingProgress progress) {
-        var existingId = jdbc.query("""
-                SELECT id
-                FROM reading_progress
-                WHERE user_id = ? AND document_id = ?
-                """, (rs, rowNum) -> rs.getObject("id", UUID.class), AppConstants.LOCAL_USER_ID, documentId);
-        if (existingId.isEmpty()) {
-            jdbc.update("""
-                    INSERT INTO reading_progress(
-                        id, user_id, document_id, version_id, section_id, block_id, char_offset,
-                        block_viewport_offset, progress_ratio, client_updated_at, device_id, revision
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-                    """,
-                    UUID.randomUUID(),
-                    AppConstants.LOCAL_USER_ID,
-                    documentId,
-                    progress.versionId(),
-                    progress.sectionId(),
-                    progress.blockId(),
-                    progress.charOffset(),
-                    progress.blockViewportOffset(),
-                    progress.progressRatio(),
-                    progress.clientUpdatedAt(),
-                    progress.deviceId());
+        var existing = progress(documentId);
+        if (existing == null) {
+            var entity = new ReadingProgressEntity();
+            entity.id = UUID.randomUUID().toString();
+            entity.userId = LOCAL_USER_ID;
+            entity.documentId = id(documentId);
+            entity.versionId = id(progress.versionId());
+            entity.sectionId = id(progress.sectionId());
+            entity.blockId = id(progress.blockId());
+            entity.charOffset = progress.charOffset();
+            entity.blockViewportOffset = progress.blockViewportOffset();
+            entity.progressRatio = progress.progressRatio();
+            entity.clientUpdatedAt = progress.clientUpdatedAt();
+            entity.deviceId = progress.deviceId();
+            entity.revision = 1;
+            readingProgressMapper.insertSelective(entity);
         } else {
-            jdbc.update("""
-                    UPDATE reading_progress
-                    SET version_id = ?, section_id = ?, block_id = ?, char_offset = ?,
-                        block_viewport_offset = ?, progress_ratio = ?, client_updated_at = ?,
-                        device_id = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    progress.versionId(),
-                    progress.sectionId(),
-                    progress.blockId(),
-                    progress.charOffset(),
-                    progress.blockViewportOffset(),
-                    progress.progressRatio(),
-                    progress.clientUpdatedAt(),
-                    progress.deviceId(),
-                    existingId.getFirst());
+            existing.versionId = id(progress.versionId());
+            existing.sectionId = id(progress.sectionId());
+            existing.blockId = id(progress.blockId());
+            existing.charOffset = progress.charOffset();
+            existing.blockViewportOffset = progress.blockViewportOffset();
+            existing.progressRatio = progress.progressRatio();
+            existing.clientUpdatedAt = progress.clientUpdatedAt();
+            existing.deviceId = progress.deviceId();
+            existing.revision++;
+            existing.updatedAt = OffsetDateTime.now();
+            readingProgressMapper.update(existing);
         }
         return getProgress(documentId);
     }
 
     private TocNode node(UUID versionId, UUID nodeId) {
-        try {
-            var row = jdbc.queryForObject("""
-                    SELECT id, parent_id, title, level, node_type, semantic_role, anchor, source_page_start, sort_order
-                    FROM content_node
-                    WHERE version_id = ? AND id = ?
-                    """, this::mapMutableTocNode, versionId, nodeId);
-            return row.toDto();
-        } catch (EmptyResultDataAccessException exception) {
+        var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(versionId)))
+                .and(CONTENT_NODE_ENTITY.ID.eq(id(nodeId))));
+        if (node == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Content node not found");
         }
+        return mapMutableTocNode(node).toDto();
     }
 
     private void ensureVersionExists(UUID versionId) {
-        var count = jdbc.queryForObject("SELECT COUNT(*) FROM document_version WHERE id = ?", Integer.class, versionId);
-        if (count == null || count == 0) {
+        if (documentVersionMapper.selectOneById(id(versionId)) == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Version not found");
         }
     }
 
     private UUID previousPublishedVersionId(UUID documentId, UUID nextVersionId) {
-        var rows = jdbc.query("""
-                SELECT id
-                FROM document_version
-                WHERE document_id = ? AND status = 'PUBLISHED' AND id <> ?
-                ORDER BY published_at DESC, version_no DESC
-                LIMIT 1
-                """, (rs, rowNum) -> rs.getObject("id", UUID.class), documentId, nextVersionId);
-        return rows.isEmpty() ? null : rows.getFirst();
+        var versions = documentVersionMapper.selectListByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
+        return versions.stream()
+                .filter(version -> !version.id.equals(id(nextVersionId)))
+                .max(Comparator
+                        .comparing((DocumentVersionEntity version) -> version.publishedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparingInt(version -> version.versionNo))
+                .map(version -> uuid(version.id))
+                .orElse(null);
+    }
+
+    private List<DocumentVersionEntity> publishedVersions(UUID documentId) {
+        return documentVersionMapper.selectListByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
     }
 
     private void migrateReadingProgress(UUID documentId, UUID previousVersionId, UUID nextVersionId) {
         if (previousVersionId == null || previousVersionId.equals(nextVersionId)) {
             return;
         }
-        var rows = jdbc.query("""
-                SELECT id, section_id, block_id, char_offset, block_viewport_offset, progress_ratio
-                FROM reading_progress
-                WHERE user_id = ? AND document_id = ? AND version_id = ?
-                """, (rs, rowNum) -> new ProgressMigrationRow(
-                        rs.getObject("id", UUID.class),
-                        rs.getObject("section_id", UUID.class),
-                        rs.getObject("block_id", UUID.class),
-                        rs.getInt("char_offset"),
-                        rs.getInt("block_viewport_offset"),
-                        rs.getBigDecimal("progress_ratio")),
-                AppConstants.LOCAL_USER_ID,
-                documentId,
-                previousVersionId);
+        var rows = readingProgressMapper.selectListByQuery(QueryWrapper.create()
+                .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
+                .from(READING_PROGRESS_ENTITY)
+                .where(READING_PROGRESS_ENTITY.USER_ID.eq(LOCAL_USER_ID))
+                .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.eq(id(documentId)))
+                .and(READING_PROGRESS_ENTITY.VERSION_ID.eq(id(previousVersionId))));
 
         for (var row : rows) {
             findProgressTarget(row, nextVersionId).ifPresent(target -> updateMigratedProgress(row, target, nextVersionId));
         }
     }
 
-    private Optional<ProgressTarget> findProgressTarget(ProgressMigrationRow row, UUID nextVersionId) {
-        return targetByBlockKey(row.blockId(), nextVersionId)
-                .or(() -> targetByContentHash(row.blockId(), nextVersionId))
-                .or(() -> targetBySectionPathAndFirstText(row.sectionId(), nextVersionId))
-                .or(() -> targetBySectionKey(row.sectionId(), nextVersionId))
+    private Optional<ProgressTarget> findProgressTarget(ReadingProgressEntity row, UUID nextVersionId) {
+        return targetByBlockKey(row.blockId, nextVersionId)
+                .or(() -> targetByContentHash(row.blockId, nextVersionId))
+                .or(() -> targetBySectionPathAndFirstText(row.sectionId, nextVersionId))
+                .or(() -> targetBySectionKey(row.sectionId, nextVersionId))
                 .or(() -> firstBlockInVersion(nextVersionId))
                 .or(() -> firstSectionInVersion(nextVersionId));
     }
 
-    private void updateMigratedProgress(ProgressMigrationRow row, ProgressTarget target, UUID nextVersionId) {
-        var charOffset = target.resetPosition() ? 0 : row.charOffset();
-        var blockViewportOffset = target.resetPosition() ? 0 : row.blockViewportOffset();
-        var progressRatio = target.documentStart() ? BigDecimal.ZERO : row.progressRatio();
-        jdbc.update("""
-                UPDATE reading_progress
-                SET version_id = ?, section_id = ?, block_id = ?, char_offset = ?,
-                    block_viewport_offset = ?, progress_ratio = ?, revision = revision + 1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                nextVersionId,
-                target.sectionId(),
-                target.blockId(),
-                charOffset,
-                blockViewportOffset,
-                progressRatio,
-                row.id());
+    private void updateMigratedProgress(ReadingProgressEntity row, ProgressTarget target, UUID nextVersionId) {
+        row.versionId = id(nextVersionId);
+        row.sectionId = target.sectionId();
+        row.blockId = target.blockId();
+        row.charOffset = target.resetPosition() ? 0 : row.charOffset;
+        row.blockViewportOffset = target.resetPosition() ? 0 : row.blockViewportOffset;
+        row.progressRatio = target.documentStart() ? BigDecimal.ZERO : row.progressRatio;
+        row.revision++;
+        row.updatedAt = OffsetDateTime.now();
+        readingProgressMapper.update(row);
     }
 
-    private Optional<ProgressTarget> targetByBlockKey(UUID oldBlockId, UUID nextVersionId) {
+    private Optional<ProgressTarget> targetByBlockKey(String oldBlockId, UUID nextVersionId) {
         if (oldBlockId == null) {
             return Optional.empty();
         }
-        return firstTarget("""
-                SELECT n.id AS section_id, b.id AS block_id
-                FROM content_block old_block
-                JOIN content_block b ON b.version_id = ? AND b.block_key = old_block.block_key
-                JOIN content_node n ON n.id = b.node_id
-                WHERE old_block.id = ?
-                ORDER BY b.seq
-                LIMIT 1
-                """, false, false, nextVersionId, oldBlockId);
+        var oldBlock = contentBlockMapper.selectOneById(oldBlockId);
+        if (oldBlock == null) {
+            return Optional.empty();
+        }
+        return firstBlock(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(nextVersionId)))
+                .and(CONTENT_BLOCK_ENTITY.BLOCK_KEY.eq(oldBlock.blockKey))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()), false, false);
     }
 
-    private Optional<ProgressTarget> targetByContentHash(UUID oldBlockId, UUID nextVersionId) {
+    private Optional<ProgressTarget> targetByContentHash(String oldBlockId, UUID nextVersionId) {
         if (oldBlockId == null) {
             return Optional.empty();
         }
-        return firstTarget("""
-                SELECT n.id AS section_id, b.id AS block_id
-                FROM content_block old_block
-                JOIN content_block b ON b.version_id = ? AND b.content_hash = old_block.content_hash
-                JOIN content_node n ON n.id = b.node_id
-                WHERE old_block.id = ? AND old_block.content_hash IS NOT NULL AND old_block.content_hash <> ''
-                ORDER BY n.path, b.seq
-                LIMIT 1
-                """, false, false, nextVersionId, oldBlockId);
+        var oldBlock = contentBlockMapper.selectOneById(oldBlockId);
+        if (oldBlock == null || oldBlock.contentHash == null || oldBlock.contentHash.isBlank()) {
+            return Optional.empty();
+        }
+        return firstBlock(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(nextVersionId)))
+                .and(CONTENT_BLOCK_ENTITY.CONTENT_HASH.eq(oldBlock.contentHash))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()), false, false);
     }
 
-    private Optional<ProgressTarget> targetBySectionPathAndFirstText(UUID oldSectionId, UUID nextVersionId) {
+    private Optional<ProgressTarget> targetBySectionPathAndFirstText(String oldSectionId, UUID nextVersionId) {
         if (oldSectionId == null) {
             return Optional.empty();
         }
-        var anchors = jdbc.query("""
-                SELECT n.path, b.plain_text
-                FROM content_node n
-                LEFT JOIN content_block b ON b.node_id = n.id
-                WHERE n.id = ?
-                ORDER BY b.seq
-                LIMIT 1
-                """, (rs, rowNum) -> new SectionAnchor(rs.getString("path"), textPrefix(rs.getString("plain_text"))), oldSectionId);
-        if (anchors.isEmpty() || anchors.getFirst().firstTextPrefix().isBlank()) {
+        var oldNode = contentNodeMapper.selectOneById(oldSectionId);
+        var oldFirstBlock = oldNode == null ? null : firstBlockInNode(oldNode.id).orElse(null);
+        var oldPrefix = textPrefix(oldFirstBlock == null ? null : oldFirstBlock.plainText);
+        if (oldNode == null || oldPrefix.isBlank()) {
             return Optional.empty();
         }
-        var anchor = anchors.getFirst();
-        var candidates = jdbc.query("""
-                SELECT n.id AS section_id, b.id AS block_id, b.plain_text
-                FROM content_node n
-                LEFT JOIN content_block b ON b.node_id = n.id
-                WHERE n.version_id = ? AND n.path = ?
-                ORDER BY b.seq
-                LIMIT 1
-                """, (rs, rowNum) -> new SectionTextTarget(
-                rs.getObject("section_id", UUID.class),
-                rs.getObject("block_id", UUID.class),
-                textPrefix(rs.getString("plain_text"))), nextVersionId, anchor.path());
-        if (candidates.isEmpty() || !anchor.firstTextPrefix().equals(candidates.getFirst().firstTextPrefix())) {
+        var candidateNode = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
+                .and(CONTENT_NODE_ENTITY.PATH.eq(oldNode.path)));
+        var candidateBlock = candidateNode == null ? null : firstBlockInNode(candidateNode.id).orElse(null);
+        if (candidateNode == null || !oldPrefix.equals(textPrefix(candidateBlock == null ? null : candidateBlock.plainText))) {
             return Optional.empty();
         }
-        var candidate = candidates.getFirst();
-        return Optional.of(new ProgressTarget(candidate.sectionId(), candidate.blockId(), true, false));
+        return Optional.of(new ProgressTarget(candidateNode.id, candidateBlock == null ? null : candidateBlock.id, true, false));
     }
 
-    private Optional<ProgressTarget> targetBySectionKey(UUID oldSectionId, UUID nextVersionId) {
+    private Optional<ProgressTarget> targetBySectionKey(String oldSectionId, UUID nextVersionId) {
         if (oldSectionId == null) {
             return Optional.empty();
         }
-        return firstTarget("""
-                SELECT n.id AS section_id, b.id AS block_id
-                FROM content_node old_node
-                JOIN content_node n ON n.version_id = ? AND n.node_key = old_node.node_key
-                LEFT JOIN content_block b ON b.node_id = n.id
-                WHERE old_node.id = ?
-                ORDER BY b.seq
-                LIMIT 1
-                """, true, false, nextVersionId, oldSectionId);
+        var oldNode = contentNodeMapper.selectOneById(oldSectionId);
+        if (oldNode == null) {
+            return Optional.empty();
+        }
+        var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
+                .and(CONTENT_NODE_ENTITY.NODE_KEY.eq(oldNode.nodeKey)));
+        if (node == null) {
+            return Optional.empty();
+        }
+        var block = firstBlockInNode(node.id).orElse(null);
+        return Optional.of(new ProgressTarget(node.id, block == null ? null : block.id, true, false));
     }
 
     private Optional<ProgressTarget> firstBlockInVersion(UUID nextVersionId) {
-        return firstTarget("""
-                SELECT n.id AS section_id, b.id AS block_id
-                FROM content_block b
-                JOIN content_node n ON n.id = b.node_id
-                WHERE b.version_id = ?
-                ORDER BY n.path, b.seq
-                LIMIT 1
-                """, true, true, nextVersionId);
+        var nodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
+                .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
+        for (var node : nodes) {
+            var block = firstBlockInNode(node.id).orElse(null);
+            if (block != null) {
+                return Optional.of(new ProgressTarget(node.id, block.id, true, true));
+            }
+        }
+        return Optional.empty();
     }
 
     private Optional<ProgressTarget> firstSectionInVersion(UUID nextVersionId) {
-        return firstTarget("""
-                SELECT id AS section_id, CAST(NULL AS UUID) AS block_id
-                FROM content_node
-                WHERE version_id = ?
-                ORDER BY path
-                LIMIT 1
-                """, true, true, nextVersionId);
+        var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
+                .orderBy(CONTENT_NODE_ENTITY.PATH.asc())
+                .limit(1));
+        return node == null ? Optional.empty() : Optional.of(new ProgressTarget(node.id, null, true, true));
     }
 
-    private Optional<ProgressTarget> firstTarget(String sql, boolean resetPosition, boolean documentStart, Object... args) {
-        var targets = jdbc.query(sql, (rs, rowNum) -> new ProgressTarget(
-                rs.getObject("section_id", UUID.class),
-                rs.getObject("block_id", UUID.class),
-                resetPosition,
-                documentStart), args);
-        return targets.isEmpty() ? Optional.empty() : Optional.of(targets.getFirst());
-    }
-
-    private static String textPrefix(String text) {
-        if (text == null || text.isBlank()) {
-            return "";
+    private Optional<ProgressTarget> firstBlock(QueryWrapper query, boolean resetPosition, boolean documentStart) {
+        var block = contentBlockMapper.selectOneByQuery(query.limit(1));
+        if (block == null) {
+            return Optional.empty();
         }
-        var normalized = text.strip();
-        return normalized.length() <= 80 ? normalized : normalized.substring(0, 80);
+        return Optional.of(new ProgressTarget(block.nodeId, block.id, resetPosition, documentStart));
     }
 
-    private DocumentSummary mapDocumentSummary(ResultSet rs, int rowNum) throws SQLException {
+    private Optional<ContentBlockEntity> firstBlockInNode(String nodeId) {
+        return Optional.ofNullable(contentBlockMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc())
+                .limit(1)));
+    }
+
+    private ReadingProgressEntity progress(UUID documentId) {
+        return readingProgressMapper.selectOneByQuery(QueryWrapper.create()
+                .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
+                .from(READING_PROGRESS_ENTITY)
+                .where(READING_PROGRESS_ENTITY.USER_ID.eq(LOCAL_USER_ID))
+                .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.eq(id(documentId))));
+    }
+
+    private DocumentSummary mapDocumentSummary(DocumentEntity document) {
+        var progress = progress(uuid(document.id));
+        var ratio = progress == null ? BigDecimal.ZERO : progress.progressRatio;
         return new DocumentSummary(
-                rs.getObject("id", UUID.class),
-                rs.getString("code"),
-                rs.getString("title"),
-                rs.getString("description"),
-                rs.getObject("current_version_id", UUID.class),
-                rs.getBigDecimal("progress_ratio"));
+                uuid(document.id),
+                document.code,
+                document.title,
+                document.description,
+                uuid(document.currentVersionId),
+                ratio);
     }
 
-    private MutableTocNode mapMutableTocNode(ResultSet rs, int rowNum) throws SQLException {
+    private MutableTocNode mapMutableTocNode(ContentNodeEntity entity) {
         return new MutableTocNode(
-                rs.getObject("id", UUID.class),
-                rs.getObject("parent_id", UUID.class),
-                rs.getString("title"),
-                rs.getInt("level"),
-                rs.getString("node_type"),
-                rs.getString("semantic_role"),
-                rs.getString("anchor"),
-                (Integer) rs.getObject("source_page_start"),
-                rs.getInt("sort_order"));
+                entity.id,
+                entity.parentId,
+                entity.title,
+                entity.level,
+                entity.nodeType,
+                entity.semanticRole,
+                entity.anchor,
+                entity.sourcePageStart,
+                entity.sortOrder);
     }
 
-    private ContentBlock mapContentBlock(ResultSet rs, int rowNum) throws SQLException {
+    private ContentBlock mapContentBlock(ContentBlockEntity entity) {
         return new ContentBlock(
-                rs.getObject("id", UUID.class),
-                rs.getString("block_key"),
-                rs.getInt("seq"),
-                rs.getString("block_type"),
-                readTree(rs.getString("payload")),
-                rs.getString("plain_text"),
-                (Integer) rs.getObject("source_page"),
-                rs.getBigDecimal("confidence"));
+                uuid(entity.id),
+                entity.blockKey,
+                entity.seq,
+                entity.blockType,
+                readTree(entity.payload),
+                entity.plainText,
+                entity.sourcePage,
+                readNullableTree(entity.sourceBbox),
+                entity.confidence);
     }
 
-    private SearchHit mapSearchHit(ResultSet rs, int rowNum) throws SQLException {
-        var title = rs.getString("title");
-        var plainText = rs.getString("plain_text");
-        return new SearchHit(
-                rs.getObject("document_id", UUID.class),
-                rs.getObject("version_id", UUID.class),
-                rs.getObject("node_id", UUID.class),
-                rs.getObject("block_id", UUID.class),
-                title,
-                List.of(title),
-                snippet(plainText),
-                BigDecimal.ONE);
-    }
-
-    private ReadingProgress mapReadingProgress(ResultSet rs, int rowNum) throws SQLException {
+    private ReadingProgress mapReadingProgress(ReadingProgressEntity entity) {
         return new ReadingProgress(
-                rs.getObject("version_id", UUID.class),
-                rs.getObject("section_id", UUID.class),
-                rs.getObject("block_id", UUID.class),
-                rs.getInt("char_offset"),
-                rs.getInt("block_viewport_offset"),
-                rs.getBigDecimal("progress_ratio"),
-                rs.getObject("client_updated_at", OffsetDateTime.class),
-                rs.getString("device_id"),
-                rs.getLong("revision"));
+                uuid(entity.versionId),
+                uuid(entity.sectionId),
+                uuid(entity.blockId),
+                entity.charOffset,
+                entity.blockViewportOffset,
+                entity.progressRatio,
+                entity.clientUpdatedAt,
+                entity.deviceId,
+                entity.revision);
     }
 
     private JsonNode readTree(String json) {
@@ -511,16 +515,43 @@ public class DocumentQueryService {
         }
     }
 
-    private String snippet(String text) {
+    private JsonNode readNullableTree(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        return readTree(json);
+    }
+
+    private static String snippet(String text) {
         if (text == null) {
             return "";
         }
         return text.length() <= 140 ? text : text.substring(0, 140);
     }
 
+    private static String textPrefix(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        var normalized = text.strip();
+        return normalized.length() <= 80 ? normalized : normalized.substring(0, 80);
+    }
+
+    private static String lower(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private static String id(UUID value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static UUID uuid(String value) {
+        return value == null ? null : UUID.fromString(value);
+    }
+
     private static final class MutableTocNode {
-        private final UUID id;
-        private final UUID parentId;
+        private final String id;
+        private final String parentId;
         private final String title;
         private final int level;
         private final String nodeType;
@@ -531,8 +562,8 @@ public class DocumentQueryService {
         private final List<MutableTocNode> children = new ArrayList<>();
 
         private MutableTocNode(
-                UUID id,
-                UUID parentId,
+                String id,
+                String parentId,
                 String title,
                 int level,
                 String nodeType,
@@ -555,8 +586,8 @@ public class DocumentQueryService {
         private TocNode toDto() {
             children.sort(Comparator.comparingInt(node -> node.sortOrder));
             return new TocNode(
-                    id,
-                    parentId,
+                    uuid(id),
+                    uuid(parentId),
                     title,
                     level,
                     nodeType,
@@ -567,22 +598,6 @@ public class DocumentQueryService {
         }
     }
 
-    private record ProgressMigrationRow(
-            UUID id,
-            UUID sectionId,
-            UUID blockId,
-            int charOffset,
-            int blockViewportOffset,
-            BigDecimal progressRatio
-    ) {
-    }
-
-    private record ProgressTarget(UUID sectionId, UUID blockId, boolean resetPosition, boolean documentStart) {
-    }
-
-    private record SectionAnchor(String path, String firstTextPrefix) {
-    }
-
-    private record SectionTextTarget(UUID sectionId, UUID blockId, String firstTextPrefix) {
+    private record ProgressTarget(String sectionId, String blockId, boolean resetPosition, boolean documentStart) {
     }
 }

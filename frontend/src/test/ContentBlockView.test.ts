@@ -12,6 +12,7 @@ function block(overrides: Partial<ContentBlock>): ContentBlock {
     payload: { text: "hello" },
     plainText: "hello",
     sourcePage: null,
+    sourceBbox: null,
     confidence: null,
     ...overrides
   };
@@ -46,5 +47,21 @@ describe("ContentBlockView", () => {
 
     expect(wrapper.find(".table-wrap").exists()).toBe(true);
     expect(wrapper.find("td").text()).toBe("HashMap");
+  });
+
+  it("renders table snapshots without collapsing aligned text", () => {
+    const wrapper = mount(ContentBlockView, {
+      props: {
+        block: block({
+          blockType: "table_snapshot",
+          payload: { text: "Topic     Risk\nHashMap   Race" },
+          plainText: "Topic     Risk\nHashMap   Race",
+          confidence: 0.45
+        })
+      }
+    });
+
+    expect(wrapper.find(".table-snapshot").exists()).toBe(true);
+    expect(wrapper.find("pre").text()).toContain("HashMap   Race");
   });
 });

@@ -1,8 +1,9 @@
 import type { ReadingProgress } from "../types/api";
 
 const DB_NAME = "interview-reader-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "reading-progress-queue";
+const CONTENT_STORE_NAME = "node-content-cache";
 const FALLBACK_KEY = "reader.offlineProgressQueue";
 var memoryFallbackQueue: QueuedProgress[] = [];
 
@@ -59,6 +60,10 @@ function openDb(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
+      if (!db.objectStoreNames.contains(CONTENT_STORE_NAME)) {
+        const store = db.createObjectStore(CONTENT_STORE_NAME, { keyPath: "cacheKey" });
+        store.createIndex("updatedAt", "updatedAt");
+      }
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
         store.createIndex("createdAt", "createdAt");

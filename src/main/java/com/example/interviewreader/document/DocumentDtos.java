@@ -47,6 +47,7 @@ public final class DocumentDtos {
             JsonNode payload,
             String plainText,
             Integer sourcePage,
+            JsonNode sourceBbox,
             BigDecimal confidence
     ) {
     }
@@ -141,6 +142,22 @@ public final class DocumentDtos {
             Integer intervalDays,
             int repetitions,
             OffsetDateTime updatedAt
+    ) {
+    }
+
+    public record ReviewQueueItem(
+            UUID documentId,
+            UUID versionId,
+            UUID nodeId,
+            String title,
+            List<String> sectionPath,
+            String nodeType,
+            String semanticRole,
+            Integer sourcePageStart,
+            String mastery,
+            OffsetDateTime dueAt,
+            Integer intervalDays,
+            int repetitions
     ) {
     }
 }

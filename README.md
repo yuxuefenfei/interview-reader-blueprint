@@ -1,6 +1,6 @@
 # Interview Reader
 
-基于 `docs/` 蓝图落地的 Spring Boot + Vue 模块化单体。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。
+基于 `docs/` 蓝图落地的 Spring Boot + Vue 模块化单体。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
 
 ## 环境
 
@@ -18,7 +18,7 @@ $env:Path="$env:JAVA_HOME/bin;$env:Path"
 
 ## 开发运行
 
-开发环境默认使用 H2，并开启 PostgreSQL 兼容模式：
+开发环境默认使用 H2，并开启 MySQL 兼容模式：
 
 ```powershell
 mvn test
@@ -53,14 +53,22 @@ java -jar target/interview-reader-0.1.0-SNAPSHOT.jar
 
 `mvn package` 会先执行前端构建，并把 Vue 产物打进 jar 的静态资源中。
 
-前端生产构建会包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器支持 Service Worker 时会缓存应用壳；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。
+前端生产构建会包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器支持 Service Worker 时会缓存应用壳；已成功打开的章节正文会写入 IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。右侧复习面板提供“清理离线内容”，只清除正文缓存，不删除未同步进度队列。
 
-## 生产 PostgreSQL Profile
+导入任务在 jar/dev 模式默认使用 Java 21 虚拟线程后台 worker，最大并发数由 `interview-reader.import-worker.max-concurrency` 控制；测试 profile 关闭异步 worker，使用 H2 MySQL 兼容模式做确定性集成测试。
+
+PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度、文本页估算、页面尺寸和每页 normalized block 覆盖统计，便于复核页定位未覆盖内容并支持后续转换规则回归。疑似 PDF 表格会先保存为低置信度 `table_snapshot` 并产生复核 issue，避免误转成高置信正文。
+
+应用会在未显式设置 `pdfbox.fontcache` 时把 PDFBox 字体缓存放到 `./target/pdfbox-font-cache`，避免 Windows 用户目录权限导致 PDF 样本测试或 jar 运行时产生字体缓存写入告警。
+
+当前代码没有引入服务端缓存，因此未加入 Redis 依赖；后续只有出现跨请求/跨实例缓存需求时再接入单实例 Redis。
+
+## 生产 MySQL Profile
 
 生产运行使用 `prod` profile，并通过环境变量传入数据库连接：
 
 ```powershell
-$env:DATABASE_URL='jdbc:postgresql://localhost:5432/interview_reader'
+$env:DATABASE_URL='jdbc:mysql://localhost:3306/interview_reader?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC'
 $env:DATABASE_USERNAME='interview_reader'
 $env:DATABASE_PASSWORD='interview_reader'
 java -jar target/interview-reader-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod
@@ -71,6 +79,12 @@ java -jar target/interview-reader-0.1.0-SNAPSHOT.jar --spring.profiles.active=pr
 - `POST /api/import-jobs`
 - `GET /api/import-jobs/{jobId}`
 - `GET /api/import-jobs/{jobId}/issues`
+- `GET /api/import-jobs/{jobId}/raw-extraction`
+- `GET /api/import-jobs/{jobId}/source-file`
+- `GET /api/import-jobs/{jobId}/normalized-package`
+- `PATCH /api/import-jobs/{jobId}/normalized-package/sections/{sectionKey}`
+- `PATCH /api/import-jobs/{jobId}/normalized-package/blocks/{blockKey}`
+- `POST /api/import-jobs/{jobId}/cancel`
 - `POST /api/import-jobs/{jobId}/commit`
 - `GET /api/documents`
 - `GET /api/documents/{documentId}`
@@ -93,6 +107,7 @@ java -jar target/interview-reader-0.1.0-SNAPSHOT.jar --spring.profiles.active=pr
 - `sourceType=JSON_PACKAGE`，上传 JSON 文件。
 - `sourceType=EXCEL`，上传 `.xlsx` 文件。
 - `sourceType=MARKDOWN`，上传 `.md` / `.markdown` 文件。
+- `sourceType=PDF`，上传 `.pdf` 文件。PDF 导入会保存原始源文件、raw extraction 和 normalized package，复核页可按 issue/block 定位源页。
 
 当前 `POST /api/exports` 支持同步导出 JSON Package、Excel Package、Markdown 与静态 HTML：
 

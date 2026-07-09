@@ -1,26 +1,26 @@
 CREATE TABLE app_user (
-    id UUID PRIMARY KEY,
+    id CHAR(36) PRIMARY KEY,
     username VARCHAR(100) NOT NULL UNIQUE,
     display_name VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE document (
-    id UUID PRIMARY KEY,
-    owner_id UUID NOT NULL REFERENCES app_user(id),
+    id CHAR(36) PRIMARY KEY,
+    owner_id CHAR(36) NOT NULL REFERENCES app_user(id),
     code VARCHAR(120) NOT NULL,
     title VARCHAR(500) NOT NULL,
     description CLOB,
     status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
-    current_version_id UUID,
+    current_version_id CHAR(36),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(owner_id, code)
 );
 
 CREATE TABLE document_version (
-    id UUID PRIMARY KEY,
-    document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    id CHAR(36) PRIMARY KEY,
+    document_id CHAR(36) NOT NULL REFERENCES document(id) ON DELETE CASCADE,
     version_no INTEGER NOT NULL,
     source_type VARCHAR(30) NOT NULL,
     source_file_name VARCHAR(1000),
@@ -40,9 +40,9 @@ ALTER TABLE document
     FOREIGN KEY (current_version_id) REFERENCES document_version(id);
 
 CREATE TABLE content_node (
-    id UUID PRIMARY KEY,
-    version_id UUID NOT NULL REFERENCES document_version(id) ON DELETE CASCADE,
-    parent_id UUID REFERENCES content_node(id) ON DELETE CASCADE,
+    id CHAR(36) PRIMARY KEY,
+    version_id CHAR(36) NOT NULL REFERENCES document_version(id) ON DELETE CASCADE,
+    parent_id CHAR(36) REFERENCES content_node(id) ON DELETE CASCADE,
     node_key VARCHAR(300) NOT NULL,
     node_type VARCHAR(30) NOT NULL,
     semantic_role VARCHAR(30),
@@ -65,9 +65,9 @@ CREATE INDEX idx_content_node_parent ON content_node(version_id, parent_id, sort
 CREATE INDEX idx_content_node_path ON content_node(version_id, path);
 
 CREATE TABLE content_block (
-    id UUID PRIMARY KEY,
-    version_id UUID NOT NULL REFERENCES document_version(id) ON DELETE CASCADE,
-    node_id UUID NOT NULL REFERENCES content_node(id) ON DELETE CASCADE,
+    id CHAR(36) PRIMARY KEY,
+    version_id CHAR(36) NOT NULL REFERENCES document_version(id) ON DELETE CASCADE,
+    node_id CHAR(36) NOT NULL REFERENCES content_node(id) ON DELETE CASCADE,
     block_key VARCHAR(300) NOT NULL,
     seq INTEGER NOT NULL,
     block_type VARCHAR(40) NOT NULL,
@@ -86,8 +86,8 @@ CREATE TABLE content_block (
 CREATE INDEX idx_content_block_node ON content_block(node_id, seq);
 
 CREATE TABLE asset (
-    id UUID PRIMARY KEY,
-    version_id UUID NOT NULL REFERENCES document_version(id) ON DELETE CASCADE,
+    id CHAR(36) PRIMARY KEY,
+    version_id CHAR(36) NOT NULL REFERENCES document_version(id) ON DELETE CASCADE,
     asset_key VARCHAR(300) NOT NULL,
     object_key VARCHAR(1500) NOT NULL,
     original_name VARCHAR(1000),
@@ -103,8 +103,8 @@ CREATE TABLE asset (
 );
 
 CREATE TABLE import_job (
-    id UUID PRIMARY KEY,
-    owner_id UUID NOT NULL REFERENCES app_user(id),
+    id CHAR(36) PRIMARY KEY,
+    owner_id CHAR(36) NOT NULL REFERENCES app_user(id),
     source_type VARCHAR(30) NOT NULL,
     source_object_key VARCHAR(1500) NOT NULL,
     source_sha256 CHAR(64) NOT NULL,
@@ -113,7 +113,7 @@ CREATE TABLE import_job (
     status VARCHAR(40) NOT NULL,
     progress SMALLINT NOT NULL DEFAULT 0,
     current_stage VARCHAR(80),
-    result_version_id UUID REFERENCES document_version(id),
+    result_version_id CHAR(36) REFERENCES document_version(id),
     error_code VARCHAR(100),
     error_message CLOB,
     statistics CLOB NOT NULL DEFAULT '{}',
@@ -129,8 +129,8 @@ CREATE INDEX idx_import_job_owner_created ON import_job(owner_id, created_at DES
 CREATE INDEX idx_import_job_fingerprint ON import_job(import_fingerprint);
 
 CREATE TABLE import_issue (
-    id UUID PRIMARY KEY,
-    job_id UUID NOT NULL REFERENCES import_job(id) ON DELETE CASCADE,
+    id CHAR(36) PRIMARY KEY,
+    job_id CHAR(36) NOT NULL REFERENCES import_job(id) ON DELETE CASCADE,
     severity VARCHAR(20) NOT NULL,
     issue_code VARCHAR(100) NOT NULL,
     message CLOB NOT NULL,
@@ -146,12 +146,12 @@ CREATE TABLE import_issue (
 CREATE INDEX idx_import_issue_job ON import_issue(job_id, severity, resolved);
 
 CREATE TABLE reading_progress (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-    document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
-    version_id UUID NOT NULL REFERENCES document_version(id),
-    section_id UUID REFERENCES content_node(id),
-    block_id UUID REFERENCES content_block(id),
+    id CHAR(36) PRIMARY KEY,
+    user_id CHAR(36) NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    document_id CHAR(36) NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    version_id CHAR(36) NOT NULL REFERENCES document_version(id),
+    section_id CHAR(36) REFERENCES content_node(id),
+    block_id CHAR(36) REFERENCES content_block(id),
     char_offset INTEGER NOT NULL DEFAULT 0,
     block_viewport_offset INTEGER NOT NULL DEFAULT 0,
     progress_ratio NUMERIC(8,7) NOT NULL DEFAULT 0,
@@ -163,24 +163,24 @@ CREATE TABLE reading_progress (
 );
 
 CREATE TABLE bookmark (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-    document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
-    version_id UUID NOT NULL REFERENCES document_version(id),
-    section_id UUID REFERENCES content_node(id),
-    block_id UUID REFERENCES content_block(id),
+    id CHAR(36) PRIMARY KEY,
+    user_id CHAR(36) NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    document_id CHAR(36) NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    version_id CHAR(36) NOT NULL REFERENCES document_version(id),
+    section_id CHAR(36) REFERENCES content_node(id),
+    block_id CHAR(36) REFERENCES content_block(id),
     title VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, version_id, block_id)
 );
 
 CREATE TABLE note (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-    document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
-    version_id UUID NOT NULL REFERENCES document_version(id),
-    section_id UUID REFERENCES content_node(id),
-    block_id UUID REFERENCES content_block(id),
+    id CHAR(36) PRIMARY KEY,
+    user_id CHAR(36) NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    document_id CHAR(36) NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    version_id CHAR(36) NOT NULL REFERENCES document_version(id),
+    section_id CHAR(36) REFERENCES content_node(id),
+    block_id CHAR(36) REFERENCES content_block(id),
     selected_text CLOB,
     body CLOB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -188,10 +188,10 @@ CREATE TABLE note (
 );
 
 CREATE TABLE review_state (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-    document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
-    node_id UUID NOT NULL REFERENCES content_node(id) ON DELETE CASCADE,
+    id CHAR(36) PRIMARY KEY,
+    user_id CHAR(36) NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    document_id CHAR(36) NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    node_id CHAR(36) NOT NULL REFERENCES content_node(id) ON DELETE CASCADE,
     mastery VARCHAR(20) NOT NULL,
     due_at TIMESTAMP WITH TIME ZONE,
     interval_days INTEGER,
@@ -201,16 +201,16 @@ CREATE TABLE review_state (
 );
 
 CREATE TABLE tag (
-    id UUID PRIMARY KEY,
-    owner_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    id CHAR(36) PRIMARY KEY,
+    owner_id CHAR(36) NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
     name VARCHAR(200) NOT NULL,
     normalized_name VARCHAR(200) NOT NULL,
     UNIQUE(owner_id, normalized_name)
 );
 
 CREATE TABLE document_tag (
-    document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
-    tag_id UUID NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
+    document_id CHAR(36) NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    tag_id CHAR(36) NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
     PRIMARY KEY(document_id, tag_id)
 );
 

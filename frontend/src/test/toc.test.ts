@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TocNode } from "../types/api";
-import { firstReadableNode, flattenToc, progressRatioForNode } from "../utils/toc";
+import { firstReadableNode, flattenToc, isQuestionNode, progressRatioForNode, questionAnswerNodes } from "../utils/toc";
 
 const toc: TocNode[] = [
   {
@@ -22,7 +22,19 @@ const toc: TocNode[] = [
         semanticRole: "QUESTION",
         anchor: "question",
         sourcePageStart: 2,
-        children: []
+        children: [
+          {
+            id: "answer",
+            parentId: "question",
+            title: "Answer",
+            level: 3,
+            nodeType: "SECTION",
+            semanticRole: "CONCLUSION",
+            anchor: "answer",
+            sourcePageStart: 3,
+            children: []
+          }
+        ]
       }
     ]
   }
@@ -30,7 +42,7 @@ const toc: TocNode[] = [
 
 describe("toc utilities", () => {
   it("flattens nested toc in reading order", () => {
-    expect(flattenToc(toc).map((node) => node.id)).toEqual(["root", "question"]);
+    expect(flattenToc(toc).map((node) => node.id)).toEqual(["root", "question", "answer"]);
   });
 
   it("prefers question nodes as readable entry", () => {
@@ -38,6 +50,13 @@ describe("toc utilities", () => {
   });
 
   it("computes stable node progress", () => {
-    expect(progressRatioForNode(toc, "question")).toBe(1);
+    expect(progressRatioForNode(toc, "question")).toBe(0.6667);
+  });
+
+  it("detects question nodes and answer descendants for folded review mode", () => {
+    const question = toc[0].children[0];
+
+    expect(isQuestionNode(question)).toBe(true);
+    expect(questionAnswerNodes(question).map((node) => node.id)).toEqual(["answer"]);
   });
 });

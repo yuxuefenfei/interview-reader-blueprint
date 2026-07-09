@@ -6,11 +6,22 @@ export function flattenToc(nodes: TocNode[]): TocNode[] {
 
 export function firstReadableNode(nodes: TocNode[]): TocNode | null {
   for (const node of flattenToc(nodes)) {
-    if (node.nodeType === "QUESTION" || node.children.length === 0) {
+    if (isQuestionNode(node) || node.children.length === 0) {
       return node;
     }
   }
   return nodes[0] ?? null;
+}
+
+export function isQuestionNode(node: TocNode | null): boolean {
+  return node?.nodeType === "QUESTION" || node?.semanticRole === "QUESTION";
+}
+
+export function questionAnswerNodes(node: TocNode | null): TocNode[] {
+  if (!node || !isQuestionNode(node)) {
+    return [];
+  }
+  return flattenToc(node.children).filter((candidate) => !isQuestionNode(candidate));
 }
 
 export function progressRatioForNode(nodes: TocNode[], nodeId: string): number {

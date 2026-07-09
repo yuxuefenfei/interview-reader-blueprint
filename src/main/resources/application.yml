@@ -20,3 +20,7 @@ management:
 
 interview-reader:
   converter-version: json-package-0.1.0
+  storage-dir: ./data/import-sources
+  import-worker:
+    enabled: true
+    max-concurrency: 2

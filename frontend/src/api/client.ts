@@ -4,14 +4,19 @@ import type {
   DocumentListResponse,
   DocumentSummary,
   DocumentVersion,
+  ImportIssue,
   ImportJob,
   Mastery,
   Note,
   NoteRequest,
   NodeContent,
+  NormalizedPackage,
   ReadingProgress,
+  ReviewQueueItem,
   ReviewState,
   SourceType,
+  StagedBlock,
+  StagedSection,
   TocNode
 } from "../types/api";
 
@@ -80,6 +85,15 @@ export function saveReviewState(nodeId: string, documentId: string, mastery: Mas
   });
 }
 
+export function getReviewQueue(documentId: string, limit = 5, dueOnly = false): Promise<ReviewQueueItem[]> {
+  const params = new URLSearchParams({
+    documentId,
+    limit: String(limit),
+    dueOnly: String(dueOnly)
+  });
+  return request<ReviewQueueItem[]>(`/api/review-queue?${params.toString()}`);
+}
+
 export function uploadSourceFile(file: File, sourceType: SourceType): Promise<ImportJob> {
   const body = new FormData();
   body.set("sourceType", sourceType);
@@ -90,8 +104,55 @@ export function uploadSourceFile(file: File, sourceType: SourceType): Promise<Im
   });
 }
 
+export function getImportJob(jobId: string): Promise<ImportJob> {
+  return request<ImportJob>(`/api/import-jobs/${jobId}`);
+}
+
+export function getImportIssues(jobId: string): Promise<ImportIssue[]> {
+  return request<ImportIssue[]>(`/api/import-jobs/${jobId}/issues`);
+}
+
+export function sourceFileUrl(jobId: string, page?: number | null): string {
+  const url = `/api/import-jobs/${jobId}/source-file`;
+  return page && page > 0 ? `${url}#page=${page}` : url;
+}
+
+export function getNormalizedPackage(jobId: string): Promise<NormalizedPackage> {
+  return request<NormalizedPackage>(`/api/import-jobs/${jobId}/normalized-package`);
+}
+
+export function reviseStagedSection(
+  jobId: string,
+  sectionKey: string,
+  patch: Partial<Pick<StagedSection, "parentSectionKey" | "level" | "title" | "nodeType" | "semanticRole" | "sortOrder" | "anchor">>
+): Promise<NormalizedPackage> {
+  return request<NormalizedPackage>(`/api/import-jobs/${jobId}/normalized-package/sections/${encodeURIComponent(sectionKey)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch)
+  });
+}
+
+export function reviseStagedBlock(
+  jobId: string,
+  blockKey: string,
+  patch: Partial<Pick<StagedBlock, "sectionKey" | "seq" | "blockType" | "payload" | "plainText" | "language">>
+): Promise<NormalizedPackage> {
+  return request<NormalizedPackage>(`/api/import-jobs/${jobId}/normalized-package/blocks/${encodeURIComponent(blockKey)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch)
+  });
+}
+
 export function commitImportJob(jobId: string): Promise<DocumentVersion> {
   return request<DocumentVersion>(`/api/import-jobs/${jobId}/commit`, {
+    method: "POST"
+  });
+}
+
+export function cancelImportJob(jobId: string): Promise<ImportJob> {
+  return request<ImportJob>(`/api/import-jobs/${jobId}/cancel`, {
     method: "POST"
   });
 }

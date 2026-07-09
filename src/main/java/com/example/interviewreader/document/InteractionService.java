@@ -6,24 +6,65 @@ import com.example.interviewreader.document.DocumentDtos.BookmarkDto;
 import com.example.interviewreader.document.DocumentDtos.BookmarkRequest;
 import com.example.interviewreader.document.DocumentDtos.NoteDto;
 import com.example.interviewreader.document.DocumentDtos.NoteRequest;
+import com.example.interviewreader.document.DocumentDtos.ReviewQueueItem;
 import com.example.interviewreader.document.DocumentDtos.ReviewStateDto;
 import com.example.interviewreader.document.DocumentDtos.ReviewStateRequest;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.example.interviewreader.persistence.entity.BookmarkEntity;
+import com.example.interviewreader.persistence.entity.NoteEntity;
+import com.example.interviewreader.persistence.entity.ReviewStateEntity;
+import com.example.interviewreader.persistence.mapper.BookmarkMapper;
+import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
+import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
+import com.example.interviewreader.persistence.mapper.DocumentMapper;
+import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
+import com.example.interviewreader.persistence.mapper.NoteMapper;
+import com.example.interviewreader.persistence.mapper.ReviewStateMapper;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.example.interviewreader.persistence.entity.table.BookmarkEntityTableDef.BOOKMARK_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.ContentNodeEntityTableDef.CONTENT_NODE_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.DocumentEntityTableDef.DOCUMENT_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.DocumentVersionEntityTableDef.DOCUMENT_VERSION_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.NoteEntityTableDef.NOTE_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.ReviewStateEntityTableDef.REVIEW_STATE_ENTITY;
+
 @Service
 public class InteractionService {
-    private final JdbcTemplate jdbc;
+    private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
 
-    public InteractionService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    private final BookmarkMapper bookmarkMapper;
+    private final NoteMapper noteMapper;
+    private final ReviewStateMapper reviewStateMapper;
+    private final DocumentMapper documentMapper;
+    private final DocumentVersionMapper documentVersionMapper;
+    private final ContentNodeMapper contentNodeMapper;
+    private final ContentBlockMapper contentBlockMapper;
+
+    public InteractionService(
+            BookmarkMapper bookmarkMapper,
+            NoteMapper noteMapper,
+            ReviewStateMapper reviewStateMapper,
+            DocumentMapper documentMapper,
+            DocumentVersionMapper documentVersionMapper,
+            ContentNodeMapper contentNodeMapper,
+            ContentBlockMapper contentBlockMapper
+    ) {
+        this.bookmarkMapper = bookmarkMapper;
+        this.noteMapper = noteMapper;
+        this.reviewStateMapper = reviewStateMapper;
+        this.documentMapper = documentMapper;
+        this.documentVersionMapper = documentVersionMapper;
+        this.contentNodeMapper = contentNodeMapper;
+        this.contentBlockMapper = contentBlockMapper;
     }
 
     @Transactional
@@ -32,38 +73,42 @@ public class InteractionService {
         verifySection(request.versionId(), request.sectionId());
         verifyBlock(request.versionId(), request.sectionId(), request.blockId());
 
-        var existing = jdbc.query("""
-                SELECT id
-                FROM bookmark
-                WHERE user_id = ? AND version_id = ? AND block_id = ?
-                """, (rs, rowNum) -> rs.getObject("id", UUID.class), AppConstants.LOCAL_USER_ID, request.versionId(), request.blockId());
-        if (!existing.isEmpty()) {
-            jdbc.update("""
-                    UPDATE bookmark
-                    SET document_id = ?, section_id = ?, title = ?
-                    WHERE id = ?
-                    """, request.documentId(), request.sectionId(), request.title(), existing.getFirst());
-            return getBookmark(existing.getFirst());
+        var existing = bookmarkMapper.selectOneByQuery(QueryWrapper.create()
+                .select(BOOKMARK_ENTITY.ALL_COLUMNS)
+                .from(BOOKMARK_ENTITY)
+                .where(BOOKMARK_ENTITY.USER_ID.eq(LOCAL_USER_ID))
+                .and(BOOKMARK_ENTITY.VERSION_ID.eq(id(request.versionId())))
+                .and(BOOKMARK_ENTITY.BLOCK_ID.eq(id(request.blockId()))));
+        if (existing != null) {
+            existing.documentId = id(request.documentId());
+            existing.sectionId = id(request.sectionId());
+            existing.title = request.title();
+            bookmarkMapper.update(existing);
+            return getBookmark(uuid(existing.id));
         }
 
-        var bookmarkId = UUID.randomUUID();
-        jdbc.update("""
-                INSERT INTO bookmark(id, user_id, document_id, version_id, section_id, block_id, title)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                bookmarkId,
-                AppConstants.LOCAL_USER_ID,
-                request.documentId(),
-                request.versionId(),
-                request.sectionId(),
-                request.blockId(),
-                request.title());
-        return getBookmark(bookmarkId);
+        var bookmark = new BookmarkEntity();
+        bookmark.id = UUID.randomUUID().toString();
+        bookmark.userId = LOCAL_USER_ID;
+        bookmark.documentId = id(request.documentId());
+        bookmark.versionId = id(request.versionId());
+        bookmark.sectionId = id(request.sectionId());
+        bookmark.blockId = id(request.blockId());
+        bookmark.title = request.title();
+        bookmarkMapper.insertSelective(bookmark);
+        return getBookmark(uuid(bookmark.id));
     }
 
     @Transactional
     public void deleteBookmark(UUID bookmarkId) {
-        jdbc.update("DELETE FROM bookmark WHERE id = ? AND user_id = ?", bookmarkId, AppConstants.LOCAL_USER_ID);
+        var bookmark = bookmarkMapper.selectOneByQuery(QueryWrapper.create()
+                .select(BOOKMARK_ENTITY.ALL_COLUMNS)
+                .from(BOOKMARK_ENTITY)
+                .where(BOOKMARK_ENTITY.ID.eq(id(bookmarkId)))
+                .and(BOOKMARK_ENTITY.USER_ID.eq(LOCAL_USER_ID)));
+        if (bookmark != null) {
+            bookmarkMapper.deleteById(bookmark.id);
+        }
     }
 
     @Transactional
@@ -74,20 +119,17 @@ public class InteractionService {
             verifyBlock(request.versionId(), request.sectionId(), request.blockId());
         }
 
-        var noteId = UUID.randomUUID();
-        jdbc.update("""
-                INSERT INTO note(id, user_id, document_id, version_id, section_id, block_id, selected_text, body)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                noteId,
-                AppConstants.LOCAL_USER_ID,
-                request.documentId(),
-                request.versionId(),
-                request.sectionId(),
-                request.blockId(),
-                request.selectedText(),
-                request.body());
-        return getNote(noteId);
+        var note = new NoteEntity();
+        note.id = UUID.randomUUID().toString();
+        note.userId = LOCAL_USER_ID;
+        note.documentId = id(request.documentId());
+        note.versionId = id(request.versionId());
+        note.sectionId = id(request.sectionId());
+        note.blockId = id(request.blockId());
+        note.selectedText = request.selectedText();
+        note.body = request.body();
+        noteMapper.insertSelective(note);
+        return getNote(uuid(note.id));
     }
 
     @Transactional
@@ -97,110 +139,182 @@ public class InteractionService {
         var intervalDays = intervalDays(mastery);
         var dueAt = intervalDays == null ? null : OffsetDateTime.now().plusDays(intervalDays);
 
-        var existing = jdbc.query("""
-                SELECT id, repetitions
-                FROM review_state
-                WHERE user_id = ? AND node_id = ?
-                """, (rs, rowNum) -> new ExistingReviewState(rs.getObject("id", UUID.class), rs.getInt("repetitions")), AppConstants.LOCAL_USER_ID, nodeId);
-        if (existing.isEmpty()) {
-            var reviewStateId = UUID.randomUUID();
-            jdbc.update("""
-                    INSERT INTO review_state(id, user_id, document_id, node_id, mastery, due_at, interval_days, repetitions)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    reviewStateId,
-                    AppConstants.LOCAL_USER_ID,
-                    request.documentId(),
-                    nodeId,
-                    mastery,
-                    dueAt,
-                    intervalDays,
-                    "UNKNOWN".equals(mastery) ? 0 : 1);
-            return getReviewState(reviewStateId);
+        var existing = reviewStateMapper.selectOneByQuery(QueryWrapper.create()
+                .select(REVIEW_STATE_ENTITY.ALL_COLUMNS)
+                .from(REVIEW_STATE_ENTITY)
+                .where(REVIEW_STATE_ENTITY.USER_ID.eq(LOCAL_USER_ID))
+                .and(REVIEW_STATE_ENTITY.NODE_ID.eq(id(nodeId))));
+        if (existing == null) {
+            var reviewState = new ReviewStateEntity();
+            reviewState.id = UUID.randomUUID().toString();
+            reviewState.userId = LOCAL_USER_ID;
+            reviewState.documentId = id(request.documentId());
+            reviewState.nodeId = id(nodeId);
+            reviewState.mastery = mastery;
+            reviewState.dueAt = dueAt;
+            reviewState.intervalDays = intervalDays;
+            reviewState.repetitions = "UNKNOWN".equals(mastery) ? 0 : 1;
+            reviewStateMapper.insertSelective(reviewState);
+            return getReviewState(uuid(reviewState.id));
         }
 
-        var nextRepetitions = "UNKNOWN".equals(mastery) ? 0 : existing.getFirst().repetitions() + 1;
-        jdbc.update("""
-                UPDATE review_state
-                SET document_id = ?, mastery = ?, due_at = ?, interval_days = ?, repetitions = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                request.documentId(),
-                mastery,
-                dueAt,
-                intervalDays,
-                nextRepetitions,
-                existing.getFirst().id());
-        return getReviewState(existing.getFirst().id());
+        existing.documentId = id(request.documentId());
+        existing.mastery = mastery;
+        existing.dueAt = dueAt;
+        existing.intervalDays = intervalDays;
+        existing.repetitions = "UNKNOWN".equals(mastery) ? 0 : existing.repetitions + 1;
+        existing.updatedAt = OffsetDateTime.now();
+        reviewStateMapper.update(existing);
+        return getReviewState(uuid(existing.id));
+    }
+
+    public List<ReviewQueueItem> reviewQueue(UUID documentId, Integer limit, boolean dueOnly) {
+        if (documentId != null) {
+            verifyDocument(documentId);
+        }
+        var safeLimit = Math.max(1, Math.min(limit == null ? 5 : limit, 50));
+        var now = OffsetDateTime.now();
+        return documentMapper.selectListByQuery(QueryWrapper.create()
+                        .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                        .from(DOCUMENT_ENTITY)
+                        .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                        .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED")))
+                .stream()
+                .filter(document -> documentId == null || id(documentId).equals(document.id))
+                .flatMap(document -> reviewQueueItems(document, now, dueOnly).stream())
+                .sorted(Comparator
+                        .comparingInt((ReviewQueueItem item) -> masteryRank(item.mastery()))
+                        .thenComparingInt(item -> dueRank(item.dueAt(), now))
+                        .thenComparing(ReviewQueueItem::title))
+                .limit(safeLimit)
+                .toList();
+    }
+
+    private List<ReviewQueueItem> reviewQueueItems(com.example.interviewreader.persistence.entity.DocumentEntity document, OffsetDateTime now, boolean dueOnly) {
+        if (document.currentVersionId == null) {
+            return List.of();
+        }
+        var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.ID.eq(document.currentVersionId))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
+        if (version == null) {
+            return List.of();
+        }
+        return contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                        .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                        .from(CONTENT_NODE_ENTITY)
+                        .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.id))
+                        .orderBy(CONTENT_NODE_ENTITY.PATH.asc()))
+                .stream()
+                .filter(node -> "QUESTION".equals(node.nodeType) || "QUESTION".equals(node.semanticRole))
+                .map(node -> {
+                    var state = reviewStateMapper.selectOneByQuery(QueryWrapper.create()
+                            .select(REVIEW_STATE_ENTITY.ALL_COLUMNS)
+                            .from(REVIEW_STATE_ENTITY)
+                            .where(REVIEW_STATE_ENTITY.USER_ID.eq(LOCAL_USER_ID))
+                            .and(REVIEW_STATE_ENTITY.NODE_ID.eq(node.id)));
+                    var mastery = state == null ? "UNKNOWN" : state.mastery;
+                    var dueAt = state == null ? null : state.dueAt;
+                    var intervalDays = state == null ? null : state.intervalDays;
+                    var repetitions = state == null ? 0 : state.repetitions;
+                    return new ReviewQueueItem(
+                            uuid(document.id),
+                            uuid(version.id),
+                            uuid(node.id),
+                            node.title,
+                            List.of(node.title),
+                            node.nodeType,
+                            node.semanticRole,
+                            node.sourcePageStart,
+                            mastery,
+                            dueAt,
+                            intervalDays,
+                            repetitions);
+                })
+                .filter(item -> !dueOnly || item.dueAt() == null || !item.dueAt().isAfter(now) || "UNKNOWN".equals(item.mastery()))
+                .toList();
     }
 
     private BookmarkDto getBookmark(UUID bookmarkId) {
-        return jdbc.queryForObject("""
-                SELECT id, document_id, version_id, section_id, block_id, title, created_at
-                FROM bookmark
-                WHERE id = ? AND user_id = ?
-                """, this::mapBookmark, bookmarkId, AppConstants.LOCAL_USER_ID);
+        var bookmark = bookmarkMapper.selectOneByQuery(QueryWrapper.create()
+                .select(BOOKMARK_ENTITY.ALL_COLUMNS)
+                .from(BOOKMARK_ENTITY)
+                .where(BOOKMARK_ENTITY.ID.eq(id(bookmarkId)))
+                .and(BOOKMARK_ENTITY.USER_ID.eq(LOCAL_USER_ID)));
+        return mapBookmark(bookmark);
     }
 
     private NoteDto getNote(UUID noteId) {
-        return jdbc.queryForObject("""
-                SELECT id, document_id, version_id, section_id, block_id, selected_text, body, created_at, updated_at
-                FROM note
-                WHERE id = ? AND user_id = ?
-                """, this::mapNote, noteId, AppConstants.LOCAL_USER_ID);
+        var note = noteMapper.selectOneByQuery(QueryWrapper.create()
+                .select(NOTE_ENTITY.ALL_COLUMNS)
+                .from(NOTE_ENTITY)
+                .where(NOTE_ENTITY.ID.eq(id(noteId)))
+                .and(NOTE_ENTITY.USER_ID.eq(LOCAL_USER_ID)));
+        return mapNote(note);
     }
 
     private ReviewStateDto getReviewState(UUID reviewStateId) {
-        return jdbc.queryForObject("""
-                SELECT id, document_id, node_id, mastery, due_at, interval_days, repetitions, updated_at
-                FROM review_state
-                WHERE id = ? AND user_id = ?
-                """, this::mapReviewState, reviewStateId, AppConstants.LOCAL_USER_ID);
+        var reviewState = reviewStateMapper.selectOneByQuery(QueryWrapper.create()
+                .select(REVIEW_STATE_ENTITY.ALL_COLUMNS)
+                .from(REVIEW_STATE_ENTITY)
+                .where(REVIEW_STATE_ENTITY.ID.eq(id(reviewStateId)))
+                .and(REVIEW_STATE_ENTITY.USER_ID.eq(LOCAL_USER_ID)));
+        return mapReviewState(reviewState);
+    }
+
+    private void verifyDocument(UUID documentId) {
+        var document = documentMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.ID.eq(id(documentId))));
+        if (document == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
+        }
     }
 
     private void verifyDocumentVersion(UUID documentId, UUID versionId) {
-        var count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM document d
-                JOIN document_version v ON v.document_id = d.id
-                WHERE d.owner_id = ? AND d.id = ? AND v.id = ?
-                """, Integer.class, AppConstants.LOCAL_USER_ID, documentId, versionId);
-        if (count == null || count == 0) {
+        verifyDocument(documentId);
+        var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
+                .and(DOCUMENT_VERSION_ENTITY.ID.eq(id(versionId))));
+        if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document version not found");
         }
     }
 
     private void verifySection(UUID versionId, UUID sectionId) {
-        var count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM content_node
-                WHERE version_id = ? AND id = ?
-                """, Integer.class, versionId, sectionId);
-        if (count == null || count == 0) {
+        var section = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(versionId)))
+                .and(CONTENT_NODE_ENTITY.ID.eq(id(sectionId))));
+        if (section == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Section not found");
         }
     }
 
     private void verifyBlock(UUID versionId, UUID sectionId, UUID blockId) {
-        var count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM content_block
-                WHERE version_id = ? AND node_id = ? AND id = ?
-                """, Integer.class, versionId, sectionId, blockId);
-        if (count == null || count == 0) {
+        var block = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(versionId)))
+                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(id(sectionId)))
+                .and(CONTENT_BLOCK_ENTITY.ID.eq(id(blockId))));
+        if (block == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Block not found");
         }
     }
 
     private void verifyNodeBelongsToDocument(UUID documentId, UUID nodeId) {
-        var count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM content_node n
-                JOIN document_version v ON v.id = n.version_id
-                JOIN document d ON d.id = v.document_id
-                WHERE d.owner_id = ? AND d.id = ? AND n.id = ?
-                """, Integer.class, AppConstants.LOCAL_USER_ID, documentId, nodeId);
-        if (count == null || count == 0) {
+        verifyDocument(documentId);
+        var node = contentNodeMapper.selectOneById(id(nodeId));
+        var version = node == null ? null : documentVersionMapper.selectOneById(node.versionId);
+        if (version == null || !id(documentId).equals(version.documentId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Content node not found");
         }
     }
@@ -222,42 +336,60 @@ public class InteractionService {
         };
     }
 
-    private BookmarkDto mapBookmark(ResultSet rs, int rowNum) throws SQLException {
+    private static int masteryRank(String mastery) {
+        return switch (mastery) {
+            case "HARD" -> 0;
+            case "UNKNOWN" -> 1;
+            case "FUZZY" -> 2;
+            default -> 3;
+        };
+    }
+
+    private static int dueRank(OffsetDateTime dueAt, OffsetDateTime now) {
+        return dueAt == null || !dueAt.isAfter(now) ? 0 : 1;
+    }
+
+    private static BookmarkDto mapBookmark(BookmarkEntity entity) {
         return new BookmarkDto(
-                rs.getObject("id", UUID.class),
-                rs.getObject("document_id", UUID.class),
-                rs.getObject("version_id", UUID.class),
-                rs.getObject("section_id", UUID.class),
-                rs.getObject("block_id", UUID.class),
-                rs.getString("title"),
-                rs.getObject("created_at", OffsetDateTime.class));
+                uuid(entity.id),
+                uuid(entity.documentId),
+                uuid(entity.versionId),
+                uuid(entity.sectionId),
+                uuid(entity.blockId),
+                entity.title,
+                entity.createdAt);
     }
 
-    private NoteDto mapNote(ResultSet rs, int rowNum) throws SQLException {
+    private static NoteDto mapNote(NoteEntity entity) {
         return new NoteDto(
-                rs.getObject("id", UUID.class),
-                rs.getObject("document_id", UUID.class),
-                rs.getObject("version_id", UUID.class),
-                rs.getObject("section_id", UUID.class),
-                rs.getObject("block_id", UUID.class),
-                rs.getString("selected_text"),
-                rs.getString("body"),
-                rs.getObject("created_at", OffsetDateTime.class),
-                rs.getObject("updated_at", OffsetDateTime.class));
+                uuid(entity.id),
+                uuid(entity.documentId),
+                uuid(entity.versionId),
+                uuid(entity.sectionId),
+                uuid(entity.blockId),
+                entity.selectedText,
+                entity.body,
+                entity.createdAt,
+                entity.updatedAt);
     }
 
-    private ReviewStateDto mapReviewState(ResultSet rs, int rowNum) throws SQLException {
+    private static ReviewStateDto mapReviewState(ReviewStateEntity entity) {
         return new ReviewStateDto(
-                rs.getObject("id", UUID.class),
-                rs.getObject("document_id", UUID.class),
-                rs.getObject("node_id", UUID.class),
-                rs.getString("mastery"),
-                rs.getObject("due_at", OffsetDateTime.class),
-                (Integer) rs.getObject("interval_days"),
-                rs.getInt("repetitions"),
-                rs.getObject("updated_at", OffsetDateTime.class));
+                uuid(entity.id),
+                uuid(entity.documentId),
+                uuid(entity.nodeId),
+                entity.mastery,
+                entity.dueAt,
+                entity.intervalDays,
+                entity.repetitions,
+                entity.updatedAt);
     }
 
-    private record ExistingReviewState(UUID id, int repetitions) {
+    private static String id(UUID value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static UUID uuid(String value) {
+        return value == null ? null : UUID.fromString(value);
     }
 }

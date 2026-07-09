@@ -9,16 +9,25 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -42,6 +52,26 @@ class InterviewReaderApiTests {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Test
+    void pdfBoxFontCacheDefaultsToBuildDirectory() {
+        var fontCache = System.getProperty("pdfbox.fontcache");
+
+        assertThat(fontCache).contains("pdfbox-font-cache");
+        assertThat(Files.isDirectory(Path.of(fontCache))).isTrue();
+    }
+
+    @Test
+    void h2MigrationKeepsTableAndColumnShapeInStepWithMysql() throws Exception {
+        var h2Columns = tableColumns(Path.of("src/main/resources/db/migration/h2/V1__initial_schema.sql"));
+        var mysqlColumns = tableColumns(Path.of("src/main/resources/db/migration/mysql/V1__initial_schema.sql"));
+
+        assertThat(h2Columns.keySet()).containsExactlyElementsOf(mysqlColumns.keySet());
+        assertThat(h2Columns).containsExactlyEntriesOf(mysqlColumns);
+    }
+
     @Test
     void jsonPackageCanBeImportedCommittedAndRead() throws Exception {
         var imported = importAndCommit(Files.readAllBytes(Path.of("docs/examples/document-package.example.json")));
@@ -50,6 +80,14 @@ class InterviewReaderApiTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
+        var sourceFile = mockMvc.perform(get("/api/import-jobs/{jobId}/source-file", imported.jobId()))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getContentType()).contains(MediaType.APPLICATION_OCTET_STREAM_VALUE))
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+        assertThat(sourceFile).contains("\"schemaVersion\"");
+
         mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                 .andExpect(status().isNoContent());
 
@@ -57,20 +95,33 @@ class InterviewReaderApiTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].title").value("Java 高级开发面试题完整答案"));
 
-        var tocBody = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
+        var tocResult = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].children[0].title").value("1.1 结论先行"))
                 .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .getResponse();
+        var tocEtag = tocResult.getHeader(HttpHeaders.ETAG);
+        assertThat(tocEtag).isNotBlank();
+        mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId())
+                        .header(HttpHeaders.IF_NONE_MATCH, tocEtag))
+                .andExpect(status().isNotModified());
+        var tocBody = tocResult.getContentAsString();
         var toc = objectMapper.readTree(tocBody);
         var childNodeId = UUID.fromString(toc.get(0).get("children").get(0).get("id").asText());
 
-        mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), childNodeId)
+        var contentResult = mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), childNodeId)
                         .param("limit", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blocks[0].blockKey").value("q1-conclusion-p1"))
-                .andExpect(jsonPath("$.blocks[0].payload.text").value("HashMap 的设计目标是单线程下提供高效查询与更新，它没有为复合操作、结构修改和内存可见性提供并发保证。"));
+                .andExpect(jsonPath("$.blocks[0].payload.text").value("HashMap 的设计目标是单线程下提供高效查询与更新，它没有为复合操作、结构修改和内存可见性提供并发保证。"))
+                .andReturn()
+                .getResponse();
+        var contentEtag = contentResult.getHeader(HttpHeaders.ETAG);
+        assertThat(contentEtag).isNotBlank();
+        mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), childNodeId)
+                        .param("limit", "1")
+                        .header(HttpHeaders.IF_NONE_MATCH, contentEtag))
+                .andExpect(status().isNotModified());
 
         mockMvc.perform(get("/api/search").param("q", "HashMap"))
                 .andExpect(status().isOk())
@@ -95,6 +146,80 @@ class InterviewReaderApiTests {
         mockMvc.perform(get("/api/reading-progress/{documentId}", imported.documentId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.progressRatio").value(0.42));
+    }
+
+    @Test
+    void importJobRecordsWorkerStageAndStatistics() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "worker-stage-" + UUID.randomUUID());
+
+        var job = uploadJsonPackage(objectMapper.writeValueAsBytes(source));
+
+        assertThat(job.get("status").asText()).isEqualTo("READY");
+        assertThat(job.get("currentStage").asText()).isEqualTo("READY");
+        assertThat(job.get("progress").asInt()).isEqualTo(100);
+        assertThat(job.get("statistics").get("workerMode").asText()).isEqualTo("INLINE");
+        assertThat(job.get("statistics").get("sourceFileName").asText()).isEqualTo("document-package.json");
+        assertThat(job.get("statistics").get("sectionCount").asInt()).isPositive();
+        assertThat(job.get("statistics").get("blockCount").asInt()).isPositive();
+    }
+
+    @Test
+    void uploadedSourceFileNameIsStoredAsSafeBaseName() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "safe-filename-" + UUID.randomUUID());
+
+        var job = uploadPackage(objectMapper.writeValueAsBytes(source), "JSON_PACKAGE", "..\\..\\evil.json");
+        var jobId = UUID.fromString(job.get("id").asText());
+        var objectKey = jdbc.queryForObject("SELECT source_object_key FROM import_job WHERE id = ?", String.class, jobId);
+
+        assertThat(job.get("statistics").get("sourceFileName").asText()).isEqualTo("evil.json");
+        assertThat(objectKey).doesNotContain("..").endsWith("/evil.json");
+
+        mockMvc.perform(get("/api/import-jobs/{jobId}/source-file", jobId))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION))
+                        .contains("evil.json")
+                        .doesNotContain(".."));
+    }
+
+    @Test
+    void activeImportJobCanBeCanceled() throws Exception {
+        var jobId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO import_job(
+                    id, owner_id, source_type, source_object_key, source_sha256, converter_version,
+                    import_fingerprint, status, progress, current_stage, statistics, started_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                jobId,
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                "PDF",
+                "manual/test.pdf",
+                "a".repeat(64),
+                "test-converter",
+                "b".repeat(64),
+                "EXTRACTING",
+                35,
+                "EXTRACTING",
+                "{}");
+
+        mockMvc.perform(post("/api/import-jobs/{jobId}/cancel", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"))
+                .andExpect(jsonPath("$.currentStage").value("CANCELED"))
+                .andExpect(jsonPath("$.progress").value(100));
+    }
+
+    @Test
+    void completedImportJobCannotBeCanceled() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "cancel-ready-" + UUID.randomUUID());
+        var job = uploadJsonPackage(objectMapper.writeValueAsBytes(source));
+
+        mockMvc.perform(post("/api/import-jobs/{jobId}/cancel", UUID.fromString(job.get("id").asText())))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -274,8 +399,25 @@ class InterviewReaderApiTests {
 
         for (var sample : samples) {
             var imported = importAndCommitPdf(Files.readAllBytes(sample), sample.getFileName().toString());
+            var sourceBytes = mockMvc.perform(get("/api/import-jobs/{jobId}/source-file", imported.jobId()))
+                    .andExpect(status().isOk())
+                    .andExpect(result -> assertThat(result.getResponse().getContentType()).contains(MediaType.APPLICATION_PDF_VALUE))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsByteArray();
+            assertThat(new String(sourceBytes, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
+
             var rawExtraction = getJson("/api/import-jobs/{jobId}/raw-extraction", imported.jobId());
             assertThat(rawExtraction.get("schemaVersion").asText()).isEqualTo("1.0");
+            assertThat(rawExtraction.get("preflight").get("mimeType").asText()).isEqualTo("application/pdf");
+            assertThat(rawExtraction.get("preflight").get("pageCount").asInt()).isPositive();
+            assertThat(rawExtraction.get("preflight").get("outlineMaxDepth").asInt()).isPositive();
+            assertThat(rawExtraction.get("preflight").get("textPageCount").asInt()).isPositive();
+            assertThat(rawExtraction.get("preflight").get("pageSizes").size()).isPositive();
+            assertThat(rawExtraction.get("preflight").get("fontSummary").size()).isPositive();
+            assertThat(rawExtraction.get("preflight").get("fontSummary").get(0).get("fontName").asText()).isNotBlank();
+            assertThat(rawExtraction.get("preflight").get("fontSummary").get(0).get("fontSize").asDouble()).isPositive();
+            assertThat(rawExtraction.get("preflight").get("fontSummary").get(0).get("charCount").asInt()).isPositive();
             assertThat(rawExtraction.get("sourceFileName").asText()).isEqualTo(sample.getFileName().toString());
             assertThat(rawExtraction.get("classification").asText()).isEqualTo("TEXT_OUTLINE");
             assertThat(rawExtraction.get("pageCount").asInt()).isPositive();
@@ -283,13 +425,23 @@ class InterviewReaderApiTests {
             assertThat(rawExtraction.get("outline").size()).isEqualTo(rawExtraction.get("outlineCount").asInt());
             assertThat(rawExtraction.get("pages").size()).isEqualTo(rawExtraction.get("pageCount").asInt());
             assertThat(rawExtraction.get("pages").get(0).get("charCount").asInt()).isPositive();
+            assertThat(rawExtraction.get("pages").get(0).get("width").asDouble()).isPositive();
+            assertThat(rawExtraction.get("pages").get(0).get("height").asDouble()).isPositive();
+            assertThat(rawExtraction.get("pages").get(0).has("rotation")).isTrue();
+            assertThat(rawExtraction.get("pages").get(0).has("blockCount")).isTrue();
+            assertThat(rawExtraction.get("pages").get(0).has("coveredByBlocks")).isTrue();
 
             var normalized = getJson("/api/import-jobs/{jobId}/normalized-package", imported.jobId());
             assertThat(normalized.get("version").get("sourceType").asText()).isEqualTo("PDF");
             assertThat(normalized.get("sections").size()).isPositive();
             assertThat(normalized.get("blocks").size()).isPositive();
+            assertThat(normalized.get("blocks").get(0).get("sourcePage").asInt()).isPositive();
+            assertThat(normalized.get("blocks").get(0).get("sourceBbox").get("page").asInt()).isPositive();
+            assertThat(normalized.get("blocks").get(0).get("sourceBbox").get("width").asDouble()).isPositive();
             assertThat(normalized.get("version").get("metadata").get("pageCount").asInt())
                     .isEqualTo(rawExtraction.get("pageCount").asInt());
+            assertThat(normalized.get("version").get("metadata").get("uncoveredTextPageCount").asInt())
+                    .isEqualTo(rawExtraction.get("preflight").get("uncoveredTextPageCount").asInt());
 
             mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                     .andExpect(status().isNoContent());
@@ -304,12 +456,50 @@ class InterviewReaderApiTests {
 
             var readablePosition = firstReadablePosition(imported.versionId(), toc);
             assertThat(readablePosition.blockId()).isNotNull();
+            var readerContent = getJson(
+                    "/api/versions/{versionId}/nodes/{nodeId}/content",
+                    imported.versionId(),
+                    readablePosition.sectionId());
+            assertThat(readerContent.get("blocks").get(0).get("sourceBbox").get("page").asInt()).isPositive();
+            assertThat(readerContent.get("blocks").get(0).get("sourceBbox").get("width").asDouble()).isPositive();
 
             var exported = exportJsonPackage(imported);
             assertThat(exported.get("version").get("sourceType").asText()).isEqualTo("PDF");
             assertThat(exported.get("sections").size()).isPositive();
             assertThat(exported.get("blocks").size()).isPositive();
         }
+    }
+
+    @Test
+    void generatedPdfRecognizesListAndCodeBlocks() throws Exception {
+        var job = uploadPackage(generatedSemanticPdf(), "PDF", "semantic-blocks.pdf");
+        assertThat(job.get("status").asText()).isEqualTo("READY");
+        var normalized = getJson("/api/import-jobs/{jobId}/normalized-package", UUID.fromString(job.get("id").asText()));
+        var blockTypes = normalized.get("blocks").findValuesAsText("blockType");
+        assertThat(blockTypes).contains("unordered_list", "code");
+
+        var listBlock = findByField(normalized.get("blocks"), "blockType", "unordered_list");
+        assertThat(listBlock.get("payload").get("items").get(0).asText()).contains("structural modification");
+        var codeBlock = findByField(normalized.get("blocks"), "blockType", "code");
+        assertThat(codeBlock.get("payload").get("language").asText()).isEqualTo("java");
+        assertThat(codeBlock.get("payload").get("text").asText()).contains("if (a < b)");
+    }
+
+    @Test
+    void generatedPdfFlagsPossibleTablesAsReviewSnapshots() throws Exception {
+        var job = uploadPackage(generatedTableSnapshotPdf(), "PDF", "table-snapshot.pdf");
+        assertThat(job.get("status").asText()).isEqualTo("READY");
+        var jobId = UUID.fromString(job.get("id").asText());
+
+        var normalized = getJson("/api/import-jobs/{jobId}/normalized-package", jobId);
+        var snapshot = findByField(normalized.get("blocks"), "blockType", "table_snapshot");
+        assertThat(snapshot.get("confidence").decimalValue()).isLessThan(new java.math.BigDecimal("0.50"));
+        assertThat(snapshot.get("payload").get("lines").get(0).asText()).contains("Metric | Value | Risk");
+        assertThat(snapshot.get("plainText").asText()).contains("Threads | Many | Race");
+
+        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.issueCode == 'PDF_TABLE_REVIEW_REQUIRED' && @.severity == 'WARNING')]").exists());
     }
 
     @Test
@@ -529,6 +719,56 @@ class InterviewReaderApiTests {
     }
 
     @Test
+    void reviewQueueReturnsRandomQuestionsAndCanFilterDueOnly() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "review-queue-" + UUID.randomUUID());
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+                .andExpect(status().isNoContent());
+
+        var dueQueueBody = mockMvc.perform(get("/api/review-queue")
+                        .param("documentId", imported.documentId().toString())
+                        .param("limit", "5")
+                        .param("dueOnly", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("1. HashMap 为什么线程不安全？"))
+                .andExpect(jsonPath("$[0].mastery").value("UNKNOWN"))
+                .andExpect(jsonPath("$[0].sectionPath[0]").value("1. HashMap 为什么线程不安全？"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+        var dueQueue = objectMapper.readTree(dueQueueBody);
+        var questionId = UUID.fromString(dueQueue.get(0).get("nodeId").asText());
+
+        var hardReviewRequest = """
+                {
+                  "documentId": "%s",
+                  "mastery": "HARD"
+                }
+                """.formatted(imported.documentId());
+        mockMvc.perform(put("/api/review-states/{nodeId}", questionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(hardReviewRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mastery").value("HARD"))
+                .andExpect(jsonPath("$.intervalDays").value(1));
+
+        mockMvc.perform(get("/api/review-queue")
+                        .param("documentId", imported.documentId().toString())
+                        .param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nodeId").value(questionId.toString()))
+                .andExpect(jsonPath("$[0].mastery").value("HARD"))
+                .andExpect(jsonPath("$[0].repetitions").value(1));
+
+        mockMvc.perform(get("/api/review-queue")
+                        .param("documentId", imported.documentId().toString())
+                        .param("dueOnly", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void reviewStateRejectsUnknownMastery() throws Exception {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "review-invalid-" + UUID.randomUUID());
@@ -626,6 +866,64 @@ class InterviewReaderApiTests {
         mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.issueCode == 'PARENT_SECTION_MISSING')]").exists());
+    }
+
+    @Test
+    void stagedPackageCanBeRevisedBeforeCommit() throws Exception {
+        var root = (JsonNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var mutable = (ObjectNode) root.deepCopy();
+        ((ObjectNode) mutable.get("document")).put("documentKey", "review-revision-" + UUID.randomUUID());
+        var sections = (ArrayNode) mutable.get("sections");
+        ((ObjectNode) sections.get(1)).put("parentSectionKey", "missing-parent");
+        ((ObjectNode) sections.get(1)).put("level", 4);
+
+        var upload = new MockMultipartFile(
+                "file",
+                "review-required.json",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(mutable));
+        var body = mockMvc.perform(multipart("/api/import-jobs")
+                        .file(upload)
+                        .param("sourceType", "JSON_PACKAGE"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("REVIEW_REQUIRED"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var jobId = UUID.fromString(objectMapper.readTree(body).get("id").asText());
+
+        var revision = """
+                {
+                  "parentSectionKey": "q1",
+                  "level": 2,
+                  "title": "1.1 人工修订后的结论"
+                }
+                """;
+        mockMvc.perform(patch("/api/import-jobs/{jobId}/normalized-package/sections/{sectionKey}", jobId, "q1-conclusion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(revision))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[1].title").value("1.1 人工修订后的结论"));
+
+        mockMvc.perform(get("/api/import-jobs/{jobId}", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.currentStage").value("REVIEWING"));
+        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        var versionBody = mockMvc.perform(post("/api/import-jobs/{jobId}/commit", jobId))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var version = objectMapper.readTree(versionBody);
+        var versionId = UUID.fromString(version.get("id").asText());
+
+        mockMvc.perform(get("/api/versions/{versionId}/toc", versionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].children[0].title").value("1.1 人工修订后的结论"));
     }
 
     @Test
@@ -807,6 +1105,58 @@ class InterviewReaderApiTests {
         }
     }
 
+    private byte[] generatedSemanticPdf() throws Exception {
+        try (var document = new PDDocument();
+             var out = new ByteArrayOutputStream()) {
+            var page = new PDPage();
+            document.addPage(page);
+            try (var content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.setLeading(16);
+                content.newLineAtOffset(72, 720);
+                for (var line : List.of(
+                        "Generated interview notes",
+                        "- structural modification can break hash bins",
+                        "- visibility is not guaranteed",
+                        "if (a < b) {",
+                        "    return a;",
+                        "}")) {
+                    content.showText(line);
+                    content.newLine();
+                }
+                content.endText();
+            }
+            document.save(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] generatedTableSnapshotPdf() throws Exception {
+        try (var document = new PDDocument();
+             var out = new ByteArrayOutputStream()) {
+            var page = new PDPage();
+            document.addPage(page);
+            try (var content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.setLeading(16);
+                content.newLineAtOffset(72, 720);
+                for (var line : List.of(
+                        "Generated table notes",
+                        "Metric | Value | Risk",
+                        "Threads | Many | Race",
+                        "This paragraph follows the snapshot.")) {
+                    content.showText(line);
+                    content.newLine();
+                }
+                content.endText();
+            }
+            document.save(out);
+            return out.toByteArray();
+        }
+    }
+
     private Map<String, String> hashesByKey(JsonNode array, String keyField) {
         return array.findValuesAsText(keyField).stream()
                 .collect(Collectors.toMap(
@@ -821,6 +1171,15 @@ class InterviewReaderApiTests {
             }
         }
         throw new AssertionError("Missing key " + key);
+    }
+
+    private JsonNode findByField(JsonNode array, String field, String value) {
+        for (var node : array) {
+            if (value.equals(node.get(field).asText())) {
+                return node;
+            }
+        }
+        throw new AssertionError("Missing " + field + " " + value);
     }
 
     private ContentPosition firstChildFirstBlock(UUID versionId) throws Exception {
@@ -857,6 +1216,51 @@ class InterviewReaderApiTests {
             nodeIds.add(UUID.fromString(node.get("id").asText()));
             collectNodeIds(node.get("children"), nodeIds);
         }
+    }
+
+    private Map<String, List<String>> tableColumns(Path migration) throws Exception {
+        var result = new LinkedHashMap<String, List<String>>();
+        var lines = Files.readAllLines(migration);
+        String tableName = null;
+        var columns = new java.util.ArrayList<String>();
+
+        for (var line : lines) {
+            var trimmed = line.strip();
+            if (trimmed.startsWith("CREATE TABLE ")) {
+                tableName = trimmed.substring("CREATE TABLE ".length(), trimmed.indexOf('(')).strip();
+                columns = new java.util.ArrayList<>();
+                continue;
+            }
+            if (tableName == null) {
+                continue;
+            }
+            if (trimmed.startsWith(");")) {
+                result.put(tableName, List.copyOf(columns));
+                tableName = null;
+                continue;
+            }
+            var firstToken = firstToken(trimmed);
+            if (!firstToken.isBlank() && isColumnDefinition(firstToken)) {
+                columns.add(firstToken);
+            }
+        }
+        return result;
+    }
+
+    private boolean isColumnDefinition(String firstToken) {
+        var normalized = firstToken.toUpperCase();
+        return !firstToken.startsWith("(")
+                && !Set.of("CONSTRAINT", "PRIMARY", "FOREIGN", "CHECK").contains(normalized)
+                && !normalized.startsWith("UNIQUE");
+    }
+
+    private String firstToken(String line) {
+        if (line.isBlank()) {
+            return "";
+        }
+        var withoutComma = line.endsWith(",") ? line.substring(0, line.length() - 1) : line;
+        var space = withoutComma.indexOf(' ');
+        return space < 0 ? withoutComma : withoutComma.substring(0, space);
     }
 
     private record ContentPosition(UUID sectionId, UUID blockId) {
