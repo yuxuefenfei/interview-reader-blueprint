@@ -56,9 +56,11 @@ public class ImportJobWorker {
         }));
     }
 
-    public boolean cancel(UUID jobId) {
+    public void cancel(UUID jobId) {
         var future = futures.remove(jobId);
-        return future != null && future.cancel(true);
+        if (future != null) {
+            future.cancel(true);
+        }
     }
 
     @PreDestroy

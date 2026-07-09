@@ -50,7 +50,7 @@ public class MarkdownPackageService {
     }
 
     private void appendHeading(StringBuilder markdown, int level, String title) {
-        markdown.append("#".repeat(Math.max(1, level))).append(' ').append(Objects.requireNonNullElse(title, "").trim()).append("\n\n");
+        markdown.repeat("#", Math.max(1, level)).append(' ').append(Objects.requireNonNullElse(title, "").trim()).append("\n\n");
     }
 
     private void appendList(StringBuilder markdown, DocumentPackage.BlockInfo block, boolean ordered) {
@@ -79,7 +79,7 @@ public class MarkdownPackageService {
             markdown.append(text(block)).append("\n\n");
             return;
         }
-        if (columns.isEmpty() && !rows.isEmpty()) {
+        if (columns.isEmpty()) {
             for (var i = 0; i < rows.getFirst().size(); i++) {
                 columns.add("");
             }

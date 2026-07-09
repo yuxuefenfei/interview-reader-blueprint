@@ -172,7 +172,7 @@ public class InteractionService {
         if (documentId != null) {
             verifyDocument(documentId);
         }
-        var safeLimit = Math.max(1, Math.min(limit == null ? 5 : limit, 50));
+        var safeLimit = Math.clamp(limit == null ? 5 : limit, 1, 50);
         var now = OffsetDateTime.now();
         return documentMapper.selectListByQuery(QueryWrapper.create()
                         .select(DOCUMENT_ENTITY.ALL_COLUMNS)

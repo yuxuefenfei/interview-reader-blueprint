@@ -37,27 +37,29 @@ public class ExportController {
     public ResponseEntity<?> export(@Valid @RequestBody ExportRequest request) {
         var format = request.format().toUpperCase(Locale.ROOT);
         var documentPackage = exportService.exportJsonPackage(request.documentId(), request.versionId());
-        if ("JSON_PACKAGE".equals(format)) {
-            return ResponseEntity.ok(documentPackage);
-        }
-        if ("EXCEL".equals(format)) {
-            var bytes = excelPackageService.write(documentPackage);
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .header("Content-Disposition", "attachment; filename=\"interview-reader-export.xlsx\"")
-                    .body(bytes);
-        }
-        if ("MARKDOWN".equals(format)) {
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("text/markdown;charset=UTF-8"))
-                    .header("Content-Disposition", "attachment; filename=\"interview-reader-export.md\"")
-                    .body(markdownPackageService.write(documentPackage));
-        }
-        if ("STATIC_HTML".equals(format)) {
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
-                    .header("Content-Disposition", "attachment; filename=\"interview-reader-export.html\"")
-                    .body(staticHtmlPackageService.write(documentPackage));
+        switch (format) {
+            case "JSON_PACKAGE" -> {
+                return ResponseEntity.ok(documentPackage);
+            }
+            case "EXCEL" -> {
+                var bytes = excelPackageService.write(documentPackage);
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                        .header("Content-Disposition", "attachment; filename=\"interview-reader-export.xlsx\"")
+                        .body(bytes);
+            }
+            case "MARKDOWN" -> {
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType("text/markdown;charset=UTF-8"))
+                        .header("Content-Disposition", "attachment; filename=\"interview-reader-export.md\"")
+                        .body(markdownPackageService.write(documentPackage));
+            }
+            case "STATIC_HTML" -> {
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
+                        .header("Content-Disposition", "attachment; filename=\"interview-reader-export.html\"")
+                        .body(staticHtmlPackageService.write(documentPackage));
+            }
         }
         throw new ApiException(HttpStatus.BAD_REQUEST, "MVP currently supports JSON_PACKAGE, EXCEL, MARKDOWN and STATIC_HTML exports");
     }

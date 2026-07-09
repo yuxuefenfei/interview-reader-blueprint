@@ -4,15 +4,12 @@ import com.example.interviewreader.common.Hashes;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import org.springframework.stereotype.Service;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import org.springframework.stereotype.Service;
+import java.util.*;
+import java.util.stream.Stream;
 
 @Service("markdownImportPackageService")
 public class MarkdownPackageService {
@@ -139,7 +136,7 @@ public class MarkdownPackageService {
         if (trimmed.endsWith("|")) {
             trimmed = trimmed.substring(0, trimmed.length() - 1);
         }
-        return List.of(trimmed.split("\\|", -1)).stream().map(String::trim).toList();
+        return Stream.of(trimmed.split("\\|", -1)).map(String::trim).toList();
     }
 
     private String slug(String value, String fallback) {

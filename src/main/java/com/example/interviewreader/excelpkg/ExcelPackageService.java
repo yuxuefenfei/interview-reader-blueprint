@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
+
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
@@ -355,7 +357,7 @@ public class ExcelPackageService {
 
     private boolean enabled(ExcelRow row) {
         var enabled = valueOrNull(row, "enabled");
-        return enabled == null || !"false".equalsIgnoreCase(enabled) && !"0".equals(enabled);
+        return !"false".equalsIgnoreCase(enabled) && !"0".equals(enabled);
     }
 
     private String required(ExcelRow row, String key, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
@@ -443,7 +445,7 @@ public class ExcelPackageService {
         if (value == null || value.isBlank()) {
             return List.of();
         }
-        return List.of(value.split("[,，]")).stream().map(String::trim).filter(tag -> !tag.isBlank()).toList();
+        return Stream.of(value.split("[,，]")).map(String::trim).filter(tag -> !tag.isBlank()).toList();
     }
 
     private String value(ExcelRow row, String key, String defaultValue) {

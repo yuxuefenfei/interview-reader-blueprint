@@ -18,11 +18,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -86,7 +83,7 @@ public class DocumentPackageExportService {
                         .select(TAG_ENTITY.ALL_COLUMNS)
                         .from(TAG_ENTITY)
                         .where(TAG_ENTITY.ID.eq(link.tagId))))
-                .filter(tag -> tag != null)
+                .filter(Objects::nonNull)
                 .map(tag -> tag.name)
                 .sorted()
                 .toList();

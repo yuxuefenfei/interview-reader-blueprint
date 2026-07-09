@@ -158,7 +158,7 @@ public class DocumentQueryService {
 
     public NodeContent content(UUID versionId, UUID nodeId, Integer afterSeq, Integer limit) {
         var node = node(versionId, nodeId);
-        var safeLimit = Math.max(1, Math.min(limit == null ? 50 : limit, 100));
+        var safeLimit = Math.clamp(limit == null ? 50 : limit, 1, 100);
         var rows = contentBlockMapper.selectListByQuery(QueryWrapper.create()
                 .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
                 .from(CONTENT_BLOCK_ENTITY)
@@ -179,7 +179,7 @@ public class DocumentQueryService {
         if (q == null || q.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "q is required");
         }
-        var safeLimit = Math.max(1, Math.min(limit == null ? 20 : limit, 100));
+        var safeLimit = Math.clamp(limit == null ? 20 : limit, 1, 100);
         var needle = q.trim().toLowerCase(Locale.ROOT);
         var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
                 .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
