@@ -56,6 +56,17 @@ export interface NodeContent {
   nextAfterSeq: number | null;
 }
 
+export interface SearchHit {
+  documentId: string;
+  versionId: string;
+  nodeId: string;
+  blockId: string;
+  title: string;
+  sectionPath: string[];
+  snippet: string;
+  score: number;
+}
+
 export interface ReadingProgress {
   versionId: string;
   sectionId: string | null;

@@ -238,6 +238,76 @@ a:focus-visible {
   background-color: var(--panel);
 }
 
+.search-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-quiet), var(--panel) 32%);
+  box-shadow: var(--shadow-sm);
+}
+
+.search-results header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.search-results h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.search-results header span {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.search-hit {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-raised);
+  color: var(--text);
+  text-align: left;
+  box-shadow: var(--shadow-sm);
+}
+
+.search-hit:hover {
+  border-color: color-mix(in srgb, var(--accent), var(--line) 30%);
+  transform: translateY(-1px);
+}
+
+.search-hit strong,
+.search-hit span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-hit strong {
+  color: var(--text-strong);
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.search-hit span {
+  color: var(--muted);
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .document-list {
   display: grid;
   gap: 10px;
@@ -677,10 +747,43 @@ blockquote,
   overflow: hidden;
 }
 
+.source-frame {
+  position: relative;
+  min-height: inherit;
+}
+
 .source-preview object {
   width: 100%;
   height: min(74vh, 780px);
   display: block;
+}
+
+.source-bbox-overlay {
+  position: absolute;
+  z-index: 2;
+  border: 2px solid var(--warning);
+  background: color-mix(in srgb, var(--warning), transparent 78%);
+  box-shadow:
+    0 0 0 999px rgba(15, 23, 42, 0.08),
+    0 0 0 4px color-mix(in srgb, var(--warning), transparent 72%);
+  pointer-events: none;
+}
+
+.source-bbox-label {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--warning), black 12%);
+  background: color-mix(in srgb, var(--panel-raised), transparent 5%);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-sm);
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .source-download {

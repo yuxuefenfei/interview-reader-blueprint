@@ -126,6 +126,14 @@ class InterviewReaderApiTests {
         mockMvc.perform(get("/api/search").param("q", "HashMap"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("1.1 结论先行"));
+        mockMvc.perform(get("/api/search")
+                        .param("q", "1.1 结论先行")
+                        .param("documentId", imported.documentId().toString())
+                        .param("limit", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].documentId").value(imported.documentId().toString()))
+                .andExpect(jsonPath("$[0].title").value("1.1 结论先行"));
 
         var progress = """
                 {
@@ -809,6 +817,17 @@ class InterviewReaderApiTests {
         mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.issueCode == 'PARENT_SECTION_MISSING' && @.cellRef == 'Sections!D3')]").exists());
+    }
+
+    @Test
+    void excelUploadRejectsNonZipContentBeforeParsing() throws Exception {
+        var job = uploadPackage("not an xlsx".getBytes(StandardCharsets.UTF_8), "EXCEL", "fake.xlsx");
+        assertThat(job.get("status").asText()).isEqualTo("REVIEW_REQUIRED");
+        var jobId = UUID.fromString(job.get("id").asText());
+
+        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.issueCode == 'EXCEL_MAGIC_INVALID' && @.severity == 'BLOCKING')]").exists());
     }
 
     @Test

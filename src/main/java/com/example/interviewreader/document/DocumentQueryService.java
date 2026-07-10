@@ -180,23 +180,58 @@ public class DocumentQueryService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "q is required");
         }
         var safeLimit = Math.clamp(limit == null ? 20 : limit, 1, 100);
-        var needle = q.trim().toLowerCase(Locale.ROOT);
-        var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+        var needle = q.trim();
+        var searchLimit = documentId == null ? safeLimit * 4 : safeLimit * 8;
+        var matchedBlocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
                 .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
                 .from(CONTENT_BLOCK_ENTITY)
-                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()));
+                .where(CONTENT_BLOCK_ENTITY.PLAIN_TEXT.like(needle))
+                .orderBy(CONTENT_BLOCK_ENTITY.VERSION_ID.asc(), CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc())
+                .limit(searchLimit));
+        var titleMatchedNodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.TITLE.like(needle))
+                .orderBy(CONTENT_NODE_ENTITY.PATH.asc())
+                .limit(searchLimit));
+
+        var nodeIds = new ArrayList<String>();
+        matchedBlocks.stream().map(block -> block.nodeId).distinct().forEach(nodeIds::add);
+        titleMatchedNodes.stream().map(node -> node.id).filter(id -> !nodeIds.contains(id)).forEach(nodeIds::add);
+        if (nodeIds.isEmpty()) {
+            return List.of();
+        }
+
+        var nodesById = nodesById(nodeIds);
+        var bodyMatchedNodeIds = matchedBlocks.stream()
+                .map(block -> block.nodeId)
+                .collect(java.util.stream.Collectors.toSet());
+        var missingTitleBlockNodeIds = titleMatchedNodes.stream()
+                .map(node -> node.id)
+                .filter(nodeId -> !bodyMatchedNodeIds.contains(nodeId))
+                .toList();
+        if (!missingTitleBlockNodeIds.isEmpty()) {
+            matchedBlocks = new ArrayList<>(matchedBlocks);
+            matchedBlocks.addAll(firstBlocksInNodes(missingTitleBlockNodeIds));
+        }
+
+        var versionIds = nodesById.values().stream().map(node -> node.versionId).distinct().toList();
+        var versionsById = versionsById(versionIds);
+        var documentIds = versionsById.values().stream().map(version -> version.documentId).distinct().toList();
+        var documentsById = documentsById(documentIds);
+
         var hits = new ArrayList<SearchHit>();
-        for (var block : blocks) {
-            var node = contentNodeMapper.selectOneById(block.nodeId);
-            var version = node == null ? null : documentVersionMapper.selectOneById(block.versionId);
-            var document = version == null ? null : documentMapper.selectOneById(version.documentId);
+        for (var block : matchedBlocks) {
+            var node = nodesById.get(block.nodeId);
+            var version = node == null ? null : versionsById.get(node.versionId);
+            var document = version == null ? null : documentsById.get(version.documentId);
             if (node == null || version == null || document == null || !LOCAL_USER_ID.equals(document.ownerId)) {
                 continue;
             }
             if (documentId != null && !id(documentId).equals(document.id)) {
                 continue;
             }
-            if (!lower(block.plainText).contains(needle) && !lower(node.title).contains(needle)) {
+            if (!containsIgnoreCase(block.plainText, needle) && !containsIgnoreCase(node.title, needle)) {
                 continue;
             }
             hits.add(new SearchHit(
@@ -213,6 +248,61 @@ public class DocumentQueryService {
             }
         }
         return hits;
+    }
+
+    private Map<String, ContentNodeEntity> nodesById(List<String> nodeIds) {
+        if (nodeIds.isEmpty()) {
+            return Map.of();
+        }
+        var rows = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.ID.in(nodeIds)));
+        var result = new LinkedHashMap<String, ContentNodeEntity>();
+        rows.forEach(row -> result.put(row.id, row));
+        return result;
+    }
+
+    private List<ContentBlockEntity> firstBlocksInNodes(List<String> nodeIds) {
+        if (nodeIds.isEmpty()) {
+            return List.of();
+        }
+        var rows = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.NODE_ID.in(nodeIds))
+                .orderBy(CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc()));
+        var firstBlocks = new LinkedHashMap<String, ContentBlockEntity>();
+        for (var row : rows) {
+            firstBlocks.putIfAbsent(row.nodeId, row);
+        }
+        return List.copyOf(firstBlocks.values());
+    }
+
+    private Map<String, DocumentVersionEntity> versionsById(List<String> versionIds) {
+        if (versionIds.isEmpty()) {
+            return Map.of();
+        }
+        var rows = documentVersionMapper.selectListByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.ID.in(versionIds)));
+        var result = new LinkedHashMap<String, DocumentVersionEntity>();
+        rows.forEach(row -> result.put(row.id, row));
+        return result;
+    }
+
+    private Map<String, DocumentEntity> documentsById(List<String> documentIds) {
+        if (documentIds.isEmpty()) {
+            return Map.of();
+        }
+        var rows = documentMapper.selectListByQuery(QueryWrapper.create()
+                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.ID.in(documentIds)));
+        var result = new LinkedHashMap<String, DocumentEntity>();
+        rows.forEach(row -> result.put(row.id, row));
+        return result;
     }
 
     public ReadingProgress getProgress(UUID documentId) {
@@ -539,6 +629,10 @@ public class DocumentQueryService {
 
     private static String lower(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean containsIgnoreCase(String value, String needle) {
+        return lower(value).contains(lower(needle));
     }
 
     private static String id(UUID value) {

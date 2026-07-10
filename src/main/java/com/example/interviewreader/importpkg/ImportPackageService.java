@@ -702,6 +702,15 @@ public class ImportPackageService {
 
     private ParsedSource parseSource(String sourceType, byte[] fileBytes, String sourceFileName, String sourceSha256) {
         if ("EXCEL".equals(sourceType)) {
+            if (!looksLikeZip(fileBytes)) {
+                return new ParsedSource(null, List.of(new ImportIssueDto(
+                        "BLOCKING",
+                        "EXCEL_MAGIC_INVALID",
+                        "Uploaded file is not an XLSX/ZIP package",
+                        null,
+                        null,
+                        null)), null);
+            }
             var parsed = excelPackageService.parse(fileBytes);
             var issues = new ArrayList<>(parsed.issues());
             if (parsed.documentPackage() != null) {
@@ -816,6 +825,15 @@ public class ImportPackageService {
             case "PDF" -> "document.pdf";
             default -> "document-package.json";
         };
+    }
+
+    private static boolean looksLikeZip(byte[] bytes) {
+        return bytes.length >= 4
+                && bytes[0] == 'P'
+                && bytes[1] == 'K'
+                && ((bytes[2] == 3 && bytes[3] == 4)
+                || (bytes[2] == 5 && bytes[3] == 6)
+                || (bytes[2] == 7 && bytes[3] == 8));
     }
 
     private record ParsedSource(DocumentPackage documentPackage, List<ImportIssueDto> issues, Object rawExtraction) {

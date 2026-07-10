@@ -14,6 +14,7 @@ import type {
   ReadingProgress,
   ReviewQueueItem,
   ReviewState,
+  SearchHit,
   SourceType,
   StagedBlock,
   StagedSection,
@@ -47,6 +48,17 @@ export function getToc(versionId: string): Promise<TocNode[]> {
 
 export function getNodeContent(versionId: string, nodeId: string, limit = 50): Promise<NodeContent> {
   return request<NodeContent>(`/api/versions/${versionId}/nodes/${nodeId}/content?limit=${limit}`);
+}
+
+export function searchContent(query: string, documentId?: string | null, limit = 8): Promise<SearchHit[]> {
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(limit)
+  });
+  if (documentId) {
+    params.set("documentId", documentId);
+  }
+  return request<SearchHit[]>(`/api/search?${params.toString()}`);
 }
 
 export function getReadingProgress(documentId: string): Promise<ReadingProgress | null> {

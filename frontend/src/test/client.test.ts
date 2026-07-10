@@ -9,6 +9,7 @@ import {
   reviseStagedSection,
   saveBookmark,
   saveReviewState,
+  searchContent,
   sourceFileUrl
 } from "../api/client";
 
@@ -95,6 +96,18 @@ describe("api client interactions", () => {
     await getReviewQueue("document-1", 5, true);
 
     expect(fetch).toHaveBeenCalledWith("/api/review-queue?documentId=document-1&limit=5&dueOnly=true", undefined);
+  });
+
+  it("searches content with encoded query and optional document scope", async () => {
+    const fetch = vi.fn().mockResolvedValue(mockJsonResponse([]));
+    vi.stubGlobal("fetch", fetch);
+
+    await searchContent("HashMap 并发", "document-1", 8);
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/search?q=HashMap+%E5%B9%B6%E5%8F%91&limit=8&documentId=document-1",
+      undefined
+    );
   });
 
   it("gets import review artifacts", async () => {

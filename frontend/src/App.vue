@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import {
   commitImportJob,
   createNote,
+  getDocument,
   getImportIssues,
   getImportJob,
   getNodeContent,
@@ -15,6 +16,7 @@ import {
   saveBookmark,
   saveReadingProgress,
   saveReviewState,
+  searchContent,
   sourceFileUrl,
   reviseStagedBlock,
   reviseStagedSection,
@@ -34,11 +36,14 @@ import type {
   NodeContent,
   NormalizedPackage,
   ReviewQueueItem,
+  SearchHit,
+  SourceBbox,
   SourceType,
   StagedBlock,
   StagedSection,
   TocNode
 } from "./types/api";
+import { pageForBbox, sourceOverlayLabel, sourceOverlayStyle } from "./utils/sourceBbox";
 import { firstReadableNode, flattenToc, isQuestionNode, progressRatioForNode, questionAnswerNodes } from "./utils/toc";
 
 const documents = ref<DocumentSummary[]>([]);
@@ -50,6 +55,8 @@ const loading = ref(false);
 const busyMessage = ref("");
 const error = ref("");
 const query = ref("");
+const searchHits = ref<SearchHit[]>([]);
+const searchStatus = ref("");
 const theme = ref(localStorage.getItem("reader.theme") || "light");
 const fontScale = ref(Number(localStorage.getItem("reader.fontScale") || "18"));
 const lineHeight = ref(Number(localStorage.getItem("reader.lineHeight") || "1.82"));
@@ -64,6 +71,7 @@ const importReviewJob = ref<ImportJob | null>(null);
 const importIssues = ref<ImportIssue[]>([]);
 const normalizedPackage = ref<NormalizedPackage | null>(null);
 const selectedSourcePage = ref<number | null>(null);
+const selectedSourceBbox = ref<SourceBbox | null>(null);
 const deviceId = localStorage.getItem("reader.deviceId") || crypto.randomUUID();
 
 localStorage.setItem("reader.deviceId", deviceId);
@@ -83,6 +91,8 @@ const importSourceUrl = computed(() =>
   importReviewJob.value ? sourceFileUrl(importReviewJob.value.id, selectedSourcePage.value) : ""
 );
 const isReviewPdf = computed(() => String(normalizedPackage.value?.version.sourceType ?? "").toUpperCase() === "PDF");
+const selectedSourceOverlay = computed(() => sourceOverlayStyle(selectedSourceBbox.value));
+const selectedSourceLabel = computed(() => sourceOverlayLabel(selectedSourceBbox.value, selectedSourcePage.value));
 const terminalImportStatuses = new Set(["READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED"]);
 
 const readerStyle = computed(() => ({
@@ -118,6 +128,26 @@ async function refreshDocuments(): Promise<void> {
   });
 }
 
+async function searchLibrary(): Promise<void> {
+  await refreshDocuments();
+  await searchReadableContent();
+}
+
+async function searchReadableContent(): Promise<void> {
+  const term = query.value.trim();
+  searchHits.value = [];
+  searchStatus.value = "";
+  if (!term) {
+    return;
+  }
+  try {
+    searchHits.value = await searchContent(term, selectedDocument.value?.id ?? null, 8);
+    searchStatus.value = searchHits.value.length === 0 ? "没有正文命中" : `${searchHits.value.length} 条正文命中`;
+  } catch (caught) {
+    searchStatus.value = caught instanceof Error ? caught.message : "搜索失败";
+  }
+}
+
 async function selectDocument(document: DocumentSummary): Promise<void> {
   clearImportReview();
   if (!document.currentVersionId) {
@@ -145,6 +175,7 @@ function clearImportReview(): void {
   importIssues.value = [];
   normalizedPackage.value = null;
   selectedSourcePage.value = null;
+  selectedSourceBbox.value = null;
 }
 
 async function selectNode(node: TocNode | null): Promise<void> {
@@ -283,6 +314,29 @@ async function openReviewItem(item: ReviewQueueItem): Promise<void> {
   selectedMastery.value = item.mastery;
 }
 
+async function openSearchHit(hit: SearchHit): Promise<void> {
+  await runInteraction("正在打开搜索结果", async () => {
+    let targetDocument = documents.value.find((candidate) => candidate.id === hit.documentId) ?? null;
+    if (!targetDocument) {
+      targetDocument = await getDocument(hit.documentId);
+      documents.value = [
+        targetDocument,
+        ...documents.value.filter((candidate) => candidate.id !== targetDocument!.id)
+      ];
+    }
+    if (selectedDocument.value?.id !== targetDocument.id) {
+      await selectDocument(targetDocument);
+    }
+    const node = allNodes.value.find((candidate) => candidate.id === hit.nodeId);
+    if (!node) {
+      interactionMessage.value = "命中章节暂不可用";
+      return;
+    }
+    await selectNode(node);
+    interactionMessage.value = `已定位：${hit.title}`;
+  });
+}
+
 async function toggleAnswer(): Promise<void> {
   if (!selectedDocument.value?.currentVersionId || answerNodes.value.length === 0) {
     return;
@@ -400,6 +454,7 @@ async function loadImportReview(job: ImportJob): Promise<void> {
   normalizedPackage.value = await getNormalizedPackage(job.id);
   importIssues.value = await getImportIssues(job.id);
   selectedSourcePage.value = firstReviewSourcePage();
+  selectedSourceBbox.value = firstReviewSourceBbox();
 }
 
 async function refreshImportReview(jobId: string, normalized?: NormalizedPackage): Promise<void> {
@@ -407,6 +462,7 @@ async function refreshImportReview(jobId: string, normalized?: NormalizedPackage
   importIssues.value = await getImportIssues(jobId);
   importReviewJob.value = await getImportJob(jobId);
   selectedSourcePage.value = selectedSourcePage.value ?? firstReviewSourcePage();
+  selectedSourceBbox.value = selectedSourceBbox.value ?? firstReviewSourceBbox();
 }
 
 function firstReviewSourcePage(): number | null {
@@ -421,29 +477,56 @@ function firstReviewSourcePage(): number | null {
     ?? null;
 }
 
+function firstReviewSourceBbox(): SourceBbox | null {
+  for (const issue of importIssues.value) {
+    const bbox = bboxForIssue(issue);
+    if (bbox) {
+      return bbox;
+    }
+  }
+  return stagedBlocks.value.find((block) => block.sourceBbox)?.sourceBbox
+    ?? stagedSections.value.find((section) => section.sourceBbox)?.sourceBbox
+    ?? null;
+}
+
 function sourcePageForIssue(issue: ImportIssue): number | null {
   if (issue.sourcePage) {
     return issue.sourcePage;
   }
   if (issue.blockKey) {
-    return stagedBlocks.value.find((block) => block.blockKey === issue.blockKey)?.sourcePage ?? null;
+    const block = stagedBlocks.value.find((candidate) => candidate.blockKey === issue.blockKey);
+    return block?.sourcePage ?? pageForBbox(block?.sourceBbox) ?? null;
   }
   if (issue.sectionKey) {
-    return stagedSections.value.find((section) => section.sectionKey === issue.sectionKey)?.sourcePageStart ?? null;
+    const section = stagedSections.value.find((candidate) => candidate.sectionKey === issue.sectionKey);
+    return section?.sourcePageStart ?? pageForBbox(section?.sourceBbox) ?? null;
+  }
+  return null;
+}
+
+function bboxForIssue(issue: ImportIssue): SourceBbox | null {
+  if (issue.blockKey) {
+    return stagedBlocks.value.find((block) => block.blockKey === issue.blockKey)?.sourceBbox ?? null;
+  }
+  if (issue.sectionKey) {
+    return stagedSections.value.find((section) => section.sectionKey === issue.sectionKey)?.sourceBbox ?? null;
   }
   return null;
 }
 
 function focusIssueSource(issue: ImportIssue): void {
+  selectedSourceBbox.value = bboxForIssue(issue);
   selectedSourcePage.value = sourcePageForIssue(issue) ?? selectedSourcePage.value;
 }
 
 function focusSectionSource(section: StagedSection): void {
-  selectedSourcePage.value = section.sourcePageStart ?? section.sourceBbox?.page ?? selectedSourcePage.value;
+  selectedSourceBbox.value = section.sourceBbox;
+  selectedSourcePage.value = section.sourcePageStart ?? pageForBbox(section.sourceBbox) ?? selectedSourcePage.value;
 }
 
 function focusBlockSource(block: StagedBlock): void {
-  selectedSourcePage.value = block.sourcePage ?? block.sourceBbox?.page ?? selectedSourcePage.value;
+  selectedSourceBbox.value = block.sourceBbox;
+  selectedSourcePage.value = block.sourcePage ?? pageForBbox(block.sourceBbox) ?? selectedSourcePage.value;
 }
 
 function bboxLabel(block: StagedBlock): string {
@@ -561,9 +644,26 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
         v-model="query"
         class="search-input"
         type="search"
-        placeholder="搜索文档"
-        @keyup.enter="refreshDocuments"
+        placeholder="搜索文档或正文"
+        @keyup.enter="searchLibrary"
       />
+
+      <section v-if="searchHits.length > 0 || searchStatus" class="search-results" aria-label="正文搜索结果">
+        <header>
+          <h2>正文命中</h2>
+          <span>{{ searchStatus }}</span>
+        </header>
+        <button
+          v-for="hit in searchHits"
+          :key="`${hit.versionId}-${hit.blockId}`"
+          class="search-hit"
+          type="button"
+          @click="openSearchHit(hit)"
+        >
+          <strong>{{ hit.title }}</strong>
+          <span>{{ hit.snippet }}</span>
+        </button>
+      </section>
 
       <nav class="document-list" aria-label="文档列表">
         <button
@@ -630,9 +730,18 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
 
             <div class="review-split">
               <section class="source-preview" aria-label="源文件预览">
-                <object v-if="isReviewPdf" :data="importSourceUrl" type="application/pdf">
-                  <a :href="importSourceUrl" target="_blank" rel="noreferrer">打开源文件</a>
-                </object>
+                <div v-if="isReviewPdf" class="source-frame">
+                  <object :data="importSourceUrl" type="application/pdf">
+                    <a :href="importSourceUrl" target="_blank" rel="noreferrer">打开源文件</a>
+                  </object>
+                  <div
+                    v-if="selectedSourceOverlay"
+                    class="source-bbox-overlay"
+                    :style="selectedSourceOverlay"
+                    aria-hidden="true"
+                  />
+                  <div v-if="selectedSourceLabel" class="source-bbox-label">{{ selectedSourceLabel }}</div>
+                </div>
                 <div v-else class="source-download">
                   <a :href="importSourceUrl" target="_blank" rel="noreferrer">打开源文件</a>
                 </div>
