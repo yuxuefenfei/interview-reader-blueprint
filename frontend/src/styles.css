@@ -409,11 +409,8 @@ a:focus-visible {
 
 .document-item {
   width: 100%;
-  min-height: 68px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 12px;
-  align-items: center;
+  min-height: 54px;
+  display: block;
   padding: 13px;
   border: 1px solid var(--line);
   background: var(--panel-raised);
@@ -435,35 +432,10 @@ a:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.document-item span {
-  min-width: 42px;
-  padding: 4px 7px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-quiet);
-  color: var(--muted);
-  font-size: 12px;
-  text-align: center;
-}
-
-.document-item::after {
-  content: "";
-  grid-column: 1 / -1;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent) 0 var(--doc-progress), var(--line) var(--doc-progress) 100%);
-}
-
 .document-item.active {
   border-color: color-mix(in srgb, var(--accent), var(--line) 24%);
   background: var(--accent-tint);
   box-shadow: 0 10px 22px color-mix(in srgb, var(--accent), transparent 88%);
-}
-
-.document-item.active span {
-  border-color: color-mix(in srgb, var(--accent), var(--line) 28%);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
 }
 
 .reader-area {
@@ -1575,6 +1547,7 @@ input[type="range"] {
     inset: 0;
     width: 58px;
     height: 58px;
+    border-radius: 50%;
     border-color: color-mix(in srgb, var(--accent), black 8%);
     background: var(--accent);
     color: white;
@@ -1600,6 +1573,7 @@ input[type="range"] {
     bottom: 0;
     width: 44px;
     height: 44px;
+    border-radius: 50%;
     opacity: 0;
     pointer-events: none;
     transform: translate(0, 0) scale(0.82);
@@ -1628,16 +1602,25 @@ input[type="range"] {
     transform: translate(-94px, -12px) scale(1);
   }
 
-  .mobile-toolbox.open .mobile-tool-action.progress {
-    transform: translate(-116px, -110px) scale(1);
+  .mobile-toolbox-progress {
+    position: absolute;
+    z-index: 2;
+    right: 11px;
+    bottom: 5px;
+    left: 11px;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, white, transparent 62%);
+    pointer-events: none;
   }
 
-  .mobile-tool-action.progress {
-    border-color: color-mix(in srgb, var(--accent), var(--line) 30%);
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-size: 12px;
-    font-weight: 800;
+  .mobile-toolbox-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: white;
+    transition: width 220ms ease;
   }
 
   .mobile-search-panel {

@@ -716,17 +716,6 @@ function masteryLabel(mastery: Mastery): string {
   }[mastery];
 }
 
-function progressPercent(value: number | null | undefined): number {
-  const ratio = Number(value ?? 0);
-  return Number.isFinite(ratio) ? Math.round(Math.min(1, Math.max(0, ratio)) * 100) : 0;
-}
-
-function documentProgressStyle(document: DocumentSummary): Record<string, string> {
-  return {
-    "--doc-progress": `${progressPercent(document.progressRatio)}%`
-  };
-}
-
 async function importSourceFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -1027,12 +1016,10 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
           :key="document.id"
           class="document-item"
           :class="{ active: document.id === selectedDocument?.id }"
-          :style="documentProgressStyle(document)"
           type="button"
           @click="selectDocument(document)"
         >
           <strong>{{ document.title }}</strong>
-          <span>{{ progressPercent(document.progressRatio) }}%</span>
         </button>
       </nav>
       <button
@@ -1359,9 +1346,6 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
         <button class="mobile-tool-action toc" type="button" aria-label="目录" @click="openMobileToc">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
-        <div class="mobile-tool-action progress" aria-label="当前进度">
-          <strong>{{ currentProgressPercent }}%</strong>
-        </div>
       </div>
       <div v-if="mobileSearchOpen" class="mobile-search-panel">
         <input
@@ -1387,6 +1371,16 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
             <span>{{ hit.snippet }}</span>
           </button>
         </section>
+      </div>
+      <div
+        class="mobile-toolbox-progress"
+        role="progressbar"
+        aria-label="当前阅读进度"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-valuenow="currentProgressPercent"
+      >
+        <span :style="{ width: `${currentProgressPercent}%` }"></span>
       </div>
       <button class="mobile-tool-toggle" type="button" aria-label="打开工具箱" @click="toggleMobileTools">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" /></svg>
