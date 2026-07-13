@@ -12,6 +12,16 @@ export interface DocumentListResponse {
   nextCursor: string | null;
 }
 
+export interface AuthSession {
+  authenticated: boolean;
+  username: string | null;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
 export interface TocNode {
   id: string;
   parentId: string | null;
@@ -66,6 +76,8 @@ export interface SearchHit {
   snippet: string;
   score: number;
 }
+
+export type ExportFormat = "JSON_PACKAGE" | "EXCEL" | "MARKDOWN" | "STATIC_HTML";
 
 export interface ReadingProgress {
   versionId: string;

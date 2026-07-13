@@ -5,8 +5,10 @@ import java.nio.file.Path;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
+@ConfigurationPropertiesScan
 @MapperScan("com.example.interviewreader.persistence.mapper")
 public class InterviewReaderApplication {
     private static final String PDFBOX_FONT_CACHE_PROPERTY = "pdfbox.fontcache";

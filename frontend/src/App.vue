@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   commitImportJob,
   createNote,
+  exportDocument,
+  getAuthSession,
   getDocument,
   getImportIssues,
   getImportJob,
@@ -12,6 +14,8 @@ import {
   getReviewQueue,
   getToc,
   listDocuments,
+  login,
+  logout,
   publishVersion,
   saveBookmark,
   saveReadingProgress,
@@ -30,11 +34,13 @@ import { enqueueReadingProgress, flushReadingProgressQueue } from "./offline/pro
 import type {
   ContentBlock,
   DocumentSummary,
+  ExportFormat,
   ImportIssue,
   ImportJob,
   Mastery,
   NodeContent,
   NormalizedPackage,
+  ReadingProgress,
   ReviewQueueItem,
   SearchHit,
   SourceBbox,
@@ -44,9 +50,17 @@ import type {
   TocNode
 } from "./types/api";
 import { pageForBbox, sourceOverlayLabel, sourceOverlayStyle } from "./utils/sourceBbox";
+import { blockAtViewportAnchor, scrollTopForBlockOffset } from "./utils/readingPosition";
 import { firstReadableNode, flattenToc, isQuestionNode, progressRatioForNode, questionAnswerNodes } from "./utils/toc";
 
+const authReady = ref(false);
+const authSession = ref({ authenticated: false, username: null as string | null });
+const loginForm = ref({ username: "", password: "" });
+const loginBusy = ref(false);
+const loginError = ref("");
 const documents = ref<DocumentSummary[]>([]);
+const documentNextCursor = ref<string | null>(null);
+const loadingMoreDocuments = ref(false);
 const selectedDocument = ref<DocumentSummary | null>(null);
 const toc = ref<TocNode[]>([]);
 const activeNode = ref<TocNode | null>(null);
@@ -57,6 +71,9 @@ const error = ref("");
 const query = ref("");
 const searchHits = ref<SearchHit[]>([]);
 const searchStatus = ref("");
+const exportingFormat = ref<ExportFormat | null>(null);
+const mobileToolsOpen = ref(false);
+const mobileSearchOpen = ref(false);
 const theme = ref(localStorage.getItem("reader.theme") || "light");
 const fontScale = ref(Number(localStorage.getItem("reader.fontScale") || "18"));
 const lineHeight = ref(Number(localStorage.getItem("reader.lineHeight") || "1.82"));
@@ -72,17 +89,28 @@ const importIssues = ref<ImportIssue[]>([]);
 const normalizedPackage = ref<NormalizedPackage | null>(null);
 const selectedSourcePage = ref<number | null>(null);
 const selectedSourceBbox = ref<SourceBbox | null>(null);
+const readerMain = ref<HTMLElement | null>(null);
+const currentReadingBlock = ref<ContentBlock | null>(null);
+const currentBlockViewportOffset = ref(0);
+const currentProgressRevision = ref(0);
 const deviceId = localStorage.getItem("reader.deviceId") || crypto.randomUUID();
+let onlineListenerAttached = false;
+let progressListenersAttached = false;
+let progressSaveTimer: number | null = null;
+let readingPositionFrame: number | null = null;
+let lastReadingPositionCheck = 0;
+let lastPersistedProgressSignature = "";
 
 localStorage.setItem("reader.deviceId", deviceId);
 
 const allNodes = computed(() => flattenToc(toc.value));
-const activeIndex = computed(() => allNodes.value.findIndex((node) => node.id === activeNode.value?.id));
-const previousNode = computed(() => (activeIndex.value > 0 ? allNodes.value[activeIndex.value - 1] : null));
+const readableNodes = computed(() => allNodes.value.filter((node) => isQuestionNode(node) || node.children.length === 0));
+const activeIndex = computed(() => readableNodes.value.findIndex((node) => node.id === activeNode.value?.id));
+const previousNode = computed(() => (activeIndex.value > 0 ? readableNodes.value[activeIndex.value - 1] : null));
 const nextNode = computed(() =>
-  activeIndex.value >= 0 && activeIndex.value < allNodes.value.length - 1 ? allNodes.value[activeIndex.value + 1] : null
+  activeIndex.value >= 0 && activeIndex.value < readableNodes.value.length - 1 ? readableNodes.value[activeIndex.value + 1] : null
 );
-const currentBlock = computed(() => content.value?.blocks[0] ?? null);
+const currentBlock = computed(() => currentReadingBlock.value ?? content.value?.blocks[0] ?? null);
 const isQuestionMode = computed(() => isQuestionNode(activeNode.value));
 const answerNodes = computed(() => questionAnswerNodes(activeNode.value));
 const stagedSections = computed(() => normalizedPackage.value?.sections.slice(0, 12) ?? []);
@@ -93,6 +121,13 @@ const importSourceUrl = computed(() =>
 const isReviewPdf = computed(() => String(normalizedPackage.value?.version.sourceType ?? "").toUpperCase() === "PDF");
 const selectedSourceOverlay = computed(() => sourceOverlayStyle(selectedSourceBbox.value));
 const selectedSourceLabel = computed(() => sourceOverlayLabel(selectedSourceBbox.value, selectedSourcePage.value));
+const currentProgressPercent = computed(() => activeNode.value ? Math.round(progressRatioForNode(toc.value, activeNode.value.id) * 100) : 0);
+const exportFormats: Array<{ format: ExportFormat; label: string }> = [
+  { format: "JSON_PACKAGE", label: "JSON" },
+  { format: "EXCEL", label: "Excel" },
+  { format: "MARKDOWN", label: "Markdown" },
+  { format: "STATIC_HTML", label: "HTML" }
+];
 const terminalImportStatuses = new Set(["READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED"]);
 
 const readerStyle = computed(() => ({
@@ -113,19 +148,122 @@ watch(lineHeight, (value) => {
 });
 
 onMounted(() => {
-  void refreshDocuments();
-  void flushQueuedProgress();
-  window.addEventListener("online", flushQueuedProgress);
+  void initializeSession();
 });
+
+onBeforeUnmount(() => {
+  if (onlineListenerAttached) {
+    window.removeEventListener("online", flushQueuedProgress);
+  }
+  if (progressListenersAttached) {
+    document.removeEventListener("visibilitychange", saveProgressWhenHidden);
+    window.removeEventListener("pagehide", saveProgressWhenHidden);
+  }
+  if (progressSaveTimer !== null) {
+    window.clearTimeout(progressSaveTimer);
+  }
+  if (readingPositionFrame !== null) {
+    window.cancelAnimationFrame(readingPositionFrame);
+  }
+});
+
+async function initializeSession(): Promise<void> {
+  try {
+    authSession.value = await getAuthSession();
+  } catch {
+    authSession.value = { authenticated: false, username: null };
+  } finally {
+    authReady.value = true;
+  }
+  if (authSession.value.authenticated) {
+    startAuthenticatedApp();
+    await refreshDocuments();
+  }
+}
+
+async function submitLogin(): Promise<void> {
+  loginBusy.value = true;
+  loginError.value = "";
+  try {
+    authSession.value = await login(loginForm.value);
+    loginForm.value.password = "";
+    startAuthenticatedApp();
+    await refreshDocuments();
+  } catch (caught) {
+    loginError.value = caught instanceof Error ? caught.message : "登录失败";
+  } finally {
+    loginBusy.value = false;
+  }
+}
+
+async function signOut(): Promise<void> {
+  await logout().catch(() => undefined);
+  authSession.value = { authenticated: false, username: null };
+  loginForm.value.password = "";
+  resetWorkspace();
+}
+
+function startAuthenticatedApp(): void {
+  flushQueuedProgress();
+  if (!onlineListenerAttached) {
+    window.addEventListener("online", flushQueuedProgress);
+    onlineListenerAttached = true;
+  }
+  if (!progressListenersAttached) {
+    document.addEventListener("visibilitychange", saveProgressWhenHidden);
+    window.addEventListener("pagehide", saveProgressWhenHidden);
+    progressListenersAttached = true;
+  }
+  if (readingPositionFrame === null) {
+    readingPositionFrame = window.requestAnimationFrame(pollReadingPosition);
+  }
+}
+
+function resetWorkspace(): void {
+  documents.value = [];
+  documentNextCursor.value = null;
+  loadingMoreDocuments.value = false;
+  selectedDocument.value = null;
+  toc.value = [];
+  activeNode.value = null;
+  content.value = null;
+  currentReadingBlock.value = null;
+  currentBlockViewportOffset.value = 0;
+  currentProgressRevision.value = 0;
+  lastPersistedProgressSignature = "";
+  reviewQueue.value = [];
+  searchHits.value = [];
+  searchStatus.value = "";
+  error.value = "";
+  clearImportReview();
+}
 
 async function refreshDocuments(): Promise<void> {
   await run("正在加载文档", async () => {
-    const response = await listDocuments(query.value);
+    const response = await listDocuments(query.value, null);
     documents.value = response.items;
+    documentNextCursor.value = response.nextCursor;
     if (!selectedDocument.value && response.items.length > 0) {
       await selectDocument(response.items[0]);
     }
   });
+}
+
+async function loadMoreDocuments(): Promise<void> {
+  if (!documentNextCursor.value || loadingMoreDocuments.value) {
+    return;
+  }
+  loadingMoreDocuments.value = true;
+  try {
+    const response = await listDocuments(query.value, documentNextCursor.value);
+    const existingIds = new Set(documents.value.map((document) => document.id));
+    documents.value = [...documents.value, ...response.items.filter((document) => !existingIds.has(document.id))];
+    documentNextCursor.value = response.nextCursor;
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : "加载更多文档失败";
+  } finally {
+    loadingMoreDocuments.value = false;
+  }
 }
 
 async function searchLibrary(): Promise<void> {
@@ -164,9 +302,10 @@ async function selectDocument(document: DocumentSummary): Promise<void> {
     reviewQueue.value = [];
     toc.value = await getToc(versionId);
     const progress = await getReadingProgress(document.id).catch(() => null);
+    currentProgressRevision.value = progress?.revision ?? 0;
     const resumeNode =
       progress?.sectionId ? allNodes.value.find((node) => node.id === progress.sectionId) ?? null : null;
-    await selectNode(resumeNode ?? firstReadableNode(toc.value));
+    await selectNode(resumeNode ?? firstReadableNode(toc.value), progress?.versionId === versionId ? progress : null);
   });
 }
 
@@ -178,9 +317,12 @@ function clearImportReview(): void {
   selectedSourceBbox.value = null;
 }
 
-async function selectNode(node: TocNode | null): Promise<void> {
+async function selectNode(node: TocNode | null, restoreProgress: ReadingProgress | null = null): Promise<void> {
   if (!node || !selectedDocument.value?.currentVersionId) {
     return;
+  }
+  if (activeNode.value && activeNode.value.id !== node.id) {
+    await saveProgress();
   }
   await run("正在加载正文", async () => {
     activeNode.value = node;
@@ -192,8 +334,10 @@ async function selectNode(node: TocNode | null): Promise<void> {
     answerContents.value = {};
     tocOpen.value = false;
     await nextTick();
-    document.querySelector("[data-reader-main]")?.scrollTo({ top: 0, behavior: "smooth" });
-    await saveProgress(content.value.blocks[0] ?? null);
+    restoreReadingPosition(restoreProgress);
+    if (!restoreProgress) {
+      await saveProgress();
+    }
   });
 }
 
@@ -212,24 +356,150 @@ async function loadNodeContent(versionId: string, nodeId: string, limit: number)
   }
 }
 
-async function saveProgress(block: ContentBlock | null): Promise<void> {
-  if (!selectedDocument.value?.currentVersionId || !activeNode.value) {
+function restoreReadingPosition(progress: ReadingProgress | null): void {
+  const main = readerMain.value;
+  const fallbackBlock = content.value?.blocks[0] ?? null;
+  const restoredBlock = progress?.blockId
+    ? content.value?.blocks.find((block) => block.id === progress.blockId) ?? fallbackBlock
+    : fallbackBlock;
+  const hasSavedBlock = progress?.blockId === restoredBlock?.id;
+  currentReadingBlock.value = restoredBlock;
+  currentBlockViewportOffset.value = hasSavedBlock ? progress?.blockViewportOffset ?? 0 : 0;
+  if (progress) {
+    lastPersistedProgressSignature = progressSignature(progress);
+  }
+  if (!main || !restoredBlock) {
     return;
   }
-  const progress = {
+  const target = Array.from(main.querySelectorAll<HTMLElement>("[data-block-id]"))
+    .find((element) => element.dataset.blockId === restoredBlock.id);
+  if (!target) {
+    main.scrollTo({ top: 0, behavior: "auto" });
+    return;
+  }
+  const mainRect = main.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const savedOffset = hasSavedBlock ? progress?.blockViewportOffset ?? 0 : 0;
+  main.scrollTo({
+    top: scrollTopForBlockOffset(main.scrollTop, targetRect.top - mainRect.top, savedOffset),
+    behavior: "auto"
+  });
+}
+
+function captureReadingPosition(): boolean {
+  const main = readerMain.value;
+  const blocks = content.value?.blocks;
+  if (!main || !blocks?.length) {
+    return false;
+  }
+  const mainRect = main.getBoundingClientRect();
+  const elements = Array.from(main.querySelectorAll<HTMLElement>("[data-block-id]"));
+  const anchorY = mainRect.top + Math.min(40, Math.max(20, main.clientHeight * 0.1));
+  const visibleBlock = blockAtViewportAnchor(
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { id: element.dataset.blockId ?? "", top: rect.top, bottom: rect.bottom };
+    }),
+    anchorY
+  );
+  const nextBlock = visibleBlock ? blocks.find((block) => block.id === visibleBlock.id) ?? null : null;
+  if (!nextBlock) {
+    return false;
+  }
+  const nextOffset = Math.round(visibleBlock!.top - mainRect.top);
+  const changed = currentReadingBlock.value?.id !== nextBlock.id || currentBlockViewportOffset.value !== nextOffset;
+  currentReadingBlock.value = nextBlock;
+  currentBlockViewportOffset.value = nextOffset;
+  return changed;
+}
+
+function onReaderScroll(): void {
+  if (!captureReadingPosition()) {
+    return;
+  }
+  scheduleProgressSave();
+}
+
+function pollReadingPosition(timestamp: number): void {
+  if (document.visibilityState !== "hidden" && timestamp - lastReadingPositionCheck >= 250) {
+    lastReadingPositionCheck = timestamp;
+    if (captureReadingPosition()) {
+      void saveProgress();
+    }
+  }
+  readingPositionFrame = window.requestAnimationFrame(pollReadingPosition);
+}
+
+function scheduleProgressSave(): void {
+  if (progressSaveTimer !== null) {
+    window.clearTimeout(progressSaveTimer);
+  }
+  progressSaveTimer = window.setTimeout(() => {
+    progressSaveTimer = null;
+    void saveProgress();
+  }, 2_000);
+}
+
+function currentProgress(): ReadingProgress | null {
+  if (!selectedDocument.value?.currentVersionId || !activeNode.value) {
+    return null;
+  }
+  return {
     versionId: selectedDocument.value.currentVersionId,
     sectionId: activeNode.value.id,
-    blockId: block?.id ?? null,
+    blockId: currentReadingBlock.value?.id ?? null,
     charOffset: 0,
-    blockViewportOffset: 0,
+    blockViewportOffset: currentBlockViewportOffset.value,
     progressRatio: progressRatioForNode(toc.value, activeNode.value.id),
     clientUpdatedAt: new Date().toISOString(),
     deviceId,
-    revision: 0
+    revision: currentProgressRevision.value
   };
-  await saveReadingProgress(selectedDocument.value.id, progress)
-    .then(() => flushQueuedProgress())
-    .catch(() => enqueueReadingProgress(selectedDocument.value!.id, progress));
+}
+
+async function saveProgress(): Promise<void> {
+  const progress = currentProgress();
+  if (!progress || !selectedDocument.value) {
+    return;
+  }
+  const signature = progressSignature(progress);
+  if (signature === lastPersistedProgressSignature) {
+    return;
+  }
+  try {
+    const saved = await saveReadingProgress(selectedDocument.value.id, progress);
+    currentProgressRevision.value = saved.revision;
+    lastPersistedProgressSignature = progressSignature(saved);
+    flushQueuedProgress();
+  } catch {
+    lastPersistedProgressSignature = signature;
+    await enqueueReadingProgress(selectedDocument.value.id, progress);
+  }
+}
+
+function progressSignature(progress: ReadingProgress): string {
+  return [
+    progress.versionId,
+    progress.sectionId ?? "",
+    progress.blockId ?? "",
+    progress.charOffset,
+    progress.blockViewportOffset,
+    progress.progressRatio
+  ].join("|");
+}
+
+function saveProgressWhenHidden(event: Event): void {
+  if (document.visibilityState !== "hidden" && event.type !== "pagehide") {
+    return;
+  }
+  const progress = currentProgress();
+  if (!progress || !selectedDocument.value) {
+    return;
+  }
+  const body = new Blob([JSON.stringify(progress)], { type: "application/json" });
+  if (!navigator.sendBeacon?.(`/api/reading-progress/${selectedDocument.value.id}`, body)) {
+    void enqueueReadingProgress(selectedDocument.value.id, progress);
+  }
 }
 
 function flushQueuedProgress(): void {
@@ -301,6 +571,49 @@ async function clearOfflineCache(): Promise<void> {
   });
 }
 
+async function exportCurrentDocument(format: ExportFormat): Promise<void> {
+  if (!selectedDocument.value?.currentVersionId) {
+    interactionMessage.value = "请先选择已发布文档";
+    return;
+  }
+  exportingFormat.value = format;
+  await runInteraction("正在导出", async () => {
+    const blob = await exportDocument(selectedDocument.value!.id, selectedDocument.value!.currentVersionId!, format);
+    saveBlob(blob, exportFileName(selectedDocument.value!.title, format));
+    interactionMessage.value = `已导出 ${exportLabel(format)}`;
+  });
+  exportingFormat.value = null;
+}
+
+function saveBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportFileName(title: string, format: ExportFormat): string {
+  const safeTitle = title.trim().replace(/[\\/:*?"<>|]+/g, "-").slice(0, 80) || "interview-reader";
+  return `${safeTitle}.${exportExtension(format)}`;
+}
+
+function exportExtension(format: ExportFormat): string {
+  return {
+    JSON_PACKAGE: "json",
+    EXCEL: "xlsx",
+    MARKDOWN: "md",
+    STATIC_HTML: "html"
+  }[format];
+}
+
+function exportLabel(format: ExportFormat): string {
+  return exportFormats.find((item) => item.format === format)?.label ?? format;
+}
+
 async function openReviewItem(item: ReviewQueueItem): Promise<void> {
   if (item.documentId !== selectedDocument.value?.id) {
     return;
@@ -335,6 +648,20 @@ async function openSearchHit(hit: SearchHit): Promise<void> {
     await selectNode(node);
     interactionMessage.value = `已定位：${hit.title}`;
   });
+}
+
+function toggleMobileTools(): void {
+  mobileToolsOpen.value = !mobileToolsOpen.value;
+}
+
+function toggleMobileSearch(): void {
+  mobileSearchOpen.value = !mobileSearchOpen.value;
+  mobileToolsOpen.value = false;
+}
+
+function openMobileToc(): void {
+  tocOpen.value = true;
+  mobileToolsOpen.value = false;
 }
 
 async function toggleAnswer(): Promise<void> {
@@ -626,7 +953,36 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
 </script>
 
 <template>
-  <div class="app-shell" :class="`theme-${theme}`" :style="readerStyle">
+  <div class="app-shell" :class="[`theme-${theme}`, { 'auth-mode': !authSession.authenticated }]" :style="readerStyle">
+    <section v-if="!authReady" class="login-shell" aria-live="polite">
+      <div class="login-panel">
+        <span class="login-mark" aria-hidden="true"></span>
+        <h1>Interview Reader</h1>
+        <p>正在检查登录状态</p>
+      </div>
+    </section>
+
+    <section v-else-if="!authSession.authenticated" class="login-shell">
+      <form class="login-panel" @submit.prevent="submitLogin">
+        <span class="login-mark" aria-hidden="true"></span>
+        <h1>Interview Reader</h1>
+        <p>登录后才能导入、阅读、搜索、导出和保存进度。</p>
+        <label>
+          用户名
+          <input v-model.trim="loginForm.username" type="text" autocomplete="username" required />
+        </label>
+        <label>
+          密码
+          <input v-model="loginForm.password" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary-action" type="submit" :disabled="loginBusy">
+          {{ loginBusy ? "登录中" : "登录" }}
+        </button>
+        <span v-if="loginError" class="login-error">{{ loginError }}</span>
+      </form>
+    </section>
+
+    <template v-else>
     <aside class="library-panel">
       <div class="library-header">
         <h1>Interview Reader</h1>
@@ -679,6 +1035,15 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
           <span>{{ progressPercent(document.progressRatio) }}%</span>
         </button>
       </nav>
+      <button
+        v-if="documentNextCursor"
+        class="load-more-documents"
+        type="button"
+        :disabled="loadingMoreDocuments"
+        @click="loadMoreDocuments"
+      >
+        {{ loadingMoreDocuments ? "加载中" : "加载更多" }}
+      </button>
     </aside>
 
     <section class="reader-area">
@@ -692,24 +1057,30 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
           <span v-else-if="importReviewJob">{{ importReviewJob.status }}</span>
         </div>
         <div class="toolbar-actions">
-          <IconButton label="上一节" :disabled="!previousNode" @click="selectNode(previousNode)">
+          <IconButton class="desktop-nav-action" label="上一节" :disabled="!previousNode" @click="selectNode(previousNode)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
           </IconButton>
-          <IconButton label="下一节" :disabled="!nextNode" @click="selectNode(nextNode)">
+          <IconButton class="desktop-nav-action" label="下一节" :disabled="!nextNode" @click="selectNode(nextNode)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           </IconButton>
           <IconButton label="主题" @click="theme = theme === 'light' ? 'sepia' : theme === 'sepia' ? 'dark' : 'light'">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z" /></svg>
+          </IconButton>
+          <IconButton label="退出登录" @click="signOut">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-5" /></svg>
           </IconButton>
         </div>
       </header>
 
       <div class="reader-body">
         <aside class="toc-panel" :class="{ open: tocOpen }">
+          <button class="toc-close" type="button" aria-label="关闭目录" @click="tocOpen = false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
           <TocTree :nodes="toc" :active-node-id="activeNode?.id ?? null" @select="selectNode" />
         </aside>
 
-        <main class="content-panel" data-reader-main>
+        <main ref="readerMain" class="content-panel" data-reader-main @scroll.passive="onReaderScroll">
           <div v-if="loading" class="state-line">{{ busyMessage }}</div>
           <div v-else-if="error" class="state-line error">{{ error }}</div>
           <section v-else-if="importReviewJob && normalizedPackage" class="import-review">
@@ -880,6 +1251,20 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
             <strong>{{ activeNode ? Math.round(progressRatioForNode(toc, activeNode.id) * 100) : 0 }}%</strong>
           </div>
           <section class="assist-section">
+            <h2>导出</h2>
+            <div class="export-actions" role="group" aria-label="导出当前文档">
+              <button
+                v-for="item in exportFormats"
+                :key="item.format"
+                type="button"
+                :disabled="!selectedDocument?.currentVersionId || exportingFormat !== null"
+                @click="exportCurrentDocument(item.format)"
+              >
+                {{ exportingFormat === item.format ? "..." : item.label }}
+              </button>
+            </div>
+          </section>
+          <section class="assist-section">
             <h2>复习</h2>
             <div class="review-actions">
               <button type="button" :disabled="!selectedDocument" @click="loadReviewQueue(false)">
@@ -949,5 +1334,64 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
         </aside>
       </div>
     </section>
+    <nav class="mobile-page-nav" aria-label="移动端翻页">
+      <button type="button" :disabled="!previousNode" aria-label="上一节" @click="selectNode(previousNode)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      </button>
+      <button type="button" :disabled="!nextNode" aria-label="下一节" @click="selectNode(nextNode)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      </button>
+    </nav>
+
+    <div class="mobile-toolbox" :class="{ open: mobileToolsOpen }">
+      <div class="mobile-tool-actions" aria-label="移动端工具箱">
+        <label class="mobile-tool-action import" title="导入">
+          <input
+            type="file"
+            accept="application/json,.json,text/markdown,.md,.markdown,application/pdf,.pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
+            @change="importSourceFile"
+          />
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 21h14" /></svg>
+        </label>
+        <button class="mobile-tool-action search" type="button" aria-label="搜索" @click="toggleMobileSearch">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
+        </button>
+        <button class="mobile-tool-action toc" type="button" aria-label="目录" @click="openMobileToc">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <div class="mobile-tool-action progress" aria-label="当前进度">
+          <strong>{{ currentProgressPercent }}%</strong>
+        </div>
+      </div>
+      <div v-if="mobileSearchOpen" class="mobile-search-panel">
+        <input
+          v-model="query"
+          class="search-input"
+          type="search"
+          placeholder="搜索文档或正文"
+          @keyup.enter="searchLibrary"
+        />
+        <section v-if="searchHits.length > 0 || searchStatus" class="search-results" aria-label="移动端正文搜索结果">
+          <header>
+            <h2>正文命中</h2>
+            <span>{{ searchStatus }}</span>
+          </header>
+          <button
+            v-for="hit in searchHits"
+            :key="`mobile-${hit.versionId}-${hit.blockId}`"
+            class="search-hit"
+            type="button"
+            @click="openSearchHit(hit)"
+          >
+            <strong>{{ hit.title }}</strong>
+            <span>{{ hit.snippet }}</span>
+          </button>
+        </section>
+      </div>
+      <button class="mobile-tool-toggle" type="button" aria-label="打开工具箱" @click="toggleMobileTools">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" /></svg>
+      </button>
+    </div>
+    </template>
   </div>
 </template>

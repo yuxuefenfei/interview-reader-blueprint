@@ -2,8 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cancelImportJob,
   createNote,
+  exportDocument,
+  getAuthSession,
   getImportIssues,
   getNormalizedPackage,
+  listDocuments,
+  login,
+  logout,
   getReviewQueue,
   reviseStagedBlock,
   reviseStagedSection,
@@ -95,7 +100,10 @@ describe("api client interactions", () => {
 
     await getReviewQueue("document-1", 5, true);
 
-    expect(fetch).toHaveBeenCalledWith("/api/review-queue?documentId=document-1&limit=5&dueOnly=true", undefined);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/review-queue?documentId=document-1&limit=5&dueOnly=true",
+      expect.objectContaining({ credentials: "include" })
+    );
   });
 
   it("searches content with encoded query and optional document scope", async () => {
@@ -106,7 +114,72 @@ describe("api client interactions", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       "/api/search?q=HashMap+%E5%B9%B6%E5%8F%91&limit=8&documentId=document-1",
-      undefined
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+
+  it("requests subsequent document pages using the opaque cursor", async () => {
+    const fetch = vi.fn().mockResolvedValue(mockJsonResponse({ items: [], nextCursor: null }));
+    vi.stubGlobal("fetch", fetch);
+
+    await listDocuments("Java 并发", "next-page", 16);
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/documents?limit=16&query=Java+%E5%B9%B6%E5%8F%91&cursor=next-page",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+
+  it("uses cookie-backed auth endpoints", async () => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(mockJsonResponse({ authenticated: true, username: "admin" })));
+    vi.stubGlobal("fetch", fetch);
+
+    await getAuthSession();
+    await login({ username: "admin", password: "admin" });
+    await logout();
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      "/api/auth/session",
+      expect.objectContaining({ credentials: "include" })
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "/api/auth/login",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ username: "admin", password: "admin" })
+      })
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST", credentials: "include" })
+    );
+  });
+
+  it("exports document packages as binary responses", async () => {
+    const response = new Response(new Blob(["{}"], { type: "application/json" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+    const fetch = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal("fetch", fetch);
+
+    const blob = await exportDocument("document-1", "version-1", "JSON_PACKAGE");
+
+    expect(blob.type).toBe("application/json");
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/exports",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          documentId: "document-1",
+          versionId: "version-1",
+          format: "JSON_PACKAGE"
+        })
+      })
     );
   });
 
@@ -117,8 +190,16 @@ describe("api client interactions", () => {
     await getImportIssues("job-1");
     await getNormalizedPackage("job-1");
 
-    expect(fetch).toHaveBeenNthCalledWith(1, "/api/import-jobs/job-1/issues", undefined);
-    expect(fetch).toHaveBeenNthCalledWith(2, "/api/import-jobs/job-1/normalized-package", undefined);
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      "/api/import-jobs/job-1/issues",
+      expect.objectContaining({ credentials: "include" })
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "/api/import-jobs/job-1/normalized-package",
+      expect.objectContaining({ credentials: "include" })
+    );
   });
 
   it("builds source file review URLs", () => {

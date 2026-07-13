@@ -3,6 +3,7 @@ package com.example.interviewreader.document;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.document.DocumentDtos.ContentBlock;
+import com.example.interviewreader.document.DocumentDtos.DocumentPage;
 import com.example.interviewreader.document.DocumentDtos.DocumentSummary;
 import com.example.interviewreader.document.DocumentDtos.NodeContent;
 import com.example.interviewreader.document.DocumentDtos.ReadingProgress;
@@ -23,8 +24,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,19 +72,30 @@ public class DocumentQueryService {
         this.objectMapper = objectMapper;
     }
 
-    public List<DocumentSummary> listDocuments(String query) {
-        var normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-        var documents = documentMapper.selectListByQuery(QueryWrapper.create()
+    public DocumentPage listDocuments(String query, String cursor, Integer limit) {
+        var normalizedQuery = query == null ? "" : query.trim();
+        var safeLimit = Math.clamp(limit == null ? 16 : limit, 1, 100);
+        var pageCursor = decodeDocumentCursor(cursor);
+        var wrapper = QueryWrapper.create()
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
-                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .orderBy(DOCUMENT_ENTITY.UPDATED_AT.desc(), DOCUMENT_ENTITY.TITLE.asc()));
-        return documents.stream()
-                .filter(document -> normalizedQuery.isBlank()
-                        || lower(document.title).contains(normalizedQuery)
-                        || lower(document.code).contains(normalizedQuery))
-                .map(this::mapDocumentSummary)
-                .toList();
+                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID));
+        if (!normalizedQuery.isBlank()) {
+            wrapper.and(DOCUMENT_ENTITY.TITLE.like(normalizedQuery)
+                    .or(DOCUMENT_ENTITY.CODE.like(normalizedQuery)));
+        }
+        if (pageCursor != null) {
+            wrapper.and(DOCUMENT_ENTITY.UPDATED_AT.lt(pageCursor.updatedAt())
+                    .or(DOCUMENT_ENTITY.UPDATED_AT.eq(pageCursor.updatedAt())
+                            .and(DOCUMENT_ENTITY.ID.gt(pageCursor.documentId()))));
+        }
+        var documents = documentMapper.selectListByQuery(wrapper
+                .orderBy(DOCUMENT_ENTITY.UPDATED_AT.desc(), DOCUMENT_ENTITY.ID.asc())
+                .limit(safeLimit + 1));
+        var hasNext = documents.size() > safeLimit;
+        var pageItems = hasNext ? documents.subList(0, safeLimit) : documents;
+        var nextCursor = hasNext ? encodeDocumentCursor(pageItems.getLast()) : null;
+        return new DocumentPage(pageItems.stream().map(this::mapDocumentSummary).toList(), nextCursor);
     }
 
     public DocumentSummary getDocument(UUID documentId) {
@@ -631,6 +645,27 @@ public class DocumentQueryService {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
+    private String encodeDocumentCursor(DocumentEntity document) {
+        var raw = document.updatedAt.toInstant() + "|" + document.id;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private DocumentCursor decodeDocumentCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return null;
+        }
+        try {
+            var raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            var separator = raw.indexOf('|');
+            if (separator <= 0 || separator == raw.length() - 1) {
+                throw new IllegalArgumentException("cursor shape");
+            }
+            return new DocumentCursor(OffsetDateTime.parse(raw.substring(0, separator)), raw.substring(separator + 1));
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid document cursor");
+        }
+    }
+
     private static boolean containsIgnoreCase(String value, String needle) {
         return lower(value).contains(lower(needle));
     }
@@ -693,5 +728,8 @@ public class DocumentQueryService {
     }
 
     private record ProgressTarget(String sectionId, String blockId, boolean resetPosition, boolean documentStart) {
+    }
+
+    private record DocumentCursor(OffsetDateTime updatedAt, String documentId) {
     }
 }

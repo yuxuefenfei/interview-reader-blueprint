@@ -10,7 +10,7 @@ spring:
       max-request-size: 10MB
 
 server:
-  port: 8080
+  port: 28080
 
 management:
   endpoints:
@@ -21,6 +21,11 @@ management:
 interview-reader:
   converter-version: json-package-0.1.0
   storage-dir: ./data/import-sources
+  security:
+    enabled: true
+    username: ${INTERVIEW_READER_USERNAME:admin}
+    password: ${INTERVIEW_READER_PASSWORD:admin}
+    session-ttl: PT12H
   import-worker:
     enabled: true
     max-concurrency: 2

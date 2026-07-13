@@ -5,8 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     proxy: {
-      "/api": "http://localhost:8080",
-      "/actuator": "http://localhost:8080"
+      "/api": "http://localhost:28080",
+      "/actuator": "http://localhost:28080"
     }
   },
   build: {

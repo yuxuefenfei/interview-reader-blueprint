@@ -4,7 +4,6 @@ import com.example.interviewreader.document.DocumentDtos.DocumentSummary;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -17,8 +16,12 @@ public class DocumentController {
     }
 
     @GetMapping
-    public Map<String, Object> list(@RequestParam(required = false) String query) {
-        return Map.of("items", service.listDocuments(query), "nextCursor", "");
+    public DocumentDtos.DocumentPage list(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return service.listDocuments(query, cursor, limit);
     }
 
     @GetMapping("/{documentId}")

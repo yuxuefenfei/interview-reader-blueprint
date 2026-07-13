@@ -157,6 +157,45 @@ class InterviewReaderApiTests {
     }
 
     @Test
+    void documentLibraryUsesDatabaseCursorPagination() throws Exception {
+        var marker = "cursor-page-" + UUID.randomUUID();
+        for (var index = 0; index < 3; index++) {
+            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+            ((ObjectNode) source.get("document")).put("documentKey", marker + "-key-" + index);
+            ((ObjectNode) source.get("document")).put("title", marker + " title " + index);
+            ((ObjectNode) source.get("version")).put("versionKey", "cursor-" + index);
+            importAndCommit(objectMapper.writeValueAsBytes(source));
+        }
+
+        var first = objectMapper.readTree(mockMvc.perform(get("/api/documents")
+                        .param("query", marker)
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+        var cursor = first.get("nextCursor").asText();
+        assertThat(cursor).isNotBlank();
+
+        var second = objectMapper.readTree(mockMvc.perform(get("/api/documents")
+                        .param("query", marker)
+                        .param("limit", "2")
+                        .param("cursor", cursor))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.nextCursor").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+        assertThat(first.get("items").findValuesAsText("id"))
+                .doesNotContain(second.get("items").get(0).get("id").asText());
+
+        mockMvc.perform(get("/api/documents").param("cursor", "not-a-valid-cursor"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void importJobRecordsWorkerStageAndStatistics() throws Exception {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "worker-stage-" + UUID.randomUUID());

@@ -27,10 +27,10 @@ mvn spring-boot:run
 
 启动后访问：
 
-- `http://localhost:8080/`
-- `http://localhost:8080/api/health`
-- `http://localhost:8080/actuator/health`
-- `http://localhost:8080/h2-console`
+- `http://localhost:28080/`
+- `http://localhost:28080/api/health`
+- `http://localhost:28080/actuator/health`
+- `http://localhost:28080/h2-console`
 
 H2 数据文件默认写入 `./data/interview-reader`。
 
@@ -42,7 +42,7 @@ npm install
 npm run dev
 ```
 
-Vite 会把 `/api` 代理到 `http://localhost:8080`。
+Vite 会把 `/api` 代理到 `http://localhost:28080`。
 
 ## Jar 方式运行
 
@@ -73,6 +73,17 @@ $env:DATABASE_USERNAME='interview_reader'
 $env:DATABASE_PASSWORD='interview_reader'
 java -jar target/interview-reader-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod
 ```
+
+## 登录配置
+
+所有业务 API 都要求登录。开发 profile 默认账号为 `admin` / `admin`，可通过环境变量覆盖；生产 profile 必须显式提供两项凭据：
+
+```powershell
+$env:INTERVIEW_READER_USERNAME='reader-admin'
+$env:INTERVIEW_READER_PASSWORD='replace-with-a-strong-password'
+```
+
+会话使用单实例内存存储、HttpOnly 且 SameSite=Lax 的 Cookie。应用重启后现有会话会失效；单实例部署无需 Redis。
 
 ## 已实现 API
 

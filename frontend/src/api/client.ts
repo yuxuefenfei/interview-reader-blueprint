@@ -1,11 +1,14 @@
 import type {
   Bookmark,
   BookmarkRequest,
+  AuthSession,
   DocumentListResponse,
   DocumentSummary,
   DocumentVersion,
+  ExportFormat,
   ImportIssue,
   ImportJob,
+  LoginRequest,
   Mastery,
   Note,
   NoteRequest,
@@ -22,7 +25,7 @@ import type {
 } from "../types/api";
 
 async function request<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init);
+  const response = await fetch(input, withCredentials(init));
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: response.statusText }));
     throw new Error(typeof body.error === "string" ? body.error : response.statusText);
@@ -33,9 +36,46 @@ async function request<T>(input: RequestInfo | URL, init?: RequestInit): Promise
   return response.json() as Promise<T>;
 }
 
-export function listDocuments(query = ""): Promise<DocumentListResponse> {
-  const params = query.trim() ? `?query=${encodeURIComponent(query.trim())}` : "";
-  return request<DocumentListResponse>(`/api/documents${params}`);
+async function requestBlob(input: RequestInfo | URL, init?: RequestInit): Promise<Blob> {
+  const response = await fetch(input, withCredentials(init));
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(typeof body.error === "string" ? body.error : response.statusText);
+  }
+  return response.blob();
+}
+
+function withCredentials(init?: RequestInit): RequestInit {
+  return { ...init, credentials: "include" };
+}
+
+export function getAuthSession(): Promise<AuthSession> {
+  return request<AuthSession>("/api/auth/session");
+}
+
+export function login(credentials: LoginRequest): Promise<AuthSession> {
+  return request<AuthSession>("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(credentials)
+  });
+}
+
+export function logout(): Promise<AuthSession> {
+  return request<AuthSession>("/api/auth/logout", {
+    method: "POST"
+  });
+}
+
+export function listDocuments(query = "", cursor: string | null = null, limit = 16): Promise<DocumentListResponse> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (query.trim()) {
+    params.set("query", query.trim());
+  }
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+  return request<DocumentListResponse>(`/api/documents?${params.toString()}`);
 }
 
 export function getDocument(documentId: string): Promise<DocumentSummary> {
@@ -59,6 +99,14 @@ export function searchContent(query: string, documentId?: string | null, limit =
     params.set("documentId", documentId);
   }
   return request<SearchHit[]>(`/api/search?${params.toString()}`);
+}
+
+export function exportDocument(documentId: string, versionId: string, format: ExportFormat): Promise<Blob> {
+  return requestBlob("/api/exports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documentId, versionId, format })
+  });
 }
 
 export function getReadingProgress(documentId: string): Promise<ReadingProgress | null> {

@@ -9,5 +9,7 @@ spring:
 
 interview-reader:
   storage-dir: ./target/test-import-sources
+  security:
+    enabled: false
   import-worker:
     enabled: false

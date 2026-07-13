@@ -26,6 +26,12 @@ public final class DocumentDtos {
     ) {
     }
 
+    public record DocumentPage(
+            List<DocumentSummary> items,
+            String nextCursor
+    ) {
+    }
+
     public record TocNode(
             UUID id,
             UUID parentId,

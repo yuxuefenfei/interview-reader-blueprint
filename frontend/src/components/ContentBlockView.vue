@@ -9,6 +9,12 @@ function textFromPayload(payload: Record<string, unknown>, fallback: string): st
   return typeof payload.text === "string" ? payload.text : fallback;
 }
 
+function codeTextFromPayload(payload: Record<string, unknown>, fallback: string): string {
+  return textFromPayload(payload, fallback)
+    .replace(/\r\n?/g, "\n")
+    .replace(/}\s+(?=[\u4e00-\u9fff])/g, "}\n");
+}
+
 function itemsFromPayload(payload: Record<string, unknown>): string[] {
   return Array.isArray(payload.items) ? payload.items.map(String) : [];
 }
@@ -48,7 +54,7 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
 
     <figure v-else-if="block.blockType === 'code'" class="code-block">
       <figcaption>{{ codeLanguage(block.payload, block) }}</figcaption>
-      <pre><code>{{ textFromPayload(block.payload, block.plainText) }}</code></pre>
+      <pre><code>{{ codeTextFromPayload(block.payload, block.plainText) }}</code></pre>
     </figure>
 
     <div v-else-if="block.blockType === 'table'" class="table-wrap">
