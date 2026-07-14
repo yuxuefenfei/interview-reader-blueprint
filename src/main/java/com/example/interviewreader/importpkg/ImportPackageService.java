@@ -121,11 +121,8 @@ public class ImportPackageService {
 
     @Transactional
     public ImportJobDto createImportJob(String sourceType, MultipartFile file, UUID targetDocumentId) {
-        var normalizedSourceType = sourceType.toUpperCase(Locale.ROOT);
-        if (!Set.of("JSON_PACKAGE", "EXCEL", "MARKDOWN", "PDF").contains(normalizedSourceType)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "MVP currently supports JSON_PACKAGE, EXCEL, MARKDOWN and PDF imports");
-        }
         var fileBytes = readBytes(file);
+        var normalizedSourceType = detectSourceType(file.getOriginalFilename(), fileBytes);
         var sourceSha256 = Hashes.sha256(fileBytes);
         var targetId = targetDocumentId == null ? null : id(targetDocumentId);
         if (targetId != null && documentMapper.selectOneByQuery(QueryWrapper.create()
@@ -627,6 +624,7 @@ public class ImportPackageService {
         return new ImportJobDto(
                 UUID.fromString(job.id),
                 uuid(job.targetDocumentId),
+                job.sourceType,
                 job.status,
                 job.currentStage,
                 job.progress,
@@ -717,6 +715,31 @@ public class ImportPackageService {
                 .where(IMPORT_JOB_ENTITY.ID.eq(id(jobId))));
     }
 
+    private String detectSourceType(String fileName, byte[] bytes) {
+        var normalizedName = Objects.toString(fileName, "").toLowerCase(Locale.ROOT);
+        if (startsWith(bytes, "%PDF-")) return "PDF";
+        if (normalizedName.endsWith(".xlsx") || normalizedName.endsWith(".xls") || looksLikeZip(bytes)) return "EXCEL";
+        if (normalizedName.endsWith(".md") || normalizedName.endsWith(".markdown")) return "MARKDOWN";
+        if (normalizedName.endsWith(".json") || firstNonWhitespace(bytes) == '{' || firstNonWhitespace(bytes) == '[') return "JSON_PACKAGE";
+        throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_SOURCE_FILE", "无法识别文件格式，请上传 PDF、Excel、Markdown 或 JSON 文档包。");
+    }
+
+    private static boolean startsWith(byte[] bytes, String prefix) {
+        var prefixBytes = prefix.getBytes(StandardCharsets.US_ASCII);
+        if (bytes.length < prefixBytes.length) return false;
+        for (var index = 0; index < prefixBytes.length; index++) {
+            if (bytes[index] != prefixBytes[index]) return false;
+        }
+        return true;
+    }
+
+    private static char firstNonWhitespace(byte[] bytes) {
+        for (var value : bytes) {
+            var character = (char) value;
+            if (!Character.isWhitespace(character)) return character;
+        }
+        return '\0';
+    }
     private ParsedSource parseSource(String sourceType, byte[] fileBytes, String sourceFileName, String sourceSha256) {
         if ("EXCEL".equals(sourceType)) {
             if (!looksLikeZip(fileBytes)) {

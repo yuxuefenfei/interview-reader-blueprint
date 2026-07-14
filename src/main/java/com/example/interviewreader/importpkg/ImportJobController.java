@@ -31,7 +31,7 @@ public class ImportJobController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ImportJobDto create(
-            @RequestParam("sourceType") String sourceType,
+            @RequestParam(required = false) String sourceType,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) UUID targetDocumentId
     ) {

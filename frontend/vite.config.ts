@@ -5,8 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     proxy: {
-      "/api": "http://localhost:28080",
-      "/actuator": "http://localhost:28080"
+      "/api": { target: process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:28080", changeOrigin: true },
+      "/actuator": { target: process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:28080", changeOrigin: true }
     }
   },
   build: {

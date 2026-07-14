@@ -1,9 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
-import ReaderView from "../views/ReaderView.vue";
-import AdminLayout from "../layouts/AdminLayout.vue";
-import AdminDocumentsView from "../views/AdminDocumentsView.vue";
-import ImportCenterView from "../views/ImportCenterView.vue";
-import VersionEditorView from "../views/VersionEditorView.vue";
+
+const ReaderView = () => import("../views/ReaderView.vue");
+const AdminLayout = () => import("../layouts/AdminLayout.vue");
+const AdminDocumentsView = () => import("../views/AdminDocumentsView.vue");
+const AdminDocumentDetailView = () => import("../views/AdminDocumentDetailView.vue");
+const ImportCenterView = () => import("../views/ImportCenterView.vue");
+const VersionEditorView = () => import("../views/VersionEditorView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -14,6 +16,7 @@ const router = createRouter({
     { path: "/admin", component: AdminLayout, children: [
       { path: "", redirect: "/admin/documents" },
       { path: "documents", component: AdminDocumentsView },
+      { path: "documents/:documentId", component: AdminDocumentDetailView },
       { path: "imports", component: ImportCenterView },
       { path: "versions/:versionId/edit", component: VersionEditorView }
     ] },
@@ -22,9 +25,7 @@ const router = createRouter({
 });
 
 router.beforeEach((to) => {
-  if (to.path.startsWith("/admin") && window.matchMedia("(max-width: 760px)").matches) {
-    return "/reader";
-  }
+  if (to.path.startsWith("/admin") && window.matchMedia("(max-width: 760px)").matches) return "/reader";
   return true;
 });
 

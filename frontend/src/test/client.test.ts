@@ -14,18 +14,18 @@ describe("Axios API domains", () => {
     });
   });
 
-  it("uses Axios multipart uploads under the admin API domain", async () => {
+  it("uses Axios multipart uploads and lets the server recognize source type", async () => {
     const post = vi.spyOn(http, "post").mockResolvedValue({ data: { id: "job-1" } } as never);
     const file = new File(["pdf"], "sample.pdf", { type: "application/pdf" });
-    await adminApi.upload(file, "PDF", "document-1");
+    await adminApi.upload(file, "document-1");
     expect(post).toHaveBeenCalledWith("/admin/import-jobs", expect.any(FormData));
     const body = post.mock.calls[0][1] as FormData;
-    expect(body.get("sourceType")).toBe("PDF");
+    expect(body.get("sourceType")).toBeNull();
     expect(body.get("targetDocumentId")).toBe("document-1");
   });
 
-  it("loads the editable draft through the management endpoint", async () => {
-    const get = vi.spyOn(http, "get").mockResolvedValue({ data: { version: {}, documentPackage: {} } } as never);
+  it("loads the lightweight editor snapshot through the management endpoint", async () => {
+    const get = vi.spyOn(http, "get").mockResolvedValue({ data: { version: {}, document: {}, nodes: [] } } as never);
     await adminApi.editor("version-1");
     expect(get).toHaveBeenCalledWith("/admin/versions/version-1/editor");
   });

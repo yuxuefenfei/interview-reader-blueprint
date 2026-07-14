@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -25,8 +26,17 @@ public class AdminDocumentController {
     }
 
     @GetMapping("/documents")
-    public ManagementDtos.AdminDocumentPage documents(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        return service.documents(page, size);
+    public ManagementDtos.AdminDocumentPage documents(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
+        return service.documents(query, page, size);
+    }
+
+    @GetMapping("/documents/{documentId}")
+    public ManagementDtos.AdminDocumentSummary document(@PathVariable UUID documentId) {
+        return service.document(documentId);
     }
 
     @GetMapping("/documents/{documentId}/versions")
@@ -40,11 +50,49 @@ public class AdminDocumentController {
         return service.createRevision(documentId, sourceVersionId);
     }
 
+    /** Small initial editor payload: document header and tree only, no block bodies. */
     @GetMapping("/versions/{versionId}/editor")
-    public ManagementDtos.EditableVersion editor(@PathVariable UUID versionId) {
-        return service.editor(versionId);
+    public ManagementDtos.EditorSnapshot editor(@PathVariable UUID versionId) {
+        return service.editorSnapshot(versionId);
     }
 
+    @GetMapping("/versions/{versionId}/editor/nodes/{nodeId}/blocks")
+    public ManagementDtos.NodeBlocksPage nodeBlocks(
+            @PathVariable UUID versionId,
+            @PathVariable UUID nodeId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return service.nodeBlocks(versionId, nodeId, cursor, limit);
+    }
+
+    @PatchMapping("/versions/{versionId}/editor/nodes/{nodeId}")
+    public ManagementDtos.EditorSnapshot updateNode(
+            @PathVariable UUID versionId,
+            @PathVariable UUID nodeId,
+            @Valid @RequestBody ManagementDtos.UpdateNodeRequest request
+    ) {
+        return service.updateNode(versionId, nodeId, request);
+    }
+
+    @PatchMapping("/versions/{versionId}/editor/structure")
+    public ManagementDtos.EditorSnapshot updateStructure(
+            @PathVariable UUID versionId,
+            @Valid @RequestBody ManagementDtos.StructureUpdateRequest request
+    ) {
+        return service.updateStructure(versionId, request);
+    }
+
+    @PatchMapping("/versions/{versionId}/editor/blocks/{blockId}")
+    public ManagementDtos.EditorBlock updateBlock(
+            @PathVariable UUID versionId,
+            @PathVariable UUID blockId,
+            @Valid @RequestBody ManagementDtos.UpdateBlockRequest request
+    ) {
+        return service.updateBlock(versionId, blockId, request);
+    }
+
+    /** Kept temporarily for external clients that still save a complete package. */
     @PutMapping("/versions/{versionId}/editor")
     public ManagementDtos.EditableVersion save(@PathVariable UUID versionId, @Valid @RequestBody ManagementDtos.SaveDraftRequest request) {
         return service.save(versionId, request);

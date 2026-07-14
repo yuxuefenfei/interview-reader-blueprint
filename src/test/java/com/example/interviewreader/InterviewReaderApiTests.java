@@ -1007,6 +1007,60 @@ class InterviewReaderApiTests {
         mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                 .andExpect(status().isNoContent());
     }
+    @Test
+    void editorUsesLightweightSnapshotAndDiscardReleasesImportJobReference() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "editor-snapshot-" + UUID.randomUUID());
+        var job = uploadPackage(objectMapper.writeValueAsBytes(source), "PDF", "document-package.json");
+        var jobId = UUID.fromString(job.get("id").asText());
+        assertThat(job.get("sourceType").asText()).isEqualTo("JSON_PACKAGE");
+
+        var version = objectMapper.readTree(mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", jobId))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString());
+        var versionId = UUID.fromString(version.get("id").asText());
+
+        var snapshot = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor", versionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentPackage").doesNotExist())
+                .andExpect(jsonPath("$.nodes.length()").value(2))
+                .andReturn().getResponse().getContentAsString());
+        var childId = UUID.fromString(snapshot.get("nodes").get(1).get("id").asText());
+
+        var blockPage = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", versionId, childId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andReturn().getResponse().getContentAsString());
+        var blockId = UUID.fromString(blockPage.get("items").get(0).get("id").asText());
+
+        var nodeUpdate = """
+                { "draftRevision": 0, "title": "已修订的结论", "nodeType": "SECTION", "semanticRole": "CONCLUSION", "anchor": "updated-conclusion" }
+                """;
+        mockMvc.perform(patch("/api/admin/versions/{versionId}/editor/nodes/{nodeId}", versionId, childId)
+                        .contentType(MediaType.APPLICATION_JSON).content(nodeUpdate))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version.draftRevision").value(1))
+                .andExpect(jsonPath("$.nodes[1].title").value("已修订的结论"));
+
+        var blockUpdate = """
+                { "draftRevision": 1, "blockType": "paragraph", "payload": { "text": "可检索的新内容" }, "plainText": "可检索的新内容", "language": null }
+                """;
+        mockMvc.perform(patch("/api/admin/versions/{versionId}/editor/blocks/{blockId}", versionId, blockId)
+                        .contentType(MediaType.APPLICATION_JSON).content(blockUpdate))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockType").value("paragraph"))
+                .andExpect(jsonPath("$.plainText").value("可检索的新内容"));
+
+        mockMvc.perform(delete("/api/admin/versions/{versionId}/editor", versionId))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.currentStage").value("DRAFT_DISCARDED"));
+        mockMvc.perform(get("/api/admin/versions/{versionId}/editor", versionId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Only draft versions can be edited"));
+    }
     private ImportResult importAndCommit(byte[] jsonPackage) throws Exception {
         var job = uploadJsonPackage(jsonPackage);
         return commitReadyJob(job);

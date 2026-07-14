@@ -11,16 +11,19 @@ import com.example.interviewreader.persistence.entity.ContentBlockEntity;
 import com.example.interviewreader.persistence.entity.ContentNodeEntity;
 import com.example.interviewreader.persistence.entity.DocumentEntity;
 import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
+import com.example.interviewreader.persistence.entity.ImportJobEntity;
 import com.example.interviewreader.persistence.mapper.AssetMapper;
 import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
 import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
 import com.example.interviewreader.persistence.mapper.DocumentMapper;
 import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
+import com.example.interviewreader.persistence.mapper.ImportJobMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,7 +33,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.HashSet;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,16 +46,21 @@ import static com.example.interviewreader.persistence.entity.table.ContentBlockE
 import static com.example.interviewreader.persistence.entity.table.ContentNodeEntityTableDef.CONTENT_NODE_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentEntityTableDef.DOCUMENT_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentVersionEntityTableDef.DOCUMENT_VERSION_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.ImportJobEntityTableDef.IMPORT_JOB_ENTITY;
 
 @Service
 public class VersionRevisionService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
+    private static final Set<String> EDITABLE_BLOCK_TYPES = Set.of(
+            "paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote",
+            "callout", "formula", "image", "divider", "table_snapshot");
 
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
     private final ContentNodeMapper contentNodeMapper;
     private final ContentBlockMapper contentBlockMapper;
     private final AssetMapper assetMapper;
+    private final ImportJobMapper importJobMapper;
     private final DocumentPackageValidator validator;
     private final DocumentQueryService documentQueryService;
     private final ObjectMapper objectMapper;
@@ -60,6 +71,7 @@ public class VersionRevisionService {
             ContentNodeMapper contentNodeMapper,
             ContentBlockMapper contentBlockMapper,
             AssetMapper assetMapper,
+            ImportJobMapper importJobMapper,
             DocumentPackageValidator validator,
             DocumentQueryService documentQueryService,
             ObjectMapper objectMapper
@@ -69,19 +81,29 @@ public class VersionRevisionService {
         this.contentNodeMapper = contentNodeMapper;
         this.contentBlockMapper = contentBlockMapper;
         this.assetMapper = assetMapper;
+        this.importJobMapper = importJobMapper;
         this.validator = validator;
         this.documentQueryService = documentQueryService;
         this.objectMapper = objectMapper;
     }
 
     public ManagementDtos.AdminDocumentPage documents(Integer page, Integer size) {
+        return documents(null, page, size);
+    }
+
+    public ManagementDtos.AdminDocumentPage documents(String query, Integer page, Integer size) {
         var safePage = Math.max(page == null ? 1 : page, 1);
         var safeSize = Math.clamp(size == null ? 20 : size, 1, 100);
         var offset = (safePage - 1) * safeSize;
-        var documents = documentMapper.selectListByQuery(QueryWrapper.create()
+        var normalizedQuery = query == null ? "" : query.trim();
+        var wrapper = QueryWrapper.create()
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
-                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID));
+        if (!normalizedQuery.isBlank()) {
+            wrapper.and(DOCUMENT_ENTITY.TITLE.like(normalizedQuery).or(DOCUMENT_ENTITY.CODE.like(normalizedQuery)));
+        }
+        var documents = documentMapper.selectListByQuery(wrapper
                 .orderBy(DOCUMENT_ENTITY.UPDATED_AT.desc(), DOCUMENT_ENTITY.ID.asc())
                 .limit(offset, safeSize + 1));
         var hasNext = documents.size() > safeSize;
@@ -93,12 +115,18 @@ public class VersionRevisionService {
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.in(ids)));
         var byDocument = new HashMap<String, List<DocumentVersionEntity>>();
         versions.forEach(version -> byDocument.computeIfAbsent(version.documentId, ignored -> new ArrayList<>()).add(version));
-        return new ManagementDtos.AdminDocumentPage(pageItems.stream().map(document -> {
-            var documentVersions = byDocument.getOrDefault(document.id, List.of());
-            return new ManagementDtos.AdminDocumentSummary(
-                    uuid(document.id), document.code, document.title, document.status, uuid(document.currentVersionId),
-                    documentVersions.size(), documentVersions.stream().filter(version -> "DRAFT".equals(version.status)).count(), document.updatedAt);
-        }).toList(), safePage, safeSize, hasNext);
+        return new ManagementDtos.AdminDocumentPage(pageItems.stream()
+                .map(document -> documentSummary(document, byDocument.getOrDefault(document.id, List.of())))
+                .toList(), safePage, safeSize, hasNext);
+    }
+
+    public ManagementDtos.AdminDocumentSummary document(UUID documentId) {
+        var document = requireDocument(documentId);
+        var versions = documentVersionMapper.selectListByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(document.id)));
+        return documentSummary(document, versions);
     }
 
     public List<ManagementDtos.VersionSummary> versions(UUID documentId) {
@@ -164,17 +192,242 @@ public class VersionRevisionService {
     @Transactional
     public void deleteDraft(UUID versionId) {
         var version = requireDraft(versionId);
+        var jobs = importJobMapper.selectListByQuery(QueryWrapper.create()
+                .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
+                .from(IMPORT_JOB_ENTITY)
+                .where(IMPORT_JOB_ENTITY.RESULT_VERSION_ID.eq(version.id)));
+        for (var job : jobs) {
+            job.resultVersionId = null;
+            job.status = "READY";
+            job.currentStage = "DRAFT_DISCARDED";
+            job.errorCode = null;
+            job.errorMessage = null;
+            importJobMapper.update(job);
+        }
         deleteContent(version.id);
         documentVersionMapper.deleteById(version.id);
         touchDocument(version.documentId);
     }
 
+    public ManagementDtos.EditorSnapshot editorSnapshot(UUID versionId) {
+        var version = requireDraft(versionId);
+        var document = requireDocument(uuid(version.documentId));
+        var nodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.id))
+                .orderBy(CONTENT_NODE_ENTITY.PATH.asc()))
+                .stream().map(this::editorNode).toList();
+        return new ManagementDtos.EditorSnapshot(summary(version),
+                new ManagementDtos.EditorDocument(uuid(document.id), document.code, document.title, document.description, version.language), nodes);
+    }
+
+    public ManagementDtos.NodeBlocksPage nodeBlocks(UUID versionId, UUID nodeId, String cursor, Integer limit) {
+        var version = requireDraft(versionId);
+        requireNode(version.id, nodeId);
+        var safeLimit = Math.clamp(limit == null ? 40 : limit, 1, 100);
+        var afterSeq = decodeBlockCursor(cursor);
+        var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.id))
+                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(id(nodeId)))
+                .and(CONTENT_BLOCK_ENTITY.SEQ.gt(afterSeq))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc())
+                .limit(safeLimit + 1));
+        var hasNext = blocks.size() > safeLimit;
+        var page = hasNext ? blocks.subList(0, safeLimit) : blocks;
+        return new ManagementDtos.NodeBlocksPage(page.stream().map(this::editorBlock).toList(), hasNext ? Integer.toString(page.getLast().seq) : null);
+    }
+
+    @Transactional
+    public ManagementDtos.EditorSnapshot updateNode(UUID versionId, UUID nodeId, ManagementDtos.UpdateNodeRequest request) {
+        var version = requireDraft(versionId);
+        requireRevision(version, request.draftRevision());
+        var node = requireNode(version.id, nodeId);
+        if (request.title() == null || request.title().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NODE_TITLE_REQUIRED", "节点标题不能为空。");
+        }
+        node.title = request.title().trim();
+        node.nodeType = requiredCode(request.nodeType(), "节点类型");
+        node.semanticRole = blankToNull(request.semanticRole());
+        node.anchor = blankToNull(request.anchor()) == null ? slug(node.nodeKey) : request.anchor().trim();
+        contentNodeMapper.update(node);
+        refreshNodeSearchText(version.id, node.id);
+        advanceDraft(version);
+        return editorSnapshot(versionId);
+    }
+
+    @Transactional
+    public ManagementDtos.EditorSnapshot updateStructure(UUID versionId, ManagementDtos.StructureUpdateRequest request) {
+        var version = requireDraft(versionId);
+        requireRevision(version, request.draftRevision());
+        if (request.nodes() == null || request.nodes().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "STRUCTURE_REQUIRED", "文档结构不能为空。");
+        }
+        var persisted = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.id)));
+        if (persisted.size() != request.nodes().size()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "STRUCTURE_MISMATCH", "结构更新必须包含当前版本的全部节点。");
+        }
+        var byId = persisted.stream().collect(java.util.stream.Collectors.toMap(node -> node.id, node -> node));
+        var requested = new HashMap<String, ManagementDtos.StructureNode>();
+        for (var item : request.nodes()) {
+            if (item == null || item.id() == null || byId.get(id(item.id())) == null || requested.put(id(item.id()), item) != null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "STRUCTURE_NODE_INVALID", "结构中包含无效或重复节点。");
+            }
+            if (item.parentId() != null && !byId.containsKey(id(item.parentId()))) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "STRUCTURE_PARENT_INVALID", "目标父节点不存在。");
+            }
+            if (item.parentId() != null && item.parentId().equals(item.id())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "STRUCTURE_CYCLE", "节点不能成为自己的父节点。");
+            }
+        }
+        assertAcyclic(requested);
+        var children = new HashMap<String, List<ContentNodeEntity>>();
+        for (var node : persisted) {
+            var item = requested.get(node.id);
+            node.parentId = item.parentId() == null ? null : id(item.parentId());
+            node.sortOrder = item.sortOrder();
+            children.computeIfAbsent(Objects.toString(node.parentId, "ROOT"), ignored -> new ArrayList<>()).add(node);
+        }
+        children.values().forEach(list -> list.sort(Comparator.comparingInt((ContentNodeEntity node) -> node.sortOrder).thenComparing(node -> node.id)));
+        applyPaths(children, "ROOT", null, 1);
+        persisted.forEach(contentNodeMapper::update);
+        advanceDraft(version);
+        return editorSnapshot(versionId);
+    }
+
+    @Transactional
+    public ManagementDtos.EditorBlock updateBlock(UUID versionId, UUID blockId, ManagementDtos.UpdateBlockRequest request) {
+        var version = requireDraft(versionId);
+        requireRevision(version, request.draftRevision());
+        var block = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.id))
+                .and(CONTENT_BLOCK_ENTITY.ID.eq(id(blockId))));
+        if (block == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "内容块不存在。");
+        }
+        block.blockType = requiredBlockType(request.blockType());
+        block.payload = json(request.payload() == null ? Map.of("text", Objects.requireNonNullElse(request.plainText(), "")) : request.payload());
+        block.plainText = Objects.requireNonNullElse(request.plainText(), "");
+        block.language = blankToNull(request.language());
+        contentBlockMapper.update(block);
+        refreshNodeSearchText(version.id, block.nodeId);
+        advanceDraft(version);
+        return editorBlock(block);
+    }
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
         requireDocument(documentId);
         documentQueryService.publish(documentId, versionId);
     }
 
+    private ManagementDtos.EditorNode editorNode(ContentNodeEntity node) {
+        return new ManagementDtos.EditorNode(uuid(node.id), uuid(node.parentId), node.nodeKey, node.nodeType, node.semanticRole,
+                node.title, node.level, node.sortOrder, node.anchor, node.sourcePageStart, node.sourcePageEnd);
+    }
+
+    private ManagementDtos.EditorBlock editorBlock(ContentBlockEntity block) {
+        var confidence = block.confidence == null ? null : block.confidence.doubleValue();
+        return new ManagementDtos.EditorBlock(uuid(block.id), block.blockKey, block.seq, block.blockType, tree(block.payload),
+                block.plainText, block.language, block.sourcePage, treeOrNull(block.sourceBbox), confidence);
+    }
+
+    private ContentNodeEntity requireNode(String versionId, UUID nodeId) {
+        var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId))
+                .and(CONTENT_NODE_ENTITY.ID.eq(id(nodeId))));
+        if (node == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "NODE_NOT_FOUND", "节点不存在。");
+        }
+        return node;
+    }
+
+    private void refreshNodeSearchText(String versionId, String nodeId) {
+        var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId))
+                .and(CONTENT_NODE_ENTITY.ID.eq(nodeId)));
+        if (node == null) {
+            return;
+        }
+        var text = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
+                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()))
+                .stream().map(block -> Objects.requireNonNullElse(block.plainText, "")).collect(java.util.stream.Collectors.joining("\n"));
+        node.searchText = node.title + (text.isBlank() ? "" : "\n" + text);
+        contentNodeMapper.update(node);
+    }
+    private void requireRevision(DocumentVersionEntity version, long requestedRevision) {
+        if (requestedRevision != version.draftRevision) {
+            throw new ApiException(HttpStatus.CONFLICT, "DRAFT_REVISION_CONFLICT", "草稿已被其他操作更新，请刷新后再试。");
+        }
+    }
+
+    private void advanceDraft(DocumentVersionEntity version) {
+        version.draftRevision++;
+        documentVersionMapper.update(version);
+        touchDocument(version.documentId);
+    }
+
+    private void assertAcyclic(Map<String, ManagementDtos.StructureNode> nodes) {
+        for (var nodeId : nodes.keySet()) {
+            var seen = new HashSet<String>();
+            var current = nodeId;
+            while (current != null) {
+                if (!seen.add(current)) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "STRUCTURE_CYCLE", "结构中不能存在循环引用。");
+                }
+                var node = nodes.get(current);
+                current = node == null || node.parentId() == null ? null : id(node.parentId());
+            }
+        }
+    }
+
+    private void applyPaths(Map<String, List<ContentNodeEntity>> children, String key, String parentPath, int level) {
+        var siblings = children.getOrDefault(key, List.of());
+        for (var index = 0; index < siblings.size(); index++) {
+            var node = siblings.get(index);
+            node.sortOrder = (index + 1) * 10;
+            node.level = level;
+            node.path = parentPath == null ? String.format("%06d", node.sortOrder) : parentPath + "." + String.format("%06d", node.sortOrder);
+            applyPaths(children, node.id, node.path, level + 1);
+        }
+    }
+
+    private int decodeBlockCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) return 0;
+        try { return Math.max(Integer.parseInt(cursor), 0); }
+        catch (NumberFormatException exception) { throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", "内容块游标不合法。"); }
+    }
+
+    private static String requiredBlockType(String value) {
+        if (value == null || value.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "内容块类型不能为空。");
+        }
+        var blockType = value.trim().toLowerCase(Locale.ROOT);
+        if (!EDITABLE_BLOCK_TYPES.contains(blockType)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BLOCK_TYPE_INVALID", "不支持的内容块类型：" + value);
+        }
+        return blockType;
+    }
+    private static String requiredCode(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", label + "不能为空。");
+        }
+        return value.trim().toUpperCase(Locale.ROOT);
+    }
     private DocumentPackage packageFor(DocumentVersionEntity version) {
         var document = requireDocument(uuid(version.documentId));
         var nodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
@@ -327,6 +580,12 @@ public class VersionRevisionService {
         var document = documentMapper.selectOneById(documentId);
         document.updatedAt = OffsetDateTime.now();
         documentMapper.update(document);
+    }
+
+    private ManagementDtos.AdminDocumentSummary documentSummary(DocumentEntity document, List<DocumentVersionEntity> versions) {
+        return new ManagementDtos.AdminDocumentSummary(
+                uuid(document.id), document.code, document.title, document.status, uuid(document.currentVersionId),
+                versions.size(), versions.stream().filter(version -> "DRAFT".equals(version.status)).count(), document.updatedAt);
     }
 
     private ManagementDtos.VersionSummary summary(DocumentVersionEntity version) {
