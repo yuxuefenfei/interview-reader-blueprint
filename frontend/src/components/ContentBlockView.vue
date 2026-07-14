@@ -20,9 +20,7 @@ function textFromPayload(payload: Record<string, unknown>, fallback: string): st
 }
 
 function codeTextFromPayload(payload: Record<string, unknown>, fallback: string): string {
-  return textFromPayload(payload, fallback)
-    .replace(/\r\n?/g, "\n")
-    .replace(/}\s+@(?=[A-Za-z])/g, "}\n@");
+  return textFromPayload(payload, fallback).replace(/\r\n?/g, "\n");
 }
 
 function itemsFromPayload(payload: Record<string, unknown>): string[] {

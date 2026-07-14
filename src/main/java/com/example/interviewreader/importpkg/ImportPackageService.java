@@ -120,14 +120,22 @@ public class ImportPackageService {
     }
 
     @Transactional
-    public ImportJobDto createImportJob(String sourceType, MultipartFile file) {
+    public ImportJobDto createImportJob(String sourceType, MultipartFile file, UUID targetDocumentId) {
         var normalizedSourceType = sourceType.toUpperCase(Locale.ROOT);
         if (!Set.of("JSON_PACKAGE", "EXCEL", "MARKDOWN", "PDF").contains(normalizedSourceType)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "MVP currently supports JSON_PACKAGE, EXCEL, MARKDOWN and PDF imports");
         }
         var fileBytes = readBytes(file);
         var sourceSha256 = Hashes.sha256(fileBytes);
-        var importFingerprint = Hashes.sha256(sourceSha256 + ":" + normalizedSourceType + ":" + converterVersion);
+        var targetId = targetDocumentId == null ? null : id(targetDocumentId);
+        if (targetId != null && documentMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.ID.eq(targetId))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))) == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Target document not found");
+        }
+        var importFingerprint = Hashes.sha256(sourceSha256 + ":" + normalizedSourceType + ":" + converterVersion + ":" + Objects.toString(targetId, "NEW"));
         var existingJob = findImportJobByFingerprint(importFingerprint);
         if (existingJob != null) {
             return existingJob;
@@ -144,6 +152,7 @@ public class ImportPackageService {
         var job = new ImportJobEntity();
         job.id = jobId.toString();
         job.ownerId = LOCAL_USER_ID;
+        job.targetDocumentId = targetId;
         job.sourceType = normalizedSourceType;
         job.sourceObjectKey = sourceObjectKey;
         job.sourceSha256 = sourceSha256;
@@ -302,7 +311,7 @@ public class ImportPackageService {
             throw new ApiException(HttpStatus.CONFLICT, "Import package has blocking validation issues");
         }
 
-        var documentId = findDocumentId(documentPackage.document().documentKey());
+        var documentId = job.targetDocumentId == null ? findDocumentId(documentPackage.document().documentKey()) : job.targetDocumentId;
         var now = OffsetDateTime.now();
         if (documentId == null) {
             documentId = UUID.randomUUID().toString();
@@ -327,6 +336,9 @@ public class ImportPackageService {
         version.id = versionId;
         version.documentId = documentId;
         version.versionNo = nextVersionNo(documentId);
+        version.parentVersionId = currentVersionId(documentId);
+        version.originImportJobId = job.id;
+        version.draftRevision = 0;
         version.sourceType = documentPackage.version().sourceType().toUpperCase(Locale.ROOT);
         version.sourceFileName = documentPackage.version().sourceFileName();
         version.sourceFileSha256 = documentPackage.version().sourceSha256();
@@ -343,7 +355,6 @@ public class ImportPackageService {
         upsertTags(documentId, documentPackage.document().tags());
 
         var document = documentMapper.selectOneById(documentId);
-        document.currentVersionId = versionId;
         document.updatedAt = now;
         documentMapper.update(document);
 
@@ -521,6 +532,11 @@ public class ImportPackageService {
                 .orElse(0) + 1;
     }
 
+    private String currentVersionId(String documentId) {
+        var document = documentMapper.selectOneById(documentId);
+        return document == null ? null : document.currentVersionId;
+    }
+
     private ImportJobEntity loadJobForCommit(UUID jobId) {
         return requireJob(jobId);
     }
@@ -610,6 +626,7 @@ public class ImportPackageService {
     private ImportJobDto mapJob(ImportJobEntity job) {
         return new ImportJobDto(
                 UUID.fromString(job.id),
+                uuid(job.targetDocumentId),
                 job.status,
                 job.currentStage,
                 job.progress,
@@ -777,6 +794,10 @@ public class ImportPackageService {
 
     private static String id(UUID value) {
         return value == null ? null : value.toString();
+    }
+
+    private static UUID uuid(String value) {
+        return value == null || value.isBlank() ? null : UUID.fromString(value);
     }
 
     private static String emptyToNull(String value) {

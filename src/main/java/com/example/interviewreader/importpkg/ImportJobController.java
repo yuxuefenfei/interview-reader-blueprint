@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/import-jobs")
+@RequestMapping("/api/admin/import-jobs")
 public class ImportJobController {
     private final ImportPackageService service;
 
@@ -30,8 +30,12 @@ public class ImportJobController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public ImportJobDto create(@RequestParam("sourceType") String sourceType, @RequestParam("file") MultipartFile file) {
-        return service.createImportJob(sourceType, file);
+    public ImportJobDto create(
+            @RequestParam("sourceType") String sourceType,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) UUID targetDocumentId
+    ) {
+        return service.createImportJob(sourceType, file, targetDocumentId);
     }
 
     @GetMapping("/{jobId}")

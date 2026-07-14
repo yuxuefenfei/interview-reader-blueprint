@@ -11,6 +11,7 @@ public class ImportJobEntity {
     @Id(keyType = KeyType.None)
     public String id;
     public String ownerId;
+    public String targetDocumentId;
     public String sourceType;
     public String sourceObjectKey;
     public String sourceSha256;

@@ -30,7 +30,7 @@ class InterviewReaderAuthTests {
 
     @Test
     void protectedApiRejectsAnonymousRequests() throws Exception {
-        mockMvc.perform(get("/api/documents"))
+        mockMvc.perform(get("/api/reader/documents"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store"))
                 .andExpect(jsonPath("$.error").value("请先登录"));
@@ -73,7 +73,7 @@ class InterviewReaderAuthTests {
         var session = response.getCookie("IR_SESSION");
         assertThat(session).isNotNull();
 
-        mockMvc.perform(get("/api/documents").cookie(session))
+        mockMvc.perform(get("/api/reader/documents").cookie(session))
                 .andExpect(status().isOk());
     }
 
@@ -102,7 +102,7 @@ class InterviewReaderAuthTests {
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store"))
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0"));
 
-        mockMvc.perform(get("/api/documents").cookie(new Cookie("IR_SESSION", session.getValue())))
+        mockMvc.perform(get("/api/reader/documents").cookie(new Cookie("IR_SESSION", session.getValue())))
                 .andExpect(status().isUnauthorized());
     }
 }

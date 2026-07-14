@@ -1,0 +1,155 @@
+<script setup lang="ts">
+import { ArrowLeft, ArrowRight, Close, Menu, Moon, Search, Sunny } from "@element-plus/icons-vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { readerApi } from "../api/reader";
+import ContentBlockView from "../components/ContentBlockView.vue";
+import TocTree from "../components/TocTree.vue";
+import type { DocumentSummary, NodeContent, TocNode } from "../types/api";
+import { firstReadableNode, flattenToc, isQuestionNode } from "../utils/toc";
+
+defineProps<{ username?: string | null }>();
+const emit = defineEmits<{ logout: [] }>();
+const route = useRoute();
+const router = useRouter();
+const documents = ref<DocumentSummary[]>([]);
+const selected = ref<DocumentSummary | null>(null);
+const toc = ref<TocNode[]>([]);
+const activeNode = ref<TocNode | null>(null);
+const content = ref<NodeContent | null>(null);
+const loading = ref(false);
+const error = ref("");
+const drawer = ref(false);
+const searchOpen = ref(false);
+const toolsOpen = ref(false);
+const query = ref("");
+const searchHits = ref<Awaited<ReturnType<typeof readerApi.search>>>([]);
+const readingArea = ref<HTMLElement | null>(null);
+const chapterProgress = ref(0);
+const theme = ref(localStorage.getItem("reader.theme") || "light");
+let saveTimer: number | null = null;
+
+const readable = computed(() => flattenToc(toc.value).filter((node) => isQuestionNode(node) || node.children.length === 0));
+const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));
+const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activeIndex.value - 1] : null);
+const nextNode = computed(() => activeIndex.value >= 0 && activeIndex.value < readable.value.length - 1 ? readable.value[activeIndex.value + 1] : null);
+const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
+
+watch(theme, (value) => localStorage.setItem("reader.theme", value));
+watch(() => route.params.documentId, () => { void openFromRoute(); });
+onMounted(async () => { await loadDocuments(); await openFromRoute(); });
+onBeforeUnmount(() => { if (saveTimer !== null) window.clearTimeout(saveTimer); });
+
+async function loadDocuments(): Promise<void> {
+  try {
+    documents.value = (await readerApi.documents()).items;
+  } catch (caught) { error.value = message(caught); }
+}
+
+async function openFromRoute(): Promise<void> {
+  const documentId = typeof route.params.documentId === "string" ? route.params.documentId : documents.value[0]?.id;
+  if (!documentId) return;
+  const document = documents.value.find((item) => item.id === documentId) || await readerApi.document(documentId);
+  if (!document.currentVersionId) return;
+  selected.value = document;
+  loading.value = true;
+  error.value = "";
+  try {
+    toc.value = await readerApi.toc(document.currentVersionId);
+    const saved = await readerApi.progress(document.id);
+    const initial = flattenToc(toc.value).find((node) => node.id === saved?.sectionId) || firstReadableNode(toc.value);
+    if (initial) await selectNode(initial, false);
+  } catch (caught) { error.value = message(caught); }
+  finally { loading.value = false; }
+}
+
+async function selectDocument(document: DocumentSummary): Promise<void> {
+  drawer.value = false;
+  if (route.params.documentId !== document.id) await router.push(`/reader/documents/${document.id}`);
+}
+
+async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
+  if (!selected.value?.currentVersionId) return;
+  activeNode.value = node;
+  content.value = await readerApi.content(selected.value.currentVersionId, node.id);
+  drawer.value = false;
+  if (shouldScroll) await nextTick(() => readingArea.value?.scrollTo({ top: 0, behavior: "smooth" }));
+  chapterProgress.value = 0;
+  scheduleProgress();
+}
+
+function onReadingScroll(): void {
+  const area = readingArea.value;
+  if (!area) return;
+  const distance = Math.max(1, area.scrollHeight - area.clientHeight);
+  chapterProgress.value = Math.min(1, Math.max(0, area.scrollTop / distance));
+  scheduleProgress();
+}
+
+function scheduleProgress(): void {
+  if (!selected.value || !activeNode.value || !selected.value.currentVersionId) return;
+  if (saveTimer !== null) window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    if (!selected.value || !activeNode.value || !selected.value.currentVersionId) return;
+    const firstBlock = content.value?.blocks[0] ?? null;
+    void readerApi.saveProgress(selected.value.id, {
+      versionId: selected.value.currentVersionId,
+      sectionId: activeNode.value.id,
+      blockId: firstBlock?.id ?? null,
+      charOffset: 0,
+      blockViewportOffset: 0,
+      progressRatio: chapterProgress.value,
+      clientUpdatedAt: new Date().toISOString(),
+      deviceId: localStorage.getItem("reader.deviceId") || crypto.randomUUID(),
+      revision: 0
+    }).catch(() => undefined);
+  }, 700);
+}
+
+async function search(): Promise<void> {
+  if (!query.value.trim()) { searchHits.value = []; return; }
+  try { searchHits.value = await readerApi.search(query.value.trim(), selected.value?.id); }
+  catch (caught) { error.value = message(caught); }
+}
+
+async function jump(hit: { documentId: string; nodeId: string }): Promise<void> {
+  if (hit.documentId !== selected.value?.id) await router.push(`/reader/documents/${hit.documentId}`);
+  const node = flattenToc(toc.value).find((item) => item.id === hit.nodeId);
+  if (node) await selectNode(node);
+  searchOpen.value = false;
+}
+
+function toggleTheme(): void { theme.value = theme.value === "dark" ? "light" : "dark"; }
+function message(value: unknown): string { return value instanceof Error ? value.message : "加载失败"; }
+</script>
+
+<template>
+  <div class="reader-page" :class="`theme-${theme}`">
+    <header class="reader-header">
+      <button class="reader-menu-button" type="button" aria-label="打开目录" @click="drawer = true"><el-icon><Menu /></el-icon></button>
+      <div class="reader-heading"><strong>{{ activeNode?.title || selected?.title || "阅读器" }}</strong><span>{{ selected?.title }}</span></div>
+      <div class="reader-header-actions"><el-button circle :icon="theme === 'dark' ? Sunny : Moon" :aria-label="theme === 'dark' ? '浅色模式' : '深色模式'" @click="toggleTheme" /><el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button><el-button text @click="emit('logout')">退出</el-button></div>
+      <div class="mobile-chapter-progress" aria-label="当前章节阅读进度"><span :style="mobileProgressStyle"></span></div>
+    </header>
+
+    <aside class="reader-desktop-nav">
+      <div class="reader-documents"><button v-for="document in documents" :key="document.id" :class="{ active: document.id === selected?.id }" type="button" @click="selectDocument(document)">{{ document.title }}</button></div>
+      <TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" />
+    </aside>
+
+    <main ref="readingArea" class="reader-content" @scroll.passive="onReadingScroll">
+      <div v-if="loading" class="reader-state">正在加载章节</div>
+      <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
+      <template v-else-if="content">
+        <article class="reader-article"><h1>{{ content.node.title }}</h1><ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" /></article>
+        <nav class="chapter-pagination" aria-label="章节翻页"><el-button :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button><el-button type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button></nav>
+      </template>
+      <div v-else class="reader-state">选择一篇文档开始阅读</div>
+    </main>
+
+    <div class="reader-fab" :class="{ open: toolsOpen }"><button v-if="toolsOpen" class="reader-fab-action reader-fab-search" type="button" aria-label="搜索" @click="searchOpen = true; toolsOpen = false"><el-icon><Search /></el-icon></button><button v-if="toolsOpen" class="reader-fab-action reader-fab-toc" type="button" aria-label="目录" @click="drawer = true; toolsOpen = false"><el-icon><Menu /></el-icon></button><button class="reader-fab-main" type="button" :aria-label="toolsOpen ? '关闭工具箱' : '打开工具箱'" @click="toolsOpen = !toolsOpen"><el-icon><Close v-if="toolsOpen" /><Menu v-else /></el-icon></button></div>
+
+    <el-drawer v-model="drawer" direction="ltr" size="min(88vw, 360px)" :with-header="false"><section class="reader-drawer"><header><strong>文档目录</strong><el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" /></header><div class="reader-drawer-documents"><button v-for="document in documents" :key="document.id" :class="{ active: document.id === selected?.id }" type="button" @click="selectDocument(document)">{{ document.title }}</button></div><TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" /></section></el-drawer>
+    <el-drawer v-model="searchOpen" direction="btt" size="min(68vh, 520px)" :with-header="false"><section class="reader-search-sheet"><header><strong>搜索当前文档</strong><el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" /></header><el-input v-model="query" placeholder="搜索标题或正文" clearable @keyup.enter="search"><template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template></el-input><button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)"><strong>{{ hit.title }}</strong><span>{{ hit.snippet }}</span></button></section></el-drawer>
+  </div>
+</template>

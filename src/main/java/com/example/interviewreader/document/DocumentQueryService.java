@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.update.UpdateWrapper;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
@@ -33,7 +34,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -79,7 +79,8 @@ public class DocumentQueryService {
         var wrapper = QueryWrapper.create()
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
-                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID));
+                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"));
         if (!normalizedQuery.isBlank()) {
             wrapper.and(DOCUMENT_ENTITY.TITLE.like(normalizedQuery)
                     .or(DOCUMENT_ENTITY.CODE.like(normalizedQuery)));
@@ -103,6 +104,7 @@ public class DocumentQueryService {
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"))
                 .and(DOCUMENT_ENTITY.ID.eq(id(documentId))));
         if (document == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
@@ -119,6 +121,9 @@ public class DocumentQueryService {
                 .and(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId))));
         if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Version not found");
+        }
+        if (!"DRAFT".equals(version.status)) {
+            throw new ApiException(HttpStatus.CONFLICT, "Only a draft version can be published");
         }
         var previousVersionId = previousPublishedVersionId(documentId, versionId);
         var now = OffsetDateTime.now();
@@ -143,6 +148,7 @@ public class DocumentQueryService {
     }
 
     public List<TocNode> toc(UUID versionId) {
+        ensurePublishedVersion(versionId);
         var rows = contentNodeMapper.selectListByQuery(QueryWrapper.create()
                 .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
                 .from(CONTENT_NODE_ENTITY)
@@ -171,6 +177,7 @@ public class DocumentQueryService {
     }
 
     public NodeContent content(UUID versionId, UUID nodeId, Integer afterSeq, Integer limit) {
+        ensurePublishedVersion(versionId);
         var node = node(versionId, nodeId);
         var safeLimit = Math.clamp(limit == null ? 50 : limit, 1, 100);
         var rows = contentBlockMapper.selectListByQuery(QueryWrapper.create()
@@ -300,7 +307,8 @@ public class DocumentQueryService {
         var rows = documentVersionMapper.selectListByQuery(QueryWrapper.create()
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
-                .where(DOCUMENT_VERSION_ENTITY.ID.in(versionIds)));
+                .where(DOCUMENT_VERSION_ENTITY.ID.in(versionIds))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
         var result = new LinkedHashMap<String, DocumentVersionEntity>();
         rows.forEach(row -> result.put(row.id, row));
         return result;
@@ -313,7 +321,9 @@ public class DocumentQueryService {
         var rows = documentMapper.selectListByQuery(QueryWrapper.create()
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
-                .where(DOCUMENT_ENTITY.ID.in(documentIds)));
+                .where(DOCUMENT_ENTITY.ID.in(documentIds))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED")));
         var result = new LinkedHashMap<String, DocumentEntity>();
         rows.forEach(row -> result.put(row.id, row));
         return result;
@@ -376,6 +386,17 @@ public class DocumentQueryService {
         }
     }
 
+    private void ensurePublishedVersion(UUID versionId) {
+        var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ID)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(versionId)))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
+        if (version == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Published version not found");
+        }
+    }
+
     private UUID previousPublishedVersionId(UUID documentId, UUID nextVersionId) {
         var versions = documentVersionMapper.selectListByQuery(QueryWrapper.create()
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
@@ -407,151 +428,24 @@ public class DocumentQueryService {
                 .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
                 .from(READING_PROGRESS_ENTITY)
                 .where(READING_PROGRESS_ENTITY.USER_ID.eq(LOCAL_USER_ID))
-                .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.eq(id(documentId)))
-                .and(READING_PROGRESS_ENTITY.VERSION_ID.eq(id(previousVersionId))));
-
+                .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.eq(id(documentId))));
         for (var row : rows) {
-            findProgressTarget(row, nextVersionId).ifPresent(target -> updateMigratedProgress(row, target, nextVersionId));
+            var update = UpdateWrapper.of(ReadingProgressEntity.class)
+                    .set(READING_PROGRESS_ENTITY.VERSION_ID, id(nextVersionId))
+                    .set(READING_PROGRESS_ENTITY.SECTION_ID, null)
+                    .set(READING_PROGRESS_ENTITY.BLOCK_ID, null)
+                    .set(READING_PROGRESS_ENTITY.CHAR_OFFSET, 0)
+                    .set(READING_PROGRESS_ENTITY.BLOCK_VIEWPORT_OFFSET, 0)
+                    .set(READING_PROGRESS_ENTITY.PROGRESS_RATIO, BigDecimal.ZERO)
+                    .set(READING_PROGRESS_ENTITY.REVISION, row.revision + 1)
+                    .set(READING_PROGRESS_ENTITY.UPDATED_AT, OffsetDateTime.now());
+            readingProgressMapper.updateByQuery(
+                    update.toEntity(),
+                    false,
+                    QueryWrapper.create().where(READING_PROGRESS_ENTITY.ID.eq(row.id))
+            );
         }
     }
-
-    private Optional<ProgressTarget> findProgressTarget(ReadingProgressEntity row, UUID nextVersionId) {
-        return targetByBlockKey(row.blockId, nextVersionId)
-                .or(() -> targetByContentHash(row.blockId, nextVersionId))
-                .or(() -> targetBySectionPathAndFirstText(row.sectionId, nextVersionId))
-                .or(() -> targetBySectionKey(row.sectionId, nextVersionId))
-                .or(() -> firstBlockInVersion(nextVersionId))
-                .or(() -> firstSectionInVersion(nextVersionId));
-    }
-
-    private void updateMigratedProgress(ReadingProgressEntity row, ProgressTarget target, UUID nextVersionId) {
-        row.versionId = id(nextVersionId);
-        row.sectionId = target.sectionId();
-        row.blockId = target.blockId();
-        row.charOffset = target.resetPosition() ? 0 : row.charOffset;
-        row.blockViewportOffset = target.resetPosition() ? 0 : row.blockViewportOffset;
-        row.progressRatio = target.documentStart() ? BigDecimal.ZERO : row.progressRatio;
-        row.revision++;
-        row.updatedAt = OffsetDateTime.now();
-        readingProgressMapper.update(row);
-    }
-
-    private Optional<ProgressTarget> targetByBlockKey(String oldBlockId, UUID nextVersionId) {
-        if (oldBlockId == null) {
-            return Optional.empty();
-        }
-        var oldBlock = contentBlockMapper.selectOneById(oldBlockId);
-        if (oldBlock == null) {
-            return Optional.empty();
-        }
-        return firstBlock(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_BLOCK_ENTITY)
-                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(nextVersionId)))
-                .and(CONTENT_BLOCK_ENTITY.BLOCK_KEY.eq(oldBlock.blockKey))
-                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()), false, false);
-    }
-
-    private Optional<ProgressTarget> targetByContentHash(String oldBlockId, UUID nextVersionId) {
-        if (oldBlockId == null) {
-            return Optional.empty();
-        }
-        var oldBlock = contentBlockMapper.selectOneById(oldBlockId);
-        if (oldBlock == null || oldBlock.contentHash == null || oldBlock.contentHash.isBlank()) {
-            return Optional.empty();
-        }
-        return firstBlock(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_BLOCK_ENTITY)
-                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(nextVersionId)))
-                .and(CONTENT_BLOCK_ENTITY.CONTENT_HASH.eq(oldBlock.contentHash))
-                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()), false, false);
-    }
-
-    private Optional<ProgressTarget> targetBySectionPathAndFirstText(String oldSectionId, UUID nextVersionId) {
-        if (oldSectionId == null) {
-            return Optional.empty();
-        }
-        var oldNode = contentNodeMapper.selectOneById(oldSectionId);
-        var oldFirstBlock = oldNode == null ? null : firstBlockInNode(oldNode.id).orElse(null);
-        var oldPrefix = textPrefix(oldFirstBlock == null ? null : oldFirstBlock.plainText);
-        if (oldNode == null || oldPrefix.isBlank()) {
-            return Optional.empty();
-        }
-        var candidateNode = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_NODE_ENTITY)
-                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
-                .and(CONTENT_NODE_ENTITY.PATH.eq(oldNode.path)));
-        var candidateBlock = candidateNode == null ? null : firstBlockInNode(candidateNode.id).orElse(null);
-        if (candidateNode == null || !oldPrefix.equals(textPrefix(candidateBlock == null ? null : candidateBlock.plainText))) {
-            return Optional.empty();
-        }
-        return Optional.of(new ProgressTarget(candidateNode.id, candidateBlock == null ? null : candidateBlock.id, true, false));
-    }
-
-    private Optional<ProgressTarget> targetBySectionKey(String oldSectionId, UUID nextVersionId) {
-        if (oldSectionId == null) {
-            return Optional.empty();
-        }
-        var oldNode = contentNodeMapper.selectOneById(oldSectionId);
-        if (oldNode == null) {
-            return Optional.empty();
-        }
-        var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_NODE_ENTITY)
-                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
-                .and(CONTENT_NODE_ENTITY.NODE_KEY.eq(oldNode.nodeKey)));
-        if (node == null) {
-            return Optional.empty();
-        }
-        var block = firstBlockInNode(node.id).orElse(null);
-        return Optional.of(new ProgressTarget(node.id, block == null ? null : block.id, true, false));
-    }
-
-    private Optional<ProgressTarget> firstBlockInVersion(UUID nextVersionId) {
-        var nodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_NODE_ENTITY)
-                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
-                .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
-        for (var node : nodes) {
-            var block = firstBlockInNode(node.id).orElse(null);
-            if (block != null) {
-                return Optional.of(new ProgressTarget(node.id, block.id, true, true));
-            }
-        }
-        return Optional.empty();
-    }
-
-    private Optional<ProgressTarget> firstSectionInVersion(UUID nextVersionId) {
-        var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_NODE_ENTITY)
-                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(nextVersionId)))
-                .orderBy(CONTENT_NODE_ENTITY.PATH.asc())
-                .limit(1));
-        return node == null ? Optional.empty() : Optional.of(new ProgressTarget(node.id, null, true, true));
-    }
-
-    private Optional<ProgressTarget> firstBlock(QueryWrapper query, boolean resetPosition, boolean documentStart) {
-        var block = contentBlockMapper.selectOneByQuery(query.limit(1));
-        if (block == null) {
-            return Optional.empty();
-        }
-        return Optional.of(new ProgressTarget(block.nodeId, block.id, resetPosition, documentStart));
-    }
-
-    private Optional<ContentBlockEntity> firstBlockInNode(String nodeId) {
-        return Optional.ofNullable(contentBlockMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_BLOCK_ENTITY)
-                .where(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
-                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc())
-                .limit(1)));
-    }
-
     private ReadingProgressEntity progress(UUID documentId) {
         return readingProgressMapper.selectOneByQuery(QueryWrapper.create()
                 .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
@@ -631,14 +525,6 @@ public class DocumentQueryService {
             return "";
         }
         return text.length() <= 140 ? text : text.substring(0, 140);
-    }
-
-    private static String textPrefix(String text) {
-        if (text == null || text.isBlank()) {
-            return "";
-        }
-        var normalized = text.strip();
-        return normalized.length() <= 80 ? normalized : normalized.substring(0, 80);
     }
 
     private static String lower(String value) {
@@ -725,9 +611,6 @@ public class DocumentQueryService {
                     sourcePageStart,
                     children.stream().map(MutableTocNode::toDto).toList());
         }
-    }
-
-    private record ProgressTarget(String sectionId, String blockId, boolean resetPosition, boolean documentStart) {
     }
 
     private record DocumentCursor(OffsetDateTime updatedAt, String documentId) {

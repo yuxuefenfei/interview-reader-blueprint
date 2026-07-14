@@ -76,11 +76,11 @@ class InterviewReaderApiTests {
     void jsonPackageCanBeImportedCommittedAndRead() throws Exception {
         var imported = importAndCommit(Files.readAllBytes(Path.of("docs/examples/document-package.example.json")));
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", imported.jobId()))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", imported.jobId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
-        var sourceFile = mockMvc.perform(get("/api/import-jobs/{jobId}/source-file", imported.jobId()))
+        var sourceFile = mockMvc.perform(get("/api/admin/import-jobs/{jobId}/source-file", imported.jobId()))
                 .andExpect(status().isOk())
                 .andExpect(result -> assertThat(result.getResponse().getContentType()).contains(MediaType.APPLICATION_OCTET_STREAM_VALUE))
                 .andReturn()
@@ -88,28 +88,28 @@ class InterviewReaderApiTests {
                 .getContentAsString(StandardCharsets.UTF_8);
         assertThat(sourceFile).contains("\"schemaVersion\"");
 
-        mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/documents"))
+        mockMvc.perform(get("/api/reader/documents"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].title").value("Java 高级开发面试题完整答案"));
 
-        var tocResult = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
+        var tocResult = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].children[0].title").value("1.1 结论先行"))
                 .andReturn()
                 .getResponse();
         var tocEtag = tocResult.getHeader(HttpHeaders.ETAG);
         assertThat(tocEtag).isNotBlank();
-        mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId())
+        mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId())
                         .header(HttpHeaders.IF_NONE_MATCH, tocEtag))
                 .andExpect(status().isNotModified());
         var tocBody = tocResult.getContentAsString();
         var toc = objectMapper.readTree(tocBody);
         var childNodeId = UUID.fromString(toc.get(0).get("children").get(0).get("id").asText());
 
-        var contentResult = mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), childNodeId)
+        var contentResult = mockMvc.perform(get("/api/reader/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), childNodeId)
                         .param("limit", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blocks[0].blockKey").value("q1-conclusion-p1"))
@@ -118,15 +118,15 @@ class InterviewReaderApiTests {
                 .getResponse();
         var contentEtag = contentResult.getHeader(HttpHeaders.ETAG);
         assertThat(contentEtag).isNotBlank();
-        mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), childNodeId)
+        mockMvc.perform(get("/api/reader/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), childNodeId)
                         .param("limit", "1")
                         .header(HttpHeaders.IF_NONE_MATCH, contentEtag))
                 .andExpect(status().isNotModified());
 
-        mockMvc.perform(get("/api/search").param("q", "HashMap"))
+        mockMvc.perform(get("/api/reader/search").param("q", "HashMap"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("1.1 结论先行"));
-        mockMvc.perform(get("/api/search")
+        mockMvc.perform(get("/api/reader/search")
                         .param("q", "1.1 结论先行")
                         .param("documentId", imported.documentId().toString())
                         .param("limit", "3"))
@@ -145,13 +145,13 @@ class InterviewReaderApiTests {
                   "deviceId": "test"
                 }
                 """.formatted(imported.versionId(), childNodeId);
-        mockMvc.perform(put("/api/reading-progress/{documentId}", imported.documentId())
+        mockMvc.perform(put("/api/reader/reading-progress/{documentId}", imported.documentId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(progress))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.revision").value(1));
 
-        mockMvc.perform(get("/api/reading-progress/{documentId}", imported.documentId()))
+        mockMvc.perform(get("/api/reader/reading-progress/{documentId}", imported.documentId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.progressRatio").value(0.42));
     }
@@ -164,10 +164,12 @@ class InterviewReaderApiTests {
             ((ObjectNode) source.get("document")).put("documentKey", marker + "-key-" + index);
             ((ObjectNode) source.get("document")).put("title", marker + " title " + index);
             ((ObjectNode) source.get("version")).put("versionKey", "cursor-" + index);
-            importAndCommit(objectMapper.writeValueAsBytes(source));
+            var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+            mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+                    .andExpect(status().isNoContent());
         }
 
-        var first = objectMapper.readTree(mockMvc.perform(get("/api/documents")
+        var first = objectMapper.readTree(mockMvc.perform(get("/api/reader/documents")
                         .param("query", marker)
                         .param("limit", "2"))
                 .andExpect(status().isOk())
@@ -178,7 +180,7 @@ class InterviewReaderApiTests {
         var cursor = first.get("nextCursor").asText();
         assertThat(cursor).isNotBlank();
 
-        var second = objectMapper.readTree(mockMvc.perform(get("/api/documents")
+        var second = objectMapper.readTree(mockMvc.perform(get("/api/reader/documents")
                         .param("query", marker)
                         .param("limit", "2")
                         .param("cursor", cursor))
@@ -191,7 +193,7 @@ class InterviewReaderApiTests {
         assertThat(first.get("items").findValuesAsText("id"))
                 .doesNotContain(second.get("items").get(0).get("id").asText());
 
-        mockMvc.perform(get("/api/documents").param("cursor", "not-a-valid-cursor"))
+        mockMvc.perform(get("/api/reader/documents").param("cursor", "not-a-valid-cursor"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -223,7 +225,7 @@ class InterviewReaderApiTests {
         assertThat(job.get("statistics").get("sourceFileName").asText()).isEqualTo("evil.json");
         assertThat(objectKey).doesNotContain("..").endsWith("/evil.json");
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}/source-file", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/source-file", jobId))
                 .andExpect(status().isOk())
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION))
                         .contains("evil.json")
@@ -252,7 +254,7 @@ class InterviewReaderApiTests {
                 "EXTRACTING",
                 "{}");
 
-        mockMvc.perform(post("/api/import-jobs/{jobId}/cancel", jobId))
+        mockMvc.perform(post("/api/admin/import-jobs/{jobId}/cancel", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELED"))
                 .andExpect(jsonPath("$.currentStage").value("CANCELED"))
@@ -265,17 +267,17 @@ class InterviewReaderApiTests {
         ((ObjectNode) source.get("document")).put("documentKey", "cancel-ready-" + UUID.randomUUID());
         var job = uploadJsonPackage(objectMapper.writeValueAsBytes(source));
 
-        mockMvc.perform(post("/api/import-jobs/{jobId}/cancel", UUID.fromString(job.get("id").asText())))
+        mockMvc.perform(post("/api/admin/import-jobs/{jobId}/cancel", UUID.fromString(job.get("id").asText())))
                 .andExpect(status().isConflict());
     }
 
     @Test
-    void publishingNewVersionMigratesReadingProgressByStableBlockKey() throws Exception {
+    void publishingNewVersionResetsReadingProgressWhenBlockIdentityChanges() throws Exception {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "progress-migration-" + UUID.randomUUID());
 
         var first = importAndCommit(objectMapper.writeValueAsBytes(source));
-        mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", first.documentId(), first.versionId()))
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", first.documentId(), first.versionId()))
                 .andExpect(status().isNoContent());
         var firstPosition = firstChildFirstBlock(first.versionId());
 
@@ -290,7 +292,7 @@ class InterviewReaderApiTests {
                   "deviceId": "migration-test"
                 }
                 """.formatted(first.versionId(), firstPosition.sectionId(), firstPosition.blockId());
-        mockMvc.perform(put("/api/reading-progress/{documentId}", first.documentId())
+        mockMvc.perform(put("/api/reader/reading-progress/{documentId}", first.documentId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(progress))
                 .andExpect(status().isOk())
@@ -304,21 +306,21 @@ class InterviewReaderApiTests {
         firstBlock.put("plainText", "HashMap 的设计目标没有变化，但新版补充了迁移锚点验证。");
 
         var second = importAndCommit(objectMapper.writeValueAsBytes(changed));
-        mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", second.documentId(), second.versionId()))
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", second.documentId(), second.versionId()))
                 .andExpect(status().isNoContent());
         var secondPosition = firstChildFirstBlock(second.versionId());
 
         assertThat(second.documentId()).isEqualTo(first.documentId());
         assertThat(secondPosition.blockId()).isNotEqualTo(firstPosition.blockId());
 
-        mockMvc.perform(get("/api/reading-progress/{documentId}", first.documentId()))
+        mockMvc.perform(get("/api/reader/reading-progress/{documentId}", first.documentId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.versionId").value(second.versionId().toString()))
-                .andExpect(jsonPath("$.sectionId").value(secondPosition.sectionId().toString()))
-                .andExpect(jsonPath("$.blockId").value(secondPosition.blockId().toString()))
-                .andExpect(jsonPath("$.charOffset").value(7))
-                .andExpect(jsonPath("$.blockViewportOffset").value(24))
-                .andExpect(jsonPath("$.progressRatio").value(0.37))
+                .andExpect(jsonPath("$.sectionId").doesNotExist())
+                .andExpect(jsonPath("$.blockId").doesNotExist())
+                .andExpect(jsonPath("$.charOffset").value(0))
+                .andExpect(jsonPath("$.blockViewportOffset").value(0))
+                .andExpect(jsonPath("$.progressRatio").value(0.0))
                 .andExpect(jsonPath("$.revision").value(2));
     }
 
@@ -354,7 +356,7 @@ class InterviewReaderApiTests {
         assertThat(repeatedJob.get("id").asText()).isEqualTo(first.jobId().toString());
         assertThat(repeatedJob.get("status").asText()).isEqualTo("IMPORTED");
 
-        var repeatedCommitBody = mockMvc.perform(post("/api/import-jobs/{jobId}/commit", first.jobId()))
+        var repeatedCommitBody = mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", first.jobId()))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -366,7 +368,8 @@ class InterviewReaderApiTests {
     @Test
     void excelTemplateCanBeImportedAndPreservesCodeWhitespace() throws Exception {
         var imported = importAndCommitExcel(Files.readAllBytes(Path.of("docs/templates/interview-reader-import-template.xlsx")));
-        var tocBody = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
+        publish(imported);
+        var tocBody = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].children[0].title").value("1.1 结论先行"))
                 .andReturn()
@@ -375,7 +378,7 @@ class InterviewReaderApiTests {
         var toc = objectMapper.readTree(tocBody);
         var conclusionNodeId = UUID.fromString(toc.get(0).get("children").get(0).get("id").asText());
 
-        mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), conclusionNodeId)
+        mockMvc.perform(get("/api/reader/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), conclusionNodeId)
                         .param("limit", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blocks[1].blockKey").value("q1-code1"))
@@ -407,10 +410,10 @@ class InterviewReaderApiTests {
                 """.formatted(title);
 
         var imported = importAndCommitMarkdown(markdown.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                 .andExpect(status().isNoContent());
 
-        var tocBody = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
+        var tocBody = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value(title))
                 .andExpect(jsonPath("$[0].children[0].title").value("1. HashMap 为什么线程不安全？"))
@@ -420,7 +423,7 @@ class InterviewReaderApiTests {
         var toc = objectMapper.readTree(tocBody);
         var questionNodeId = UUID.fromString(toc.get(0).get("children").get(0).get("id").asText());
 
-        mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), questionNodeId)
+        mockMvc.perform(get("/api/reader/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), questionNodeId)
                         .param("limit", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blocks[0].blockType").value("paragraph"))
@@ -446,7 +449,7 @@ class InterviewReaderApiTests {
 
         for (var sample : samples) {
             var imported = importAndCommitPdf(Files.readAllBytes(sample), sample.getFileName().toString());
-            var sourceBytes = mockMvc.perform(get("/api/import-jobs/{jobId}/source-file", imported.jobId()))
+            var sourceBytes = mockMvc.perform(get("/api/admin/import-jobs/{jobId}/source-file", imported.jobId()))
                     .andExpect(status().isOk())
                     .andExpect(result -> assertThat(result.getResponse().getContentType()).contains(MediaType.APPLICATION_PDF_VALUE))
                     .andReturn()
@@ -454,7 +457,7 @@ class InterviewReaderApiTests {
                     .getContentAsByteArray();
             assertThat(new String(sourceBytes, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("%PDF");
 
-            var rawExtraction = getJson("/api/import-jobs/{jobId}/raw-extraction", imported.jobId());
+            var rawExtraction = getJson("/api/admin/import-jobs/{jobId}/raw-extraction", imported.jobId());
             assertThat(rawExtraction.get("schemaVersion").asText()).isEqualTo("1.0");
             assertThat(rawExtraction.get("preflight").get("mimeType").asText()).isEqualTo("application/pdf");
             assertThat(rawExtraction.get("preflight").get("pageCount").asInt()).isPositive();
@@ -478,7 +481,7 @@ class InterviewReaderApiTests {
             assertThat(rawExtraction.get("pages").get(0).has("blockCount")).isTrue();
             assertThat(rawExtraction.get("pages").get(0).has("coveredByBlocks")).isTrue();
 
-            var normalized = getJson("/api/import-jobs/{jobId}/normalized-package", imported.jobId());
+            var normalized = getJson("/api/admin/import-jobs/{jobId}/normalized-package", imported.jobId());
             assertThat(normalized.get("version").get("sourceType").asText()).isEqualTo("PDF");
             assertThat(normalized.get("sections").size()).isPositive();
             assertThat(normalized.get("blocks").size()).isPositive();
@@ -490,10 +493,10 @@ class InterviewReaderApiTests {
             assertThat(normalized.get("version").get("metadata").get("uncoveredTextPageCount").asInt())
                     .isEqualTo(rawExtraction.get("preflight").get("uncoveredTextPageCount").asInt());
 
-            mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+            mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                     .andExpect(status().isNoContent());
 
-            var tocBody = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
+            var tocBody = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId()))
                     .andExpect(status().isOk())
                     .andReturn()
                     .getResponse()
@@ -504,7 +507,7 @@ class InterviewReaderApiTests {
             var readablePosition = firstReadablePosition(imported.versionId(), toc);
             assertThat(readablePosition.blockId()).isNotNull();
             var readerContent = getJson(
-                    "/api/versions/{versionId}/nodes/{nodeId}/content",
+                    "/api/reader/versions/{versionId}/nodes/{nodeId}/content",
                     imported.versionId(),
                     readablePosition.sectionId());
             assertThat(readerContent.get("blocks").get(0).get("sourceBbox").get("page").asInt()).isPositive();
@@ -521,7 +524,7 @@ class InterviewReaderApiTests {
     void generatedPdfRecognizesListAndCodeBlocks() throws Exception {
         var job = uploadPackage(generatedSemanticPdf(), "PDF", "semantic-blocks.pdf");
         assertThat(job.get("status").asText()).isEqualTo("READY");
-        var normalized = getJson("/api/import-jobs/{jobId}/normalized-package", UUID.fromString(job.get("id").asText()));
+        var normalized = getJson("/api/admin/import-jobs/{jobId}/normalized-package", UUID.fromString(job.get("id").asText()));
         var blockTypes = normalized.get("blocks").findValuesAsText("blockType");
         assertThat(blockTypes).contains("unordered_list", "code");
 
@@ -540,13 +543,13 @@ class InterviewReaderApiTests {
         assertThat(job.get("status").asText()).isEqualTo("READY");
         var jobId = UUID.fromString(job.get("id").asText());
 
-        var normalized = getJson("/api/import-jobs/{jobId}/normalized-package", jobId);
+        var normalized = getJson("/api/admin/import-jobs/{jobId}/normalized-package", jobId);
         var snapshot = findByField(normalized.get("blocks"), "blockType", "table_snapshot");
         assertThat(snapshot.get("confidence").decimalValue()).isLessThan(new java.math.BigDecimal("0.50"));
         assertThat(snapshot.get("payload").get("lines").get(0).asText()).contains("Metric | Value | Risk");
         assertThat(snapshot.get("plainText").asText()).contains("Threads | Many | Race");
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.issueCode == 'PDF_TABLE_REVIEW_REQUIRED' && @.severity == 'WARNING')]").exists());
     }
@@ -679,17 +682,17 @@ class InterviewReaderApiTests {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "interactions-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
-        mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                 .andExpect(status().isNoContent());
 
-        var tocBody = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
+        var tocBody = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId()))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
         var toc = objectMapper.readTree(tocBody);
         var sectionId = UUID.fromString(toc.get(0).get("children").get(0).get("id").asText());
-        var contentBody = mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), sectionId))
+        var contentBody = mockMvc.perform(get("/api/reader/versions/{versionId}/nodes/{nodeId}/content", imported.versionId(), sectionId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -705,7 +708,7 @@ class InterviewReaderApiTests {
                   "title": "重点收藏"
                 }
                 """.formatted(imported.documentId(), imported.versionId(), sectionId, blockId);
-        var bookmarkBody = mockMvc.perform(post("/api/bookmarks")
+        var bookmarkBody = mockMvc.perform(post("/api/reader/bookmarks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookmarkRequest))
                 .andExpect(status().isCreated())
@@ -717,7 +720,7 @@ class InterviewReaderApiTests {
         var bookmarkId = objectMapper.readTree(bookmarkBody).get("id").asText();
 
         var repeatedBookmark = bookmarkRequest.replace("重点收藏", "更新后的收藏");
-        mockMvc.perform(post("/api/bookmarks")
+        mockMvc.perform(post("/api/reader/bookmarks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(repeatedBookmark))
                 .andExpect(status().isCreated())
@@ -734,7 +737,7 @@ class InterviewReaderApiTests {
                   "body": "复习并发修改风险"
                 }
                 """.formatted(imported.documentId(), imported.versionId(), sectionId, blockId);
-        mockMvc.perform(post("/api/notes")
+        mockMvc.perform(post("/api/reader/notes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(noteRequest))
                 .andExpect(status().isCreated())
@@ -747,7 +750,7 @@ class InterviewReaderApiTests {
                   "mastery": "FUZZY"
                 }
                 """.formatted(imported.documentId());
-        mockMvc.perform(put("/api/review-states/{nodeId}", sectionId)
+        mockMvc.perform(put("/api/reader/review-states/{nodeId}", sectionId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reviewRequest))
                 .andExpect(status().isOk())
@@ -755,7 +758,7 @@ class InterviewReaderApiTests {
                 .andExpect(jsonPath("$.intervalDays").value(3))
                 .andExpect(jsonPath("$.repetitions").value(1));
 
-        mockMvc.perform(put("/api/review-states/{nodeId}", sectionId)
+        mockMvc.perform(put("/api/reader/review-states/{nodeId}", sectionId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reviewRequest.replace("FUZZY", "KNOWN")))
                 .andExpect(status().isOk())
@@ -763,7 +766,7 @@ class InterviewReaderApiTests {
                 .andExpect(jsonPath("$.intervalDays").value(7))
                 .andExpect(jsonPath("$.repetitions").value(2));
 
-        mockMvc.perform(delete("/api/bookmarks/{bookmarkId}", bookmarkId))
+        mockMvc.perform(delete("/api/reader/bookmarks/{bookmarkId}", bookmarkId))
                 .andExpect(status().isNoContent());
     }
 
@@ -772,10 +775,10 @@ class InterviewReaderApiTests {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "review-queue-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
-        mockMvc.perform(post("/api/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                 .andExpect(status().isNoContent());
 
-        var dueQueueBody = mockMvc.perform(get("/api/review-queue")
+        var dueQueueBody = mockMvc.perform(get("/api/reader/review-queue")
                         .param("documentId", imported.documentId().toString())
                         .param("limit", "5")
                         .param("dueOnly", "true"))
@@ -795,14 +798,14 @@ class InterviewReaderApiTests {
                   "mastery": "HARD"
                 }
                 """.formatted(imported.documentId());
-        mockMvc.perform(put("/api/review-states/{nodeId}", questionId)
+        mockMvc.perform(put("/api/reader/review-states/{nodeId}", questionId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(hardReviewRequest))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mastery").value("HARD"))
                 .andExpect(jsonPath("$.intervalDays").value(1));
 
-        mockMvc.perform(get("/api/review-queue")
+        mockMvc.perform(get("/api/reader/review-queue")
                         .param("documentId", imported.documentId().toString())
                         .param("limit", "5"))
                 .andExpect(status().isOk())
@@ -810,7 +813,7 @@ class InterviewReaderApiTests {
                 .andExpect(jsonPath("$[0].mastery").value("HARD"))
                 .andExpect(jsonPath("$[0].repetitions").value(1));
 
-        mockMvc.perform(get("/api/review-queue")
+        mockMvc.perform(get("/api/reader/review-queue")
                         .param("documentId", imported.documentId().toString())
                         .param("dueOnly", "true"))
                 .andExpect(status().isOk())
@@ -822,7 +825,8 @@ class InterviewReaderApiTests {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "review-invalid-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
-        var tocBody = mockMvc.perform(get("/api/versions/{versionId}/toc", imported.versionId()))
+        publish(imported);
+        var tocBody = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId()))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -835,7 +839,7 @@ class InterviewReaderApiTests {
                 }
                 """.formatted(imported.documentId());
 
-        mockMvc.perform(put("/api/review-states/{nodeId}", sectionId)
+        mockMvc.perform(put("/api/reader/review-states/{nodeId}", sectionId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(reviewRequest))
                 .andExpect(status().isBadRequest())
@@ -855,7 +859,7 @@ class InterviewReaderApiTests {
         assertThat(job.get("status").asText()).isEqualTo("REVIEW_REQUIRED");
         var jobId = UUID.fromString(job.get("id").asText());
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.issueCode == 'PARENT_SECTION_MISSING' && @.cellRef == 'Sections!D3')]").exists());
     }
@@ -866,7 +870,7 @@ class InterviewReaderApiTests {
         assertThat(job.get("status").asText()).isEqualTo("REVIEW_REQUIRED");
         var jobId = UUID.fromString(job.get("id").asText());
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.issueCode == 'EXCEL_MAGIC_INVALID' && @.severity == 'BLOCKING')]").exists());
     }
@@ -884,7 +888,7 @@ class InterviewReaderApiTests {
                 MediaType.APPLICATION_JSON_VALUE,
                 objectMapper.writeValueAsBytes(mutable));
 
-        var body = mockMvc.perform(multipart("/api/import-jobs")
+        var body = mockMvc.perform(multipart("/api/admin/import-jobs")
                         .file(upload)
                         .param("sourceType", "JSON_PACKAGE"))
                 .andExpect(status().isAccepted())
@@ -894,7 +898,7 @@ class InterviewReaderApiTests {
                 .getContentAsString();
         var jobId = UUID.fromString(objectMapper.readTree(body).get("id").asText());
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].issueCode").value("SECTION_KEY_DUPLICATE"));
     }
@@ -913,7 +917,7 @@ class InterviewReaderApiTests {
                 MediaType.APPLICATION_JSON_VALUE,
                 objectMapper.writeValueAsBytes(mutable));
 
-        var body = mockMvc.perform(multipart("/api/import-jobs")
+        var body = mockMvc.perform(multipart("/api/admin/import-jobs")
                         .file(upload)
                         .param("sourceType", "JSON_PACKAGE"))
                 .andExpect(status().isAccepted())
@@ -923,7 +927,7 @@ class InterviewReaderApiTests {
                 .getContentAsString();
         var jobId = UUID.fromString(objectMapper.readTree(body).get("id").asText());
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.issueCode == 'PARENT_SECTION_MISSING')]").exists());
     }
@@ -942,7 +946,7 @@ class InterviewReaderApiTests {
                 "review-required.json",
                 MediaType.APPLICATION_JSON_VALUE,
                 objectMapper.writeValueAsBytes(mutable));
-        var body = mockMvc.perform(multipart("/api/import-jobs")
+        var body = mockMvc.perform(multipart("/api/admin/import-jobs")
                         .file(upload)
                         .param("sourceType", "JSON_PACKAGE"))
                 .andExpect(status().isAccepted())
@@ -959,29 +963,31 @@ class InterviewReaderApiTests {
                   "title": "1.1 人工修订后的结论"
                 }
                 """;
-        mockMvc.perform(patch("/api/import-jobs/{jobId}/normalized-package/sections/{sectionKey}", jobId, "q1-conclusion")
+        mockMvc.perform(patch("/api/admin/import-jobs/{jobId}/normalized-package/sections/{sectionKey}", jobId, "q1-conclusion")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(revision))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections[1].title").value("1.1 人工修订后的结论"));
 
-        mockMvc.perform(get("/api/import-jobs/{jobId}", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READY"))
                 .andExpect(jsonPath("$.currentStage").value("REVIEWING"));
-        mockMvc.perform(get("/api/import-jobs/{jobId}/issues", jobId))
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", jobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
-        var versionBody = mockMvc.perform(post("/api/import-jobs/{jobId}/commit", jobId))
+        var versionBody = mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", jobId))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
         var version = objectMapper.readTree(versionBody);
         var versionId = UUID.fromString(version.get("id").asText());
+        var documentId = UUID.fromString(version.get("documentId").asText());
+        publish(new ImportResult(jobId, documentId, versionId));
 
-        mockMvc.perform(get("/api/versions/{versionId}/toc", versionId))
+        mockMvc.perform(get("/api/reader/versions/{versionId}/toc", versionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].children[0].title").value("1.1 人工修订后的结论"));
     }
@@ -997,6 +1003,10 @@ class InterviewReaderApiTests {
         assertThat(body).contains("UP");
     }
 
+    private void publish(ImportResult imported) throws Exception {
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
+                .andExpect(status().isNoContent());
+    }
     private ImportResult importAndCommit(byte[] jsonPackage) throws Exception {
         var job = uploadJsonPackage(jsonPackage);
         return commitReadyJob(job);
@@ -1021,7 +1031,7 @@ class InterviewReaderApiTests {
         assertThat(job.get("status").asText()).isEqualTo("READY");
         var jobId = UUID.fromString(job.get("id").asText());
 
-        var versionBody = mockMvc.perform(post("/api/import-jobs/{jobId}/commit", jobId))
+        var versionBody = mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", jobId))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
                 .andReturn()
@@ -1054,7 +1064,7 @@ class InterviewReaderApiTests {
                 contentType(fileName),
                 bytes);
 
-        var jobBody = mockMvc.perform(multipart("/api/import-jobs")
+        var jobBody = mockMvc.perform(multipart("/api/admin/import-jobs")
                         .file(upload)
                         .param("sourceType", sourceType))
                 .andExpect(status().isAccepted())
@@ -1085,7 +1095,7 @@ class InterviewReaderApiTests {
                   "format": "JSON_PACKAGE"
                 }
                 """.formatted(imported.documentId(), imported.versionId());
-        var body = mockMvc.perform(post("/api/exports")
+        var body = mockMvc.perform(post("/api/admin/exports")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -1104,7 +1114,7 @@ class InterviewReaderApiTests {
                   "format": "EXCEL"
                 }
                 """.formatted(imported.documentId(), imported.versionId());
-        return mockMvc.perform(post("/api/exports")
+        return mockMvc.perform(post("/api/admin/exports")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -1122,7 +1132,7 @@ class InterviewReaderApiTests {
                   "format": "MARKDOWN"
                 }
                 """.formatted(imported.documentId(), imported.versionId());
-        return mockMvc.perform(post("/api/exports")
+        return mockMvc.perform(post("/api/admin/exports")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -1140,7 +1150,7 @@ class InterviewReaderApiTests {
                   "format": "STATIC_HTML"
                 }
                 """.formatted(imported.documentId(), imported.versionId());
-        return mockMvc.perform(post("/api/exports")
+        return mockMvc.perform(post("/api/admin/exports")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -1247,7 +1257,7 @@ class InterviewReaderApiTests {
     }
 
     private ContentPosition firstChildFirstBlock(UUID versionId) throws Exception {
-        var tocBody = mockMvc.perform(get("/api/versions/{versionId}/toc", versionId))
+        var tocBody = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", versionId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -1260,7 +1270,7 @@ class InterviewReaderApiTests {
         var nodeIds = new java.util.ArrayList<UUID>();
         collectNodeIds(toc, nodeIds);
         for (var nodeId : nodeIds) {
-            var contentBody = mockMvc.perform(get("/api/versions/{versionId}/nodes/{nodeId}/content", versionId, nodeId)
+            var contentBody = mockMvc.perform(get("/api/reader/versions/{versionId}/nodes/{nodeId}/content", versionId, nodeId)
                             .param("limit", "1"))
                     .andExpect(status().isOk())
                     .andReturn()

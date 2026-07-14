@@ -12,6 +12,9 @@ public class DocumentVersionEntity {
     public String id;
     public String documentId;
     public int versionNo;
+    public String parentVersionId;
+    public String originImportJobId;
+    public long draftRevision;
     public String sourceType;
     public String sourceFileName;
     public String sourceFileSha256;

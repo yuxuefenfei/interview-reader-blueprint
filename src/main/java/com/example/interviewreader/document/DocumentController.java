@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/documents")
+@RequestMapping("/api/reader/documents")
 public class DocumentController {
     private final DocumentQueryService service;
 
@@ -29,9 +29,5 @@ public class DocumentController {
         return service.getDocument(documentId);
     }
 
-    @PostMapping("/{documentId}/versions/{versionId}/publish")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void publish(@PathVariable UUID documentId, @PathVariable UUID versionId) {
-        service.publish(documentId, versionId);
-    }
+
 }

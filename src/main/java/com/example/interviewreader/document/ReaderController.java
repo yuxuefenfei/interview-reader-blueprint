@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/versions")
+@RequestMapping("/api/reader/versions")
 public class ReaderController {
     private final DocumentQueryService service;
     private final ObjectMapper objectMapper;

@@ -230,7 +230,7 @@ public class PdfPackageService {
                         plainText,
                         candidate.language(),
                         candidate.pageNumber(),
-                        pageBbox(candidate.pageNumber(), candidate.mediaBox()),
+                        pageBbox(candidate),
                         confidence(candidate),
                         Hashes.sha256(plainText)));
                 if ("table_snapshot".equals(candidate.blockType())) {
@@ -363,13 +363,15 @@ public class PdfPackageService {
     }
 
     private List<PdfBlockCandidate> blockCandidates(PDDocument document, int startPage, int endPage) throws IOException {
-        var stripper = new PDFTextStripper();
-        stripper.setSortByPosition(true);
         var result = new ArrayList<PdfBlockCandidate>();
         for (var page = startPage; page <= endPage; page++) {
+            var stripper = new PositionedTextStripper();
+            stripper.setSortByPosition(true);
             stripper.setStartPage(page);
             stripper.setEndPage(page);
+            var firstCandidate = result.size();
             addBlockCandidates(result, stripper.getText(document), page, document.getPage(page - 1).getMediaBox());
+            attachLineBounds(result, firstCandidate, stripper.lines());
         }
         return result;
     }
@@ -383,6 +385,19 @@ public class PdfPackageService {
         for (var rawLine : text.lines().toList()) {
             var rawText = rawLine.stripTrailing();
             var line = rawLine.strip();
+            if (looksLikeRunningHeader(line)) {
+                continue;
+            }
+            var headingAnnotation = splitHeadingAndAnnotation(rawText);
+            if (headingAnnotation != null) {
+                flushParagraph(result, paragraph, pageNumber, mediaBox);
+                flushList(result, listItems, listType, pageNumber, mediaBox);
+                flushTableSnapshot(result, tableLines, pageNumber, mediaBox);
+                appendLine(paragraph, headingAnnotation.heading());
+                flushParagraph(result, paragraph, pageNumber, mediaBox);
+                appendCodeLine(code, headingAnnotation.annotation());
+                continue;
+            }
             if (line.isBlank() || line.matches("\\d{1,4}")) {
                 flushParagraph(result, paragraph, pageNumber, mediaBox);
                 flushCode(result, code, pageNumber, mediaBox);
@@ -464,7 +479,7 @@ public class PdfPackageService {
         var text = paragraph.toString().strip();
         paragraph.setLength(0);
         if (text.length() > 1) {
-            result.add(new PdfBlockCandidate("paragraph", text, List.of(), null, pageNumber, mediaBox));
+            result.add(new PdfBlockCandidate("paragraph", text, List.of(), null, pageNumber, mediaBox, null));
         }
     }
 
@@ -475,7 +490,7 @@ public class PdfPackageService {
         var text = trimCode(code.toString());
         code.setLength(0);
         if (text.length() > 1) {
-            result.add(new PdfBlockCandidate("code", text, List.of(), inferLanguage(text), pageNumber, mediaBox));
+            result.add(new PdfBlockCandidate("code", text, List.of(), inferLanguage(text), pageNumber, mediaBox, null));
         }
     }
 
@@ -483,7 +498,7 @@ public class PdfPackageService {
         if (items.isEmpty()) {
             return;
         }
-        result.add(new PdfBlockCandidate(blockType, String.join("\n", items), List.copyOf(items), null, pageNumber, mediaBox));
+        result.add(new PdfBlockCandidate(blockType, String.join("\n", items), List.copyOf(items), null, pageNumber, mediaBox, null));
         items.clear();
     }
 
@@ -493,9 +508,9 @@ public class PdfPackageService {
         }
         var text = String.join("\n", lines);
         if (lines.size() >= 2) {
-            result.add(new PdfBlockCandidate("table_snapshot", text, List.copyOf(lines), null, pageNumber, mediaBox));
+            result.add(new PdfBlockCandidate("table_snapshot", text, List.copyOf(lines), null, pageNumber, mediaBox, null));
         } else {
-            result.add(new PdfBlockCandidate("paragraph", text, List.of(), null, pageNumber, mediaBox));
+            result.add(new PdfBlockCandidate("paragraph", text, List.of(), null, pageNumber, mediaBox, null));
         }
         lines.clear();
     }
@@ -541,13 +556,22 @@ public class PdfPackageService {
         };
     }
 
-    private JsonNode pageBbox(int pageNumber, PDRectangle mediaBox) {
+    private JsonNode pageBbox(PdfBlockCandidate candidate) {
+        var bounds = candidate.bounds();
+        if (bounds == null) {
+            return objectMapper.valueToTree(Map.of(
+                    "page", candidate.pageNumber(),
+                    "x", 0,
+                    "y", 0,
+                    "width", candidate.mediaBox().getWidth(),
+                    "height", candidate.mediaBox().getHeight()));
+        }
         return objectMapper.valueToTree(Map.of(
-                "page", pageNumber,
-                "x", 0,
-                "y", 0,
-                "width", mediaBox.getWidth(),
-                "height", mediaBox.getHeight()));
+                "page", candidate.pageNumber(),
+                "x", bounds.x(),
+                "y", bounds.y(),
+                "width", bounds.width(),
+                "height", bounds.height()));
     }
 
     private ImportIssueDto issue(String severity, String code, String message) {
@@ -651,6 +675,7 @@ public class PdfPackageService {
             return false;
         }
         return line.matches("^(?://|/\\*|\\*|\\*/).*")
+                || line.matches("^@[A-Za-z][\\w.]*.*")
                 || line.matches("^(else|catch|finally)\\b.*")
                 || line.matches("^[)}\\],;]+$");
     }
@@ -660,16 +685,44 @@ public class PdfPackageService {
         if (closingBrace < 0) {
             return null;
         }
+        var codeEnd = closingBrace;
         var proseStart = closingBrace + 1;
-        while (proseStart < rawText.length() && Character.isWhitespace(rawText.charAt(proseStart))) {
-            proseStart++;
+        while (proseStart < rawText.length()) {
+            var character = rawText.charAt(proseStart);
+            if (Character.isWhitespace(character)) {
+                proseStart++;
+                continue;
+            }
+            if (character == '}') {
+                codeEnd = proseStart;
+                proseStart++;
+                continue;
+            }
+            break;
         }
         if (proseStart >= rawText.length() || !isCjk(rawText.charAt(proseStart))) {
             return null;
         }
-        var code = rawText.substring(0, closingBrace + 1).stripTrailing();
+        var code = rawText.substring(0, codeEnd + 1).stripTrailing();
         var prose = rawText.substring(proseStart).strip();
         return code.isBlank() || prose.isBlank() || !isCodeLine(code, code.strip()) ? null : new CodeProseSplit(code, prose);
+    }
+
+    private static HeadingAnnotationSplit splitHeadingAndAnnotation(String rawText) {
+        var annotationStart = rawText.indexOf('@');
+        if (annotationStart <= 0 || annotationStart == rawText.length() - 1) {
+            return null;
+        }
+        var heading = rawText.substring(0, annotationStart).strip();
+        var annotation = rawText.substring(annotationStart).strip();
+        if (heading.isBlank() || !heading.chars().anyMatch(value -> isCjk((char) value)) || !annotation.matches("^@[A-Za-z][\\w.]*.*")) {
+            return null;
+        }
+        return new HeadingAnnotationSplit(heading, annotation);
+    }
+
+    private static boolean looksLikeRunningHeader(String line) {
+        return line.length() < 100 && line.contains("系统化解析") && line.contains("面试题");
     }
 
     private static void appendCodeLine(StringBuilder code, String rawText) {
@@ -761,13 +814,30 @@ public class PdfPackageService {
     private record CodeProseSplit(String code, String prose) {
     }
 
+    private record HeadingAnnotationSplit(String heading, String annotation) {
+    }
+
+    private record PositionedLine(String text, BlockBounds bounds) {
+    }
+
+    private record BlockBounds(float x, float y, float width, float height) {
+        private static BlockBounds merge(BlockBounds left, BlockBounds right) {
+            var x = Math.min(left.x, right.x);
+            var y = Math.min(left.y, right.y);
+            var endX = Math.max(left.x + left.width, right.x + right.width);
+            var endY = Math.max(left.y + left.height, right.y + right.height);
+            return new BlockBounds(x, y, endX - x, endY - y);
+        }
+    }
+
     private record PdfBlockCandidate(
             String blockType,
             String text,
             List<String> items,
             String language,
             int pageNumber,
-            PDRectangle mediaBox
+            PDRectangle mediaBox,
+            BlockBounds bounds
     ) {
         private String plainText() {
             return "unordered_list".equals(blockType) || "ordered_list".equals(blockType)
@@ -776,6 +846,62 @@ public class PdfPackageService {
         }
     }
 
+    private void attachLineBounds(List<PdfBlockCandidate> candidates, int firstCandidate, List<PositionedLine> lines) {
+        var lineIndex = 0;
+        for (var index = firstCandidate; index < candidates.size(); index++) {
+            var candidate = candidates.get(index);
+            var target = compact(candidate.plainText());
+            if (target.isBlank() || lineIndex >= lines.size()) {
+                continue;
+            }
+            var merged = "";
+            BlockBounds bounds = null;
+            while (lineIndex < lines.size()) {
+                var line = lines.get(lineIndex++);
+                merged += compact(line.text());
+                bounds = bounds == null ? line.bounds() : BlockBounds.merge(bounds, line.bounds());
+                if (merged.length() >= target.length() || !target.startsWith(merged)) {
+                    break;
+                }
+            }
+            candidates.set(index, new PdfBlockCandidate(candidate.blockType(), candidate.text(), candidate.items(), candidate.language(),
+                    candidate.pageNumber(), candidate.mediaBox(), bounds));
+        }
+    }
+
+    private static String compact(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "");
+    }
+
+    private static final class PositionedTextStripper extends PDFTextStripper {
+        private final List<PositionedLine> lines = new ArrayList<>();
+
+        private PositionedTextStripper() throws IOException {
+        }
+
+        @Override
+        protected void writeString(String text, List<TextPosition> positions) throws IOException {
+            super.writeString(text, positions);
+            if (text == null || text.isBlank() || positions == null || positions.isEmpty()) {
+                return;
+            }
+            var minX = Float.MAX_VALUE;
+            var minY = Float.MAX_VALUE;
+            var maxX = Float.MIN_VALUE;
+            var maxY = Float.MIN_VALUE;
+            for (var position : positions) {
+                minX = Math.min(minX, position.getXDirAdj());
+                minY = Math.min(minY, position.getYDirAdj());
+                maxX = Math.max(maxX, position.getXDirAdj() + position.getWidthDirAdj());
+                maxY = Math.max(maxY, position.getYDirAdj() + position.getHeightDir());
+            }
+            lines.add(new PositionedLine(text.strip(), new BlockBounds(minX, minY, Math.max(1, maxX - minX), Math.max(1, maxY - minY))));
+        }
+
+        private List<PositionedLine> lines() {
+            return List.copyOf(lines);
+        }
+    }
     private static final class FontStatsStripper extends PDFTextStripper {
         private final Map<FontKey, Integer> counts = new LinkedHashMap<>();
 

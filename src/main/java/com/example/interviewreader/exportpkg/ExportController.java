@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/exports")
+@RequestMapping("/api/admin/exports")
 public class ExportController {
     private final DocumentPackageExportService exportService;
     private final ExcelPackageService excelPackageService;
