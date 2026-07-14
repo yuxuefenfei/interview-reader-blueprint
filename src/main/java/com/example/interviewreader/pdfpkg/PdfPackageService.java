@@ -390,7 +390,17 @@ public class PdfPackageService {
                 flushTableSnapshot(result, tableLines, pageNumber, mediaBox);
                 continue;
             }
-            if (isCodeLine(rawText, line)) {
+            var codeProse = splitCodeAndProse(rawText);
+            if (codeProse != null) {
+                flushParagraph(result, paragraph, pageNumber, mediaBox);
+                flushList(result, listItems, listType, pageNumber, mediaBox);
+                flushTableSnapshot(result, tableLines, pageNumber, mediaBox);
+                appendCodeLine(code, codeProse.code());
+                flushCode(result, code, pageNumber, mediaBox);
+                appendLine(paragraph, codeProse.prose());
+                continue;
+            }
+            if (isCodeLine(rawText, line) || isCodeContinuation(code, line)) {
                 flushParagraph(result, paragraph, pageNumber, mediaBox);
                 flushList(result, listItems, listType, pageNumber, mediaBox);
                 flushTableSnapshot(result, tableLines, pageNumber, mediaBox);
@@ -631,8 +641,35 @@ public class PdfPackageService {
                 || line.contains("==")
                 || line.contains("!=");
         return hasCodePunctuation
+                || line.matches("^@[A-Za-z][\\w.]*.*")
                 || CODE_KEYWORD_PATTERN.matcher(line).matches()
                 || rawText.startsWith("    ") && (line.contains("(") || line.contains("=") || line.contains(";"));
+    }
+
+    private static boolean isCodeContinuation(StringBuilder code, String line) {
+        if (code.isEmpty() || line.isBlank()) {
+            return false;
+        }
+        return line.matches("^(?://|/\\*|\\*|\\*/).*")
+                || line.matches("^(else|catch|finally)\\b.*")
+                || line.matches("^[)}\\],;]+$");
+    }
+
+    private static CodeProseSplit splitCodeAndProse(String rawText) {
+        var closingBrace = rawText.indexOf('}');
+        if (closingBrace < 0) {
+            return null;
+        }
+        var proseStart = closingBrace + 1;
+        while (proseStart < rawText.length() && Character.isWhitespace(rawText.charAt(proseStart))) {
+            proseStart++;
+        }
+        if (proseStart >= rawText.length() || !isCjk(rawText.charAt(proseStart))) {
+            return null;
+        }
+        var code = rawText.substring(0, closingBrace + 1).stripTrailing();
+        var prose = rawText.substring(proseStart).strip();
+        return code.isBlank() || prose.isBlank() || !isCodeLine(code, code.strip()) ? null : new CodeProseSplit(code, prose);
     }
 
     private static void appendCodeLine(StringBuilder code, String rawText) {
@@ -719,6 +756,9 @@ public class PdfPackageService {
     }
 
     public record RawPage(int pageNumber, float width, float height, int rotation, int charCount, int blockCount, boolean coveredByBlocks, String text) {
+    }
+
+    private record CodeProseSplit(String code, String prose) {
     }
 
     private record PdfBlockCandidate(

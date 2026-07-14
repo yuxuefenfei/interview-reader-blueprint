@@ -530,6 +530,8 @@ class InterviewReaderApiTests {
         var codeBlock = findByField(normalized.get("blocks"), "blockType", "code");
         assertThat(codeBlock.get("payload").get("language").asText()).isEqualTo("java");
         assertThat(codeBlock.get("payload").get("text").asText()).contains("if (a < b)");
+        assertThat(codeBlock.get("payload").get("text").asText()).contains("}\n@Transactional");
+        assertThat(codeBlock.get("payload").get("text").asText()).contains("public void save() {");
     }
 
     @Test
@@ -1179,6 +1181,10 @@ class InterviewReaderApiTests {
                         "- visibility is not guaranteed",
                         "if (a < b) {",
                         "    return a;",
+                        "}",
+                        "@Transactional",
+                        "public void save() {",
+                        "    return;",
                         "}")) {
                     content.showText(line);
                     content.newLine();

@@ -1,9 +1,19 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref } from "vue";
 import type { ContentBlock } from "../types/api";
+
+const copyLabel = ref("复制代码");
+let copyLabelTimer: number | null = null;
 
 defineProps<{
   block: ContentBlock;
 }>();
+
+onBeforeUnmount(() => {
+  if (copyLabelTimer !== null) {
+    window.clearTimeout(copyLabelTimer);
+  }
+});
 
 function textFromPayload(payload: Record<string, unknown>, fallback: string): string {
   return typeof payload.text === "string" ? payload.text : fallback;
@@ -12,7 +22,7 @@ function textFromPayload(payload: Record<string, unknown>, fallback: string): st
 function codeTextFromPayload(payload: Record<string, unknown>, fallback: string): string {
   return textFromPayload(payload, fallback)
     .replace(/\r\n?/g, "\n")
-    .replace(/}\s+(?=[\u4e00-\u9fff])/g, "}\n");
+    .replace(/}\s+@(?=[A-Za-z])/g, "}\n@");
 }
 
 function itemsFromPayload(payload: Record<string, unknown>): string[] {
@@ -31,6 +41,37 @@ function tableRows(payload: Record<string, unknown>): string[][] {
 
 function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): string {
   return typeof payload.language === "string" ? payload.language : block.blockType === "code" ? "text" : "";
+}
+
+async function copyCode(block: ContentBlock): Promise<void> {
+  const text = codeTextFromPayload(block.payload, block.plainText);
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.append(textArea);
+      textArea.select();
+      const copied = document.execCommand("copy");
+      textArea.remove();
+      if (!copied) {
+        throw new Error("Clipboard unavailable");
+      }
+    }
+    copyLabel.value = "已复制";
+  } catch {
+    copyLabel.value = "复制失败";
+  }
+  if (copyLabelTimer !== null) {
+    window.clearTimeout(copyLabelTimer);
+  }
+  copyLabelTimer = window.setTimeout(() => {
+    copyLabel.value = "复制代码";
+    copyLabelTimer = null;
+  }, 1_600);
 }
 </script>
 
@@ -53,7 +94,12 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
     </ol>
 
     <figure v-else-if="block.blockType === 'code'" class="code-block">
-      <figcaption>{{ codeLanguage(block.payload, block) }}</figcaption>
+      <figcaption>
+        <span>{{ codeLanguage(block.payload, block) }}</span>
+        <button class="code-copy" type="button" :aria-label="copyLabel" :title="copyLabel" @click="copyCode(block)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" /></svg>
+        </button>
+      </figcaption>
       <pre><code>{{ codeTextFromPayload(block.payload, block.plainText) }}</code></pre>
     </figure>
 

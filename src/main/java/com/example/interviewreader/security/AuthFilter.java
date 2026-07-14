@@ -56,6 +56,7 @@ public class AuthFilter extends OncePerRequestFilter {
         return path.equals("/")
                 || path.equals("/index.html")
                 || path.equals("/favicon.ico")
+                || path.equals("/icon.svg")
                 || path.equals("/manifest.webmanifest")
                 || path.equals("/sw.js")
                 || path.startsWith("/assets/")

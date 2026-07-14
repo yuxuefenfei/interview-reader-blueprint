@@ -37,6 +37,13 @@ class InterviewReaderAuthTests {
     }
 
     @Test
+    void unauthenticatedShellAssetsRemainAvailable() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/icon.svg"))
+                .andExpect(status().isOk());
+    }
+    @Test
     void loginCreatesSessionCookieForProtectedApi() throws Exception {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

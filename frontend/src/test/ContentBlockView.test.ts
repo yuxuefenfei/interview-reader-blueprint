@@ -32,6 +32,7 @@ describe("ContentBlockView", () => {
 
     expect(wrapper.find("pre").text()).toContain("  void run()");
     expect(wrapper.text()).toContain("java");
+    expect(wrapper.find(".code-copy").exists()).toBe(true);
   });
 
   it("renders tables with horizontal-safe markup", () => {

@@ -51,6 +51,7 @@ import type {
 } from "./types/api";
 import { pageForBbox, sourceOverlayLabel, sourceOverlayStyle } from "./utils/sourceBbox";
 import { blockAtViewportAnchor, scrollTopForBlockOffset } from "./utils/readingPosition";
+import { normalizeReaderBlocks } from "./utils/contentBlocks";
 import { firstReadableNode, flattenToc, isQuestionNode, progressRatioForNode, questionAnswerNodes } from "./utils/toc";
 
 const authReady = ref(false);
@@ -72,6 +73,7 @@ const query = ref("");
 const searchHits = ref<SearchHit[]>([]);
 const searchStatus = ref("");
 const exportingFormat = ref<ExportFormat | null>(null);
+const libraryOpen = ref(false);
 const mobileToolsOpen = ref(false);
 const mobileSearchOpen = ref(false);
 const theme = ref(localStorage.getItem("reader.theme") || "light");
@@ -100,6 +102,7 @@ let progressSaveTimer: number | null = null;
 let readingPositionFrame: number | null = null;
 let lastReadingPositionCheck = 0;
 let lastPersistedProgressSignature = "";
+let readerTouchStart: { x: number; y: number; target: EventTarget | null } | null = null;
 
 localStorage.setItem("reader.deviceId", deviceId);
 
@@ -111,6 +114,7 @@ const nextNode = computed(() =>
   activeIndex.value >= 0 && activeIndex.value < readableNodes.value.length - 1 ? readableNodes.value[activeIndex.value + 1] : null
 );
 const currentBlock = computed(() => currentReadingBlock.value ?? content.value?.blocks[0] ?? null);
+const readerBlocks = computed(() => normalizeReaderBlocks(content.value?.blocks ?? []));
 const isQuestionMode = computed(() => isQuestionNode(activeNode.value));
 const answerNodes = computed(() => questionAnswerNodes(activeNode.value));
 const stagedSections = computed(() => normalizedPackage.value?.sections.slice(0, 12) ?? []);
@@ -288,6 +292,7 @@ async function searchReadableContent(): Promise<void> {
 
 async function selectDocument(document: DocumentSummary): Promise<void> {
   clearImportReview();
+  libraryOpen.value = false;
   if (!document.currentVersionId) {
     selectedDocument.value = document;
     reviewQueue.value = [];
@@ -333,6 +338,7 @@ async function selectNode(node: TocNode | null, restoreProgress: ReadingProgress
     answerExpanded.value = false;
     answerContents.value = {};
     tocOpen.value = false;
+    mobileToolsOpen.value = false;
     await nextTick();
     restoreReadingPosition(restoreProgress);
     if (!restoreProgress) {
@@ -418,6 +424,35 @@ function onReaderScroll(): void {
     return;
   }
   scheduleProgressSave();
+}
+
+function openPrimaryNavigation(): void {
+  if (window.matchMedia("(max-width: 640px)").matches) {
+    libraryOpen.value = true;
+    return;
+  }
+  tocOpen.value = !tocOpen.value;
+}
+
+function startReaderTouch(event: TouchEvent): void {
+  const touch = event.changedTouches[0];
+  if (!touch) {
+    return;
+  }
+  readerTouchStart = { x: touch.clientX, y: touch.clientY, target: event.target };
+}
+
+function endReaderTouch(event: TouchEvent): void {
+  const start = readerTouchStart;
+  readerTouchStart = null;
+  const touch = event.changedTouches[0];
+  if (!start || !touch || Math.abs(touch.clientX - start.x) < 72 || Math.abs(touch.clientX - start.x) <= Math.abs(touch.clientY - start.y)) {
+    return;
+  }
+  if (start.target instanceof Element && start.target.closest("pre, code, .table-wrap, input, textarea, button, a")) {
+    return;
+  }
+  void selectNode(touch.clientX < start.x ? nextNode.value : previousNode.value);
 }
 
 function pollReadingPosition(timestamp: number): void {
@@ -972,9 +1007,12 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
     </section>
 
     <template v-else>
-    <aside class="library-panel">
+    <aside class="library-panel" :class="{ open: libraryOpen }">
       <div class="library-header">
         <h1>Interview Reader</h1>
+        <button class="mobile-library-close" type="button" aria-label="关闭文档库" @click="libraryOpen = false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
         <label class="import-button">
           <input
             type="file"
@@ -1035,12 +1073,12 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
 
     <section class="reader-area">
       <header class="reader-toolbar">
-        <IconButton label="目录" @click="tocOpen = !tocOpen">
+        <IconButton label="文档库" @click="openPrimaryNavigation">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
         </IconButton>
         <div class="reader-title">
-          <strong>{{ importReviewJob ? "导入复核" : selectedDocument?.title || "尚未选择文档" }}</strong>
-          <span v-if="activeNode">{{ activeNode.title }}</span>
+          <strong class="reader-document-label">{{ importReviewJob ? "导入复核" : selectedDocument?.title || "尚未选择文档" }}</strong>
+          <span class="reader-section-label" v-if="activeNode">{{ activeNode.title }}</span>
           <span v-else-if="importReviewJob">{{ importReviewJob.status }}</span>
         </div>
         <div class="toolbar-actions">
@@ -1053,7 +1091,7 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
           <IconButton label="主题" @click="theme = theme === 'light' ? 'sepia' : theme === 'sepia' ? 'dark' : 'light'">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z" /></svg>
           </IconButton>
-          <IconButton label="退出登录" @click="signOut">
+          <IconButton class="logout-action" label="退出登录" @click="signOut">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-5" /></svg>
           </IconButton>
         </div>
@@ -1067,7 +1105,14 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
           <TocTree :nodes="toc" :active-node-id="activeNode?.id ?? null" @select="selectNode" />
         </aside>
 
-        <main ref="readerMain" class="content-panel" data-reader-main @scroll.passive="onReaderScroll">
+        <main
+          ref="readerMain"
+          class="content-panel"
+          data-reader-main
+          @scroll.passive="onReaderScroll"
+          @touchstart.passive="startReaderTouch"
+          @touchend.passive="endReaderTouch"
+        >
           <div v-if="loading" class="state-line">{{ busyMessage }}</div>
           <div v-else-if="error" class="state-line error">{{ error }}</div>
           <section v-else-if="importReviewJob && normalizedPackage" class="import-review">
@@ -1205,7 +1250,7 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
           </div>
           <article v-else-if="content" class="reader-document">
             <h2>{{ content.node.title }}</h2>
-            <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" />
+            <ContentBlockView v-for="block in readerBlocks" :key="block.id" :block="block" />
             <section v-if="isQuestionMode && answerNodes.length > 0" class="answer-fold">
               <button class="answer-toggle" type="button" @click="toggleAnswer">
                 {{ answerExpanded ? "收起答案" : "展开答案" }}
@@ -1214,7 +1259,7 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
                 <section v-for="answerNode in answerNodes" :key="answerNode.id" class="answer-section">
                   <h3>{{ answerNode.title }}</h3>
                   <ContentBlockView
-                    v-for="block in answerContents[answerNode.id]?.blocks ?? []"
+                    v-for="block in normalizeReaderBlocks(answerContents[answerNode.id]?.blocks ?? [])"
                     :key="block.id"
                     :block="block"
                   />
@@ -1321,14 +1366,6 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
         </aside>
       </div>
     </section>
-    <nav class="mobile-page-nav" aria-label="移动端翻页">
-      <button type="button" :disabled="!previousNode" aria-label="上一节" @click="selectNode(previousNode)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-      </button>
-      <button type="button" :disabled="!nextNode" aria-label="下一节" @click="selectNode(nextNode)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
-      </button>
-    </nav>
 
     <div class="mobile-toolbox" :class="{ open: mobileToolsOpen }">
       <div class="mobile-tool-actions" aria-label="移动端工具箱">
@@ -1342,6 +1379,12 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
         </label>
         <button class="mobile-tool-action search" type="button" aria-label="搜索" @click="toggleMobileSearch">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
+        </button>
+        <button class="mobile-tool-action previous" type="button" :disabled="!previousNode" aria-label="上一节" @click="selectNode(previousNode)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+        </button>
+        <button class="mobile-tool-action next" type="button" :disabled="!nextNode" aria-label="下一节" @click="selectNode(nextNode)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
         </button>
         <button class="mobile-tool-action toc" type="button" aria-label="目录" @click="openMobileToc">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -1382,7 +1425,13 @@ async function run(message: string, action: () => Promise<void>): Promise<void> 
       >
         <span :style="{ width: `${currentProgressPercent}%` }"></span>
       </div>
-      <button class="mobile-tool-toggle" type="button" aria-label="打开工具箱" @click="toggleMobileTools">
+      <button
+        class="mobile-tool-toggle"
+        type="button"
+        :aria-label="mobileToolsOpen ? '关闭工具箱' : '打开工具箱'"
+        :aria-expanded="mobileToolsOpen"
+        @click="toggleMobileTools"
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" /></svg>
       </button>
     </div>
