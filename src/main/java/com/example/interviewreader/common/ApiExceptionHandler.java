@@ -43,6 +43,7 @@ public class ApiExceptionHandler {
         problem.setType(URI.create("https://interview-reader.local/problems/" + code.toLowerCase()));
         problem.setTitle(status.getReasonPhrase());
         problem.setProperty("code", code);
+        problem.setProperty("error", detail);
         problem.setProperty("traceId", UUID.randomUUID().toString());
         return problem;
     }

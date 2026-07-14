@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.update.UpdateWrapper;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -197,12 +198,17 @@ public class VersionRevisionService {
                 .from(IMPORT_JOB_ENTITY)
                 .where(IMPORT_JOB_ENTITY.RESULT_VERSION_ID.eq(version.id)));
         for (var job : jobs) {
-            job.resultVersionId = null;
-            job.status = "READY";
-            job.currentStage = "DRAFT_DISCARDED";
-            job.errorCode = null;
-            job.errorMessage = null;
-            importJobMapper.update(job);
+            var update = UpdateWrapper.of(ImportJobEntity.class)
+                    .set(IMPORT_JOB_ENTITY.RESULT_VERSION_ID, null)
+                    .set(IMPORT_JOB_ENTITY.STATUS, "READY")
+                    .set(IMPORT_JOB_ENTITY.CURRENT_STAGE, "DRAFT_DISCARDED")
+                    .set(IMPORT_JOB_ENTITY.ERROR_CODE, null)
+                    .set(IMPORT_JOB_ENTITY.ERROR_MESSAGE, null);
+            importJobMapper.updateByQuery(
+                    update.toEntity(),
+                    false,
+                    QueryWrapper.create().where(IMPORT_JOB_ENTITY.ID.eq(job.id))
+            );
         }
         deleteContent(version.id);
         documentVersionMapper.deleteById(version.id);
