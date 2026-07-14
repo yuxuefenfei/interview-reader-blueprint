@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Delete, EditPen, FolderOpened, MoreFilled, RefreshRight } from "@element-plus/icons-vue";
+import { ArrowLeft, Delete, EditPen, FolderOpened, MoreFilled, Plus, RefreshRight } from "@element-plus/icons-vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -25,10 +25,21 @@ const nodeLoading = ref(false);
 const nodeSaving = ref(false);
 const structureSaving = ref(false);
 const savingBlockId = ref<string | null>(null);
+const creatingBlock = ref(false);
 const expandedPayload = ref<string[]>([]);
 
 const selectedNode = computed(() => editor.value?.nodes.find(node => node.id === selectedId.value) ?? null);
+const selectedNodeHasChildren = computed(() => !!selectedId.value && editor.value?.nodes.some(node => node.parentId === selectedId.value));
+const emptyBlockDescription = computed(() => selectedNodeHasChildren.value ? "该结构节点没有直接内容块。请选择子节点编辑正文，或在此新增内容。" : "该节点暂无内容块，可直接新增正文。")
 const blockTypes = ["paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote", "callout", "formula", "image", "divider", "table_snapshot"];
+const nodeTypes = [
+  { value: "PART", label: "篇章" }, { value: "CHAPTER", label: "章节" }, { value: "SECTION", label: "小节" },
+  { value: "SUBSECTION", label: "子节" }, { value: "QUESTION", label: "面试问题" }, { value: "APPENDIX", label: "附录" }, { value: "OTHER", label: "其他" }
+];
+const semanticRoles = [
+  { value: "QUESTION", label: "面试问题" }, { value: "ANSWER", label: "答案" }, { value: "EXPLANATION", label: "解析" },
+  { value: "CONCLUSION", label: "结论" }, { value: "INTRODUCTION", label: "导读" }, { value: "DIRECTORY", label: "目录" }
+];
 
 onMounted(() => { void load(); });
 async function load(): Promise<void> {
@@ -75,7 +86,7 @@ async function loadBlocks(append = false): Promise<void> {
   nodeLoading.value = true;
   try {
     const result = await adminApi.nodeBlocks(versionId, selectedId.value, append ? nextCursor.value ?? undefined : undefined);
-    blocks.value = append ? [...blocks.value, ...result.items] : result.items;
+    blocks.value = append ? [...blocks.value, ...result.items.filter(item => !blocks.value.some(block => block.id === item.id))] : result.items;
     nextCursor.value = result.nextCursor;
     for (const block of result.items) payloadTexts[block.id] = JSON.stringify(block.payload ?? {}, null, 2);
   } catch (caught) { ElMessage.error(message(caught)); }
@@ -108,6 +119,20 @@ async function persistStructure(): Promise<void> {
     ElMessage.error(message(caught));
     if (editor.value) treeData.value = toTree(editor.value.nodes);
   } finally { structureSaving.value = false; }
+}
+async function addBlock(): Promise<void> {
+  if (!editor.value || !selectedId.value) return;
+  creatingBlock.value = true;
+  try {
+    const block = await adminApi.createBlock(versionId, selectedId.value, editor.value.version.draftRevision, {
+      blockType: "paragraph", payload: { text: "" }, plainText: "", language: null
+    });
+    blocks.value.push(block);
+    payloadTexts[block.id] = JSON.stringify(block.payload ?? {}, null, 2);
+    editor.value.version.draftRevision++;
+    ElMessage.success("已新增内容块");
+  } catch (caught) { ElMessage.error(message(caught)); }
+  finally { creatingBlock.value = false; }
 }
 async function saveBlock(block: EditorBlock): Promise<void> {
   if (!editor.value) return;
@@ -147,19 +172,19 @@ function message(value: unknown): string { return value instanceof Error ? value
         <div class="panel-title"><div><strong>文档结构</strong><span>{{ editor.nodes.length }} 个节点</span></div><el-icon><FolderOpened /></el-icon></div>
         <p class="tree-helper">拖动节点可调整层级和顺序，松开后自动保存。</p>
         <el-tree :data="treeData" node-key="id" :props="{ label: 'title', children: 'children' }" highlight-current default-expand-all draggable expand-on-click-node :current-node-key="selectedId" :allow-drop="() => true" @node-click="selectNode" @node-drop="persistStructure">
-          <template #default="{ data }"><span class="editor-tree-label"><span>{{ data.title }}</span><small>{{ data.level }}</small></span></template>
+          <template #default="{ data }"><span class="editor-tree-label"><span>{{ data.title }}</span><small>{{ zh(data.nodeType) }} · 第 {{ data.level }} 级</small></span></template>
         </el-tree>
       </aside>
 
       <main class="editor-content-panel">
         <section v-if="selectedNode" class="node-inspector">
           <div class="section-heading"><div><p class="eyebrow">节点属性</p><h2>{{ selectedNode.title }}</h2></div><el-button type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div>
-          <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option label="章节" value="SECTION" /><el-option label="目录" value="TOC" /><el-option label="说明" value="INTRO" /></el-select></el-form-item><el-form-item label="语义角色"><el-input v-model="nodeForm.semanticRole" placeholder="例如：QUESTION、ANSWER、EXPLANATION" /></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
+          <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
         </section>
 
         <section class="block-editor" v-loading="nodeLoading">
-          <div class="section-heading"><div><p class="eyebrow">内容块</p><h2>当前节点内容</h2></div><span>{{ blocks.length }} 个已加载</span></div>
-          <el-empty v-if="!nodeLoading && !blocks.length" description="该节点暂无内容块" />
+          <div class="section-heading"><div><p class="eyebrow">内容块</p><h2>当前节点内容</h2></div><div class="block-heading-actions"><span>已加载 {{ blocks.length }} 个内容块</span><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
+          <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
           <article v-for="block in blocks" :key="block.id" class="block-edit-card">
             <header><div><el-tag size="small">{{ zh(block.blockType) }}</el-tag><span>块 #{{ block.seq }}</span></div><el-button type="primary" text :loading="savingBlockId === block.id" @click="saveBlock(block)">保存内容</el-button></header>
             <div class="block-edit-controls"><el-select v-model="block.blockType" aria-label="内容块类型"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-model="block.language" clearable placeholder="代码语言（仅代码块）" /></div>

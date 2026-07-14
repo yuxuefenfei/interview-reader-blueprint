@@ -10,6 +10,7 @@ export const adminApi = {
   deleteDraft: (versionId: string) => http.delete(`/admin/versions/${versionId}/editor`),
   editor: (versionId: string) => http.get<EditorSnapshot>(`/admin/versions/${versionId}/editor`).then(({ data }) => data),
   nodeBlocks: (versionId: string, nodeId: string, cursor?: string) => http.get<NodeBlocksPage>(`/admin/versions/${versionId}/editor/nodes/${nodeId}/blocks`, { params: { cursor, limit: 40 } }).then(({ data }) => data),
+  createBlock: (versionId: string, nodeId: string, draftRevision: number, block: Pick<EditorBlock, "blockType" | "payload" | "plainText" | "language">) => http.post<EditorBlock>(`/admin/versions/${versionId}/editor/nodes/${nodeId}/blocks`, { draftRevision, ...block }).then(({ data }) => data),
   updateNode: (versionId: string, nodeId: string, draftRevision: number, node: Pick<EditorSnapshot["nodes"][number], "title" | "nodeType" | "semanticRole" | "anchor">) => http.patch<EditorSnapshot>(`/admin/versions/${versionId}/editor/nodes/${nodeId}`, { draftRevision, ...node }).then(({ data }) => data),
   updateStructure: (versionId: string, draftRevision: number, nodes: StructureNode[]) => http.patch<EditorSnapshot>(`/admin/versions/${versionId}/editor/structure`, { draftRevision, nodes }).then(({ data }) => data),
   updateBlock: (versionId: string, blockId: string, draftRevision: number, block: Pick<EditorBlock, "blockType" | "payload" | "plainText" | "language">) => http.patch<EditorBlock>(`/admin/versions/${versionId}/editor/blocks/${blockId}`, { draftRevision, ...block }).then(({ data }) => data),

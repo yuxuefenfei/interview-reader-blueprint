@@ -1051,6 +1051,15 @@ class InterviewReaderApiTests {
                 .andExpect(jsonPath("$.blockType").value("paragraph"))
                 .andExpect(jsonPath("$.plainText").value("可检索的新内容"));
 
+        var createBlock = """
+                { "draftRevision": 2, "blockType": "paragraph", "payload": { "text": "人工补录正文" }, "plainText": "人工补录正文", "language": null }
+                """;
+        mockMvc.perform(post("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", versionId, childId)
+                        .contentType(MediaType.APPLICATION_JSON).content(createBlock))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.seq").value(11))
+                .andExpect(jsonPath("$.plainText").value("人工补录正文"));
+
         mockMvc.perform(delete("/api/admin/versions/{versionId}/editor", versionId))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/admin/import-jobs/{jobId}", jobId))

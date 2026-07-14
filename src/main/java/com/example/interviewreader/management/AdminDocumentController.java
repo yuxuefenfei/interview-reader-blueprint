@@ -66,6 +66,16 @@ public class AdminDocumentController {
         return service.nodeBlocks(versionId, nodeId, cursor, limit);
     }
 
+    @PostMapping("/versions/{versionId}/editor/nodes/{nodeId}/blocks")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ManagementDtos.EditorBlock createBlock(
+            @PathVariable UUID versionId,
+            @PathVariable UUID nodeId,
+            @Valid @RequestBody ManagementDtos.CreateBlockRequest request
+    ) {
+        return service.createBlock(versionId, nodeId, request);
+    }
+
     @PatchMapping("/versions/{versionId}/editor/nodes/{nodeId}")
     public ManagementDtos.EditorSnapshot updateNode(
             @PathVariable UUID versionId,

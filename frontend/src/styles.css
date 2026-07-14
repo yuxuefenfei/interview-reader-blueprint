@@ -189,6 +189,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .section-heading h2 { margin: 3px 0 0; font-size: 20px; letter-spacing: 0; }
 .section-heading > span { color: #758194; font-size: 13px; }
+.block-heading-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+.block-heading-actions > span { color: #758194; font-size: 13px; }
 .node-form { display: grid; grid-template-columns: minmax(220px, 2fr) minmax(150px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr); gap: 0 12px; }
 .node-form .el-form-item { margin-bottom: 0; }
 .block-editor { display: grid; gap: 16px; padding-top: 26px; }

@@ -63,6 +63,9 @@ public final class ManagementDtos {
     public record StructureNode(UUID id, UUID parentId, int sortOrder) {
     }
 
+    public record CreateBlockRequest(long draftRevision, String blockType, JsonNode payload, String plainText, String language) {
+    }
+
     public record UpdateBlockRequest(long draftRevision, String blockType, JsonNode payload, String plainText, String language) {
     }
 }

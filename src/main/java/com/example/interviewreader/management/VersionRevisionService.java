@@ -5,42 +5,20 @@ import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.document.DocumentQueryService;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.importpkg.DocumentPackageValidator;
-import com.example.interviewreader.importpkg.ImportIssueDto;
-import com.example.interviewreader.persistence.entity.AssetEntity;
-import com.example.interviewreader.persistence.entity.ContentBlockEntity;
-import com.example.interviewreader.persistence.entity.ContentNodeEntity;
-import com.example.interviewreader.persistence.entity.DocumentEntity;
-import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
-import com.example.interviewreader.persistence.entity.ImportJobEntity;
-import com.example.interviewreader.persistence.mapper.AssetMapper;
-import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
-import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
-import com.example.interviewreader.persistence.mapper.DocumentMapper;
-import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
-import com.example.interviewreader.persistence.mapper.ImportJobMapper;
+import com.example.interviewreader.persistence.entity.*;
+import com.example.interviewreader.persistence.mapper.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.update.UpdateWrapper;
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-import java.util.HashSet;
-import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.util.*;
 
 import static com.example.interviewreader.persistence.entity.table.AssetEntityTableDef.ASSET_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
@@ -55,6 +33,8 @@ public class VersionRevisionService {
     private static final Set<String> EDITABLE_BLOCK_TYPES = Set.of(
             "paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote",
             "callout", "formula", "image", "divider", "table_snapshot");
+    private static final Set<String> EDITABLE_NODE_TYPES = Set.of(
+            "PART", "CHAPTER", "SECTION", "SUBSECTION", "QUESTION", "APPENDIX", "OTHER");
 
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
@@ -255,7 +235,7 @@ public class VersionRevisionService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "NODE_TITLE_REQUIRED", "节点标题不能为空。");
         }
         node.title = request.title().trim();
-        node.nodeType = requiredCode(request.nodeType(), "节点类型");
+        node.nodeType = requiredNodeType(request.nodeType());
         node.semanticRole = blankToNull(request.semanticRole());
         node.anchor = blankToNull(request.anchor()) == null ? slug(node.nodeKey) : request.anchor().trim();
         contentNodeMapper.update(node);
@@ -327,6 +307,40 @@ public class VersionRevisionService {
         advanceDraft(version);
         return editorBlock(block);
     }
+    @Transactional
+    public ManagementDtos.EditorBlock createBlock(UUID versionId, UUID nodeId, ManagementDtos.CreateBlockRequest request) {
+        var version = requireDraft(versionId);
+        if (request == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BLOCK_REQUEST_REQUIRED", "新增内容块不能为空。");
+        }
+        requireRevision(version, request.draftRevision());
+        requireNode(version.id, nodeId);
+        var latest = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.id))
+                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(id(nodeId)))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.desc())
+                .limit(1));
+        var block = new ContentBlockEntity();
+        block.id = UUID.randomUUID().toString();
+        block.versionId = version.id;
+        block.nodeId = id(nodeId);
+        block.blockKey = "manual-" + UUID.randomUUID();
+        block.seq = latest == null ? 10 : latest.seq + 10;
+        block.blockType = requiredBlockType(request.blockType());
+        block.payload = json(request.payload() == null
+                ? Map.of("text", Objects.requireNonNullElse(request.plainText(), ""))
+                : request.payload());
+        block.plainText = Objects.requireNonNullElse(request.plainText(), "");
+        block.language = blankToNull(request.language());
+        block.createdAt = OffsetDateTime.now();
+        contentBlockMapper.insertSelective(block);
+        refreshNodeSearchText(version.id, block.nodeId);
+        advanceDraft(version);
+        return editorBlock(block);
+    }
+
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
         requireDocument(documentId);
@@ -428,11 +442,15 @@ public class VersionRevisionService {
         }
         return blockType;
     }
-    private static String requiredCode(String value, String label) {
+    private static String requiredNodeType(String value) {
         if (value == null || value.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", label + "不能为空。");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "节点类型不能为空。");
         }
-        return value.trim().toUpperCase(Locale.ROOT);
+        var nodeType = value.trim().toUpperCase(Locale.ROOT);
+        if (!EDITABLE_NODE_TYPES.contains(nodeType)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NODE_TYPE_INVALID", "不支持的节点类型：" + value);
+        }
+        return nodeType;
     }
     private DocumentPackage packageFor(DocumentVersionEntity version) {
         var document = requireDocument(uuid(version.documentId));
