@@ -5,7 +5,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { adminApi } from "../api/admin";
-import { zh } from "../shared/presentation";
+import { importIssueMessage, zh } from "../shared/presentation";
 import type { AdminDocumentSummary, ImportIssue, ImportJob } from "../types/api";
 
 const route = useRoute();
@@ -20,6 +20,7 @@ const uploading = ref(false);
 let pollTimer: number | null = null;
 const terminal = new Set(["READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED"]);
 const recognizedType = computed(() => selectedFile.value ? inferSourceType(selectedFile.value.name) : null);
+const jobStageSummary = computed(() => job.value ? stageSummary(job.value.status, job.value.currentStage) : "");
 
 onMounted(() => { void searchDocuments(""); });
 onBeforeUnmount(stopPolling);
@@ -66,6 +67,14 @@ async function commit(): Promise<void> {
     await router.push(targetId ? `/admin/documents/${targetId}` : "/admin/documents");
   } catch (caught) { ElMessage.error(message(caught)); }
 }
+function stageSummary(status: string, stage: string | null): string {
+  if (status === "READY") return "文件已完成解析与校验，可生成可编辑草稿。";
+  if (status === "REVIEW_REQUIRED") return "存在需要人工确认的校验问题，修订后可继续提交。";
+  if (status === "IMPORTED") return "草稿已生成，可前往文档管理继续修订。";
+  if (status === "FAILED") return "导入未完成，请根据错误信息调整文件后重试。";
+  return stage && stage !== status ? zh(stage) : "正在处理文件。";
+}
+function issueMessage(issue: ImportIssue): string { return importIssueMessage(issue.issueCode, issue.sourcePage, issue.message); }
 function inferSourceType(name: string): string {
   const suffix = name.split(".").pop()?.toLowerCase();
   return suffix === "pdf" ? "PDF" : suffix === "xlsx" || suffix === "xls" ? "EXCEL" : suffix === "md" || suffix === "markdown" ? "MARKDOWN" : suffix === "json" ? "JSON_PACKAGE" : "UNKNOWN";
@@ -91,11 +100,11 @@ function message(value: unknown): string { return value instanceof Error ? value
         <template #header><div class="card-heading"><div><strong>任务进度</strong><span>转换结果与校验问题会在任务完成后保留。</span></div></div></template>
         <div v-if="!job" class="empty-state">选择文件后，这里会显示导入阶段、进度和校验结果。</div>
         <template v-else>
-          <div class="job-status"><div><strong>{{ zh(job.status) }}</strong><span>{{ zh(job.currentStage) }}</span></div><el-tag effect="plain">{{ zh(job.sourceType) }}</el-tag></div>
+          <div class="job-status"><div><strong>{{ zh(job.status) }}</strong><span>{{ jobStageSummary }}</span></div><el-tag effect="plain">{{ zh(job.sourceType) }}</el-tag></div>
           <el-progress :percentage="job.progress" :status="job.status === 'FAILED' ? 'exception' : job.status === 'IMPORTED' ? 'success' : undefined" :stroke-width="10" />
           <p v-if="job.errorMessage" class="danger-text">{{ job.errorMessage }}</p>
-          <div v-if="issues.length" class="issue-list"><el-alert v-for="issue in issues" :key="`${issue.issueCode}-${issue.blockKey}`" :title="issue.message" :type="issue.severity === 'BLOCKING' ? 'error' : 'warning'" :closable="false" show-icon /></div>
-          <div class="job-actions"><el-button v-if="job.status === 'READY'" type="success" :icon="CircleCheck" @click="commit">生成草稿</el-button><el-button v-if="job.status === 'REVIEW_REQUIRED'" type="warning" disabled>请处理校验问题后重试</el-button></div>
+          <div v-if="issues.length" class="issue-list"><el-alert v-for="issue in issues" :key="`${issue.issueCode}-${issue.blockKey}`" :title="issueMessage(issue)" :type="issue.severity === 'BLOCKING' ? 'error' : 'warning'" :closable="false" show-icon /></div>
+          <div class="job-actions"><el-button v-if="job.status === 'READY'" type="success" :icon="CircleCheck" @click="commit">生成可编辑草稿</el-button><el-button v-if="job.status === 'REVIEW_REQUIRED'" type="warning" disabled>请处理校验问题后重试</el-button></div>
         </template>
       </el-card>
     </div>

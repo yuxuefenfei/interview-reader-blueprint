@@ -1,0 +1,64 @@
+# Interview Reader: JAR 内置前端静态资源的生产反向代理模板。
+# 前置条件：Spring Boot JAR 监听 127.0.0.1:28080。
+# Vue 深链接由 JAR 内的 SpaRouteController 回退到 index.html，
+# 因此前模板不要在 location / 中加入 try_files。
+
+upstream interview_reader_api {
+    server 127.0.0.1:28080;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name docs.wangwenzhu.cn;
+
+    # 已配置证书后，启用 HTTPS 跳转。
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name docs.wangwenzhu.cn;
+
+    ssl_certificate     /etc/nginx/certs/docs.wangwenzhu.cn/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/docs.wangwenzhu.cn/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    client_max_body_size 100m;
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 120s;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+
+    # 登录、阅读、管理和导入接口均由 JAR 完成鉴权。
+    location /api/ {
+        proxy_pass http://interview_reader_api;
+        proxy_no_cache 1;
+        add_header Cache-Control "no-store" always;
+    }
+
+    # 前端构建文件由 JAR 提供，可在边缘缓存。
+    location /assets/ {
+        proxy_pass http://interview_reader_api;
+        expires 365d;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # /admin/**、/reader/** 以及刷新后的深链接在 JAR 中统一回退为 Vue 应用壳。
+    location / {
+        proxy_pass http://interview_reader_api;
+    }
+
+    # 健康检查仅限本机或内网监控网段访问。按实际监控网络调整。
+    location = /actuator/health {
+        allow 127.0.0.1;
+        allow 10.0.0.0/8;
+        deny all;
+        proxy_pass http://interview_reader_api;
+    }
+}

@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +44,16 @@ class InterviewReaderAuthTests {
         mockMvc.perform(get("/icon.svg"))
                 .andExpect(status().isOk());
     }
+    @Test
+    void deepLinkedSpaRoutesReturnTheApplicationShell() throws Exception {
+        mockMvc.perform(get("/admin/documents/9a9c5fc6-d310-44fe-aff4-cca83bf28d12"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML));
+        mockMvc.perform(get("/reader/documents/9a9c5fc6-d310-44fe-aff4-cca83bf28d12"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML));
+    }
+
     @Test
     void loginCreatesSessionCookieForProtectedApi() throws Exception {
         mockMvc.perform(post("/api/auth/login")

@@ -59,9 +59,16 @@ public class AuthFilter extends OncePerRequestFilter {
                 || path.equals("/icon.svg")
                 || path.equals("/manifest.webmanifest")
                 || path.equals("/sw.js")
+                || isSpaRoute(path)
                 || path.startsWith("/assets/")
                 || path.startsWith("/actuator/health")
                 || (path.equals("/api/auth/session") && method.equals("GET"))
                 || (path.equals("/api/auth/login") && method.equals("POST"));
+    }
+    private boolean isSpaRoute(String path) {
+        return path.equals("/reader")
+                || path.startsWith("/reader/")
+                || path.equals("/admin")
+                || path.startsWith("/admin/");
     }
 }
