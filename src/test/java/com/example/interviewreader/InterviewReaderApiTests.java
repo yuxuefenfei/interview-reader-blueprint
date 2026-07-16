@@ -21,6 +21,8 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -520,6 +522,35 @@ class InterviewReaderApiTests {
         }
     }
 
+    @Test
+    void samePagePdfBookmarksAssignEachBlockToExactlyOneSection() throws Exception {
+        var job = uploadPackage(generatedSamePageOutlinePdf(), "PDF", "same-page-outline.pdf");
+        assertThat(job.get("status").asText()).isEqualTo("READY");
+
+        var normalized = getJson("/api/admin/import-jobs/{jobId}/normalized-package", UUID.fromString(job.get("id").asText()));
+        var firstSection = findByField(normalized.get("sections"), "title", "9.1 Index terminology");
+        var secondSection = findByField(normalized.get("sections"), "title", "9.2 Prefix rule");
+        var firstKey = firstSection.get("sectionKey").asText();
+        var secondKey = secondSection.get("sectionKey").asText();
+        var firstText = new StringBuilder();
+        var secondText = new StringBuilder();
+        var firstHashes = new java.util.HashSet<String>();
+        var secondHashes = new java.util.HashSet<String>();
+        for (var block : normalized.get("blocks")) {
+            if (firstKey.equals(block.get("sectionKey").asText())) {
+                firstText.append(block.get("plainText").asText()).append('\n');
+                firstHashes.add(block.get("contentHash").asText());
+            }
+            if (secondKey.equals(block.get("sectionKey").asText())) {
+                secondText.append(block.get("plainText").asText()).append('\n');
+                secondHashes.add(block.get("contentHash").asText());
+            }
+        }
+
+        assertThat(firstText).contains("Term content").doesNotContain("Prefix content");
+        assertThat(secondText).contains("Prefix content").doesNotContain("Term content");
+        assertThat(firstHashes).doesNotContainAnyElementsOf(secondHashes);
+    }
     @Test
     void generatedPdfRecognizesListAndCodeBlocks() throws Exception {
         var job = uploadPackage(generatedSemanticPdf(), "PDF", "semantic-blocks.pdf");
@@ -1269,6 +1300,42 @@ class InterviewReaderApiTests {
         }
     }
 
+    private byte[] generatedSamePageOutlinePdf() throws Exception {
+        try (var document = new PDDocument();
+             var out = new ByteArrayOutputStream()) {
+            var page = new PDPage();
+            document.addPage(page);
+            var outline = new PDDocumentOutline();
+            document.getDocumentCatalog().setDocumentOutline(outline);
+            addOutlineItem(outline, "9.1 Index terminology", page);
+            addOutlineItem(outline, "9.2 Prefix rule", page);
+            outline.openNode();
+            try (var content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.setLeading(18);
+                content.newLineAtOffset(72, 720);
+                for (var line : List.of(
+                        "9.1 Index terminology",
+                        "Term content is only for the first section.",
+                        "9.2 Prefix rule",
+                        "Prefix content is only for the second section.")) {
+                    content.showText(line);
+                    content.newLine();
+                }
+                content.endText();
+            }
+            document.save(out);
+            return out.toByteArray();
+        }
+    }
+
+    private void addOutlineItem(PDDocumentOutline outline, String title, PDPage page) {
+        var item = new PDOutlineItem();
+        item.setTitle(title);
+        item.setDestination(page);
+        outline.addLast(item);
+    }
     private byte[] generatedTableSnapshotPdf() throws Exception {
         try (var document = new PDDocument();
              var out = new ByteArrayOutputStream()) {

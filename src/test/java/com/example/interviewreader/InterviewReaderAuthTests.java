@@ -41,7 +41,7 @@ class InterviewReaderAuthTests {
     void unauthenticatedShellAssetsRemainAvailable() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/icon.svg"))
+        mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk());
     }
     @Test

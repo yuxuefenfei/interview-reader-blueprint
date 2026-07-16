@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ArrowLeft, Delete, EditPen, FolderOpened, MoreFilled, Plus, RefreshRight } from "@element-plus/icons-vue";
-import { computed, onMounted, reactive, ref } from "vue";
+import { ArrowLeft, Delete, EditPen, FolderOpened, MoreFilled, Plus, RefreshRight, Search, Setting } from "@element-plus/icons-vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { adminApi } from "../api/admin";
@@ -11,6 +11,8 @@ import { editorTextPlaceholder, parseEditorPayload, previewBlock, previewPayload
 
 type TreeNode = EditorNode & { children: TreeNode[] };
 type NodeForm = Pick<EditorNode, "title" | "nodeType" | "semanticRole" | "anchor">;
+type PreviewMode = "block" | "node";
+type SaveState = "saved" | "dirty" | "saving" | "error";
 
 const route = useRoute();
 const router = useRouter();
@@ -18,23 +20,53 @@ const versionId = route.params.versionId as string;
 const editor = ref<EditorSnapshot | null>(null);
 const treeData = ref<TreeNode[]>([]);
 const selectedId = ref<string | null>(null);
+const treeFilter = ref("");
 const nodeForm = reactive<NodeForm>({ title: "", nodeType: "SECTION", semanticRole: null, anchor: "" });
 const blocks = ref<EditorBlock[]>([]);
 const nextCursor = ref<string | null>(null);
 const payloadTexts = reactive<Record<string, string>>({});
+const savedBlockStates = reactive<Record<string, string>>({});
 const loading = ref(true);
 const nodeLoading = ref(false);
 const nodeSaving = ref(false);
 const structureSaving = ref(false);
 const savingBlockId = ref<string | null>(null);
 const creatingBlock = ref(false);
-const activePreviewBlockId = ref<string | null>(null);
+const activeBlockId = ref<string | null>(null);
 const expandedPayload = ref<string[]>([]);
+const previewMode = ref<PreviewMode>("block");
+const compactPane = ref<"editor" | "preview">("editor");
+const saveState = ref<SaveState>("saved");
+const nodePropertiesOpen = ref(false);
+const treePanelRef = ref<HTMLElement>();
+const blockListRef = ref<HTMLElement>();
+const previewScrollRef = ref<HTMLElement>();
+let autoSaveTimer: number | null = null;
 
 const selectedNode = computed(() => editor.value?.nodes.find((node) => node.id === selectedId.value) ?? null);
+const activeBlock = computed(() => blocks.value.find((block) => block.id === activeBlockId.value) ?? null);
 const selectedNodeHasChildren = computed(() => !!selectedId.value && editor.value?.nodes.some((node) => node.parentId === selectedId.value));
 const emptyBlockDescription = computed(() => selectedNodeHasChildren.value ? "该结构节点没有直接内容块。请选择子节点编辑正文，或在此新增内容。" : "该节点暂无内容块，可直接新增正文。");
 const previewBlocks = computed(() => blocks.value.map((block) => previewBlock(block, payloadTexts[block.id])));
+const visiblePreviewBlocks = computed(() => previewMode.value === "node" ? previewBlocks.value : previewBlocks.value.filter((block) => block.id === activeBlockId.value));
+const dirtyBlockCount = computed(() => blocks.value.filter(isBlockDirty).length);
+const defaultExpandedKeys = computed(() => treeData.value.slice(0, 2).map((node) => node.id));
+const filteredTreeData = computed(() => filterTree(treeData.value, treeFilter.value));
+const previewHeading = computed(() => previewMode.value === "node"
+  ? selectedNode.value?.title ?? "当前节点"
+  : activeBlock.value ? `块 #${activeBlock.value.seq} · ${zh(activeBlock.value.blockType)}` : "当前内容块");
+const nodePath = computed(() => {
+  if (!editor.value || !selectedNode.value) return "";
+  const byId = new Map(editor.value.nodes.map((node) => [node.id, node]));
+  const path: string[] = [];
+  let current: EditorNode | undefined = selectedNode.value;
+  while (current) {
+    path.unshift(current.title);
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+  return path.join(" / ");
+});
+const saveStateLabel = computed(() => ({ saved: "已保存", dirty: "有未保存修改", saving: "保存中", error: "保存失败" }[saveState.value]));
 const blockTypes = ["paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote", "callout", "formula", "image", "divider", "table_snapshot"];
 const nodeTypes = [
   { value: "PART", label: "篇章" }, { value: "CHAPTER", label: "章节" }, { value: "SECTION", label: "小节" },
@@ -46,14 +78,15 @@ const semanticRoles = [
 ];
 
 onMounted(() => { void load(); });
+onBeforeUnmount(() => { if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer); });
 
 async function load(): Promise<void> {
   loading.value = true;
   try {
     const snapshot = await adminApi.editor(versionId);
     applySnapshot(snapshot);
-    const first = snapshot.nodes[0];
-    if (first) await selectNode(first);
+    const current = snapshot.nodes.find((node) => node.id === selectedId.value) ?? snapshot.nodes[0];
+    if (current) await selectNode(current);
   } catch (caught) { ElMessage.error(message(caught)); }
   finally { loading.value = false; }
 }
@@ -65,6 +98,17 @@ function applySnapshot(snapshot: EditorSnapshot, select?: string | null): void {
   selectedId.value = active && snapshot.nodes.some((node) => node.id === active) ? active : snapshot.nodes[0]?.id ?? null;
   const node = snapshot.nodes.find((item) => item.id === selectedId.value);
   if (node) fillNodeForm(node);
+}
+
+function filterTree(nodes: TreeNode[], keyword: string): TreeNode[] {
+  const normalized = keyword.trim().toLocaleLowerCase("zh-CN");
+  if (!normalized) return nodes;
+  return nodes.flatMap((node) => {
+    const children = filterTree(node.children, keyword);
+    return node.title.toLocaleLowerCase("zh-CN").includes(normalized) || children.length
+      ? [{ ...node, children }]
+      : [];
+  });
 }
 
 function toTree(nodes: EditorNode[]): TreeNode[] {
@@ -83,8 +127,10 @@ function toTree(nodes: EditorNode[]): TreeNode[] {
 async function selectNode(node: EditorNode): Promise<void> {
   selectedId.value = node.id;
   fillNodeForm(node);
-  activePreviewBlockId.value = null;
+  activeBlockId.value = null;
   await loadBlocks();
+  await nextTick();
+  scrollTreeTo(node.id);
 }
 
 function fillNodeForm(node: EditorNode): void {
@@ -101,8 +147,13 @@ async function loadBlocks(append = false): Promise<void> {
     const result = await adminApi.nodeBlocks(versionId, selectedId.value, append ? nextCursor.value ?? undefined : undefined);
     blocks.value = append ? [...blocks.value, ...result.items.filter((item) => !blocks.value.some((block) => block.id === item.id))] : result.items;
     nextCursor.value = result.nextCursor;
-    for (const block of result.items) payloadTexts[block.id] = JSON.stringify(block.payload ?? {}, null, 2);
-    activePreviewBlockId.value ??= blocks.value[0]?.id ?? null;
+    for (const block of result.items) {
+      payloadTexts[block.id] = JSON.stringify(block.payload ?? {}, null, 2);
+      savedBlockStates[block.id] = blockState(block);
+    }
+    const firstBlock = blocks.value[0];
+    if (!activeBlockId.value && firstBlock) activateBlock(firstBlock.id, false);
+    saveState.value = "saved";
   } catch (caught) { ElMessage.error(message(caught)); }
   finally { nodeLoading.value = false; }
 }
@@ -146,25 +197,74 @@ async function addBlock(): Promise<void> {
     });
     blocks.value.push(block);
     payloadTexts[block.id] = JSON.stringify(block.payload ?? {}, null, 2);
+    savedBlockStates[block.id] = blockState(block);
     editor.value.version.draftRevision++;
-    activePreviewBlockId.value = block.id;
+    activateBlock(block.id);
     ElMessage.success("已新增内容块");
   } catch (caught) { ElMessage.error(message(caught)); }
   finally { creatingBlock.value = false; }
+}
+
+function blockState(block: EditorBlock): string {
+  return JSON.stringify({ blockType: block.blockType, plainText: block.plainText, language: block.language, payload: payloadTexts[block.id] ?? block.payload });
+}
+
+function isBlockDirty(block: EditorBlock): boolean {
+  return savedBlockStates[block.id] !== blockState(block);
 }
 
 function payloadIsInvalid(block: EditorBlock): boolean {
   return parseEditorPayload(payloadTexts[block.id], block.payload) === null;
 }
 
-async function saveBlock(block: EditorBlock): Promise<void> {
-  if (!editor.value) return;
+function blockSummary(block: EditorBlock): string {
+  const firstLine = block.plainText.split(/\r?\n/).find((line) => line.trim())?.trim() || "空内容块";
+  return firstLine.length > 44 ? `${firstLine.slice(0, 44)}...` : firstLine;
+}
+
+function centerInScrollContainer(container: HTMLElement | undefined, selector: string, smooth: boolean): void {
+  const target = container?.querySelector<HTMLElement>(selector);
+  if (!container || !target) return;
+  const containerRect = container.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const top = container.scrollTop + targetRect.top - containerRect.top - (container.clientHeight - target.clientHeight) / 2;
+  container.scrollTo({ top: Math.max(0, top), behavior: smooth ? "smooth" : "auto" });
+}
+
+function activateBlock(blockId: string, scroll = true): void {
+  activeBlockId.value = blockId;
+  compactPane.value = "editor";
+  void nextTick(() => {
+    centerInScrollContainer(blockListRef.value, `[data-block-id="${blockId}"]`, scroll);
+    centerInScrollContainer(previewScrollRef.value, `[data-preview-block-id="${blockId}"]`, scroll);
+  });
+}
+
+function scrollTreeTo(nodeId: string): void {
+  centerInScrollContainer(treePanelRef.value, `[data-node-id="${nodeId}"]`, true);
+}
+
+function scheduleBlockSave(): void {
+  const editedBlockId = activeBlock.value?.id;
+  if (!editedBlockId) return;
+  if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer);
+  saveState.value = "dirty";
+  autoSaveTimer = window.setTimeout(() => {
+    const editedBlock = blocks.value.find((block) => block.id === editedBlockId);
+    if (editedBlock) void saveBlock(editedBlock, true);
+  }, 700);
+}
+
+async function saveBlock(block: EditorBlock, quiet = false): Promise<boolean> {
+  if (!editor.value || savingBlockId.value || !isBlockDirty(block)) return true;
   const parsed = parseEditorPayload(payloadTexts[block.id], block.payload);
   if (parsed === null) {
-    ElMessage.error("扩展数据必须是有效的 JSON");
-    return;
+    saveState.value = "error";
+    if (!quiet) ElMessage.error("扩展数据必须是有效的 JSON");
+    return false;
   }
   savingBlockId.value = block.id;
+  saveState.value = "saving";
   try {
     const updated = await adminApi.updateBlock(versionId, block.id, editor.value.version.draftRevision, {
       blockType: block.blockType,
@@ -174,10 +274,24 @@ async function saveBlock(block: EditorBlock): Promise<void> {
     });
     Object.assign(block, updated);
     payloadTexts[block.id] = JSON.stringify(updated.payload ?? {}, null, 2);
+    savedBlockStates[block.id] = blockState(block);
     editor.value.version.draftRevision++;
-    ElMessage.success("内容块已保存");
-  } catch (caught) { ElMessage.error(message(caught)); }
-  finally { savingBlockId.value = null; }
+    saveState.value = "saved";
+    if (!quiet) ElMessage.success("内容块已保存");
+    return true;
+  } catch (caught) {
+    saveState.value = "error";
+    ElMessage.error(message(caught));
+    return false;
+  } finally { savingBlockId.value = null; }
+}
+
+async function saveAllBlocks(): Promise<void> {
+  for (const block of blocks.value.filter(isBlockDirty)) {
+    const saved = await saveBlock(block, true);
+    if (!saved) return;
+  }
+  ElMessage.success("当前节点内容已保存");
 }
 
 async function discard(): Promise<void> {
@@ -200,44 +314,43 @@ function message(value: unknown): string { return value instanceof Error ? value
     </header>
 
     <div v-if="editor" class="editor-workbench">
-      <aside class="editor-tree-panel" v-loading="structureSaving">
+      <aside ref="treePanelRef" class="editor-tree-panel" v-loading="structureSaving">
         <div class="panel-title"><div><strong>文档结构</strong><span>{{ editor.nodes.length }} 个节点</span></div><el-icon><FolderOpened /></el-icon></div>
-        <p class="tree-helper">拖动节点可调整层级和顺序，松开后自动保存。</p>
-        <el-tree :data="treeData" node-key="id" :props="{ label: 'title', children: 'children' }" highlight-current default-expand-all draggable expand-on-click-node :current-node-key="selectedId" :allow-drop="() => true" @node-click="selectNode" @node-drop="persistStructure">
-          <template #default="{ data }"><span class="editor-tree-label"><span>{{ data.title }}</span><small>{{ zh(data.nodeType) }} · 第 {{ data.level }} 级</small></span></template>
+        <el-input v-model="treeFilter" class="tree-search" clearable placeholder="搜索节点" :prefix-icon="Search" />
+        <el-tree :data="filteredTreeData" node-key="id" :props="{ label: 'title', children: 'children' }" highlight-current :default-expanded-keys="defaultExpandedKeys" :draggable="!treeFilter" expand-on-click-node :current-node-key="selectedId" :allow-drop="() => true" @node-click="selectNode" @node-drop="persistStructure">
+          <template #default="{ data }"><span class="editor-tree-label" :data-node-id="data.id"><span>{{ data.title }}</span><small v-if="data.id === selectedId">{{ zh(data.nodeType) }}</small></span></template>
         </el-tree>
       </aside>
 
       <main class="editor-content-panel">
         <section v-if="selectedNode" class="node-inspector">
-          <div class="section-heading"><div><p class="eyebrow">节点属性</p><h2>{{ selectedNode.title }}</h2></div><el-button type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div>
-          <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
+          <div class="section-heading"><div><p class="eyebrow">当前节点</p><h2>{{ selectedNode.title }}</h2><span class="node-path">{{ nodePath }}</span></div><div class="node-actions"><el-button :icon="Setting" @click="nodePropertiesOpen = !nodePropertiesOpen">节点属性</el-button><el-button v-if="nodePropertiesOpen" type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div></div>
+          <el-form v-show="nodePropertiesOpen" label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
         </section>
 
         <section class="block-editor" v-loading="nodeLoading">
-          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>草稿内容与阅读预览</h2></div><div class="block-heading-actions"><span>已加载 {{ blocks.length }} 个内容块</span><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
-          <div class="editor-content-workbench">
-            <div class="editor-block-list">
+          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-radio-group v-model="compactPane" class="compact-pane-toggle" size="small" aria-label="编辑工作区"><el-radio-button value="editor">编辑</el-radio-button><el-radio-button value="preview">预览</el-radio-button></el-radio-group><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
+          <div class="editor-content-workbench" :class="{ 'show-preview': compactPane === 'preview' }">
+            <aside ref="blockListRef" class="editor-block-list" aria-label="内容块列表">
               <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
-              <article v-for="block in blocks" :key="block.id" class="block-edit-card" :class="{ active: activePreviewBlockId === block.id }" @click="activePreviewBlockId = block.id">
-                <header><div><el-tag size="small">{{ zh(block.blockType) }}</el-tag><span>块 #{{ block.seq }}</span></div><el-button type="primary" text :loading="savingBlockId === block.id" @click.stop="saveBlock(block)">保存</el-button></header>
-                <div class="block-edit-controls"><el-select v-model="block.blockType" aria-label="内容块类型"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="block.blockType === 'code'" v-model="block.language" clearable placeholder="代码语言" /></div>
-                <el-input v-model="block.plainText" type="textarea" :autosize="{ minRows: 6, maxRows: 18 }" resize="vertical" :placeholder="editorTextPlaceholder(block.blockType)" @focus="activePreviewBlockId = block.id" />
-                <el-collapse v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="block.id"><template #title>扩展数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(block)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[block.id]" type="textarea" :rows="8" class="payload-editor" spellcheck="false" @focus="activePreviewBlockId = block.id" /></el-collapse-item></el-collapse>
-              </article>
+              <button v-for="block in blocks" :key="block.id" type="button" class="block-list-item" :class="{ active: activeBlockId === block.id, dirty: isBlockDirty(block) }" :aria-current="activeBlockId === block.id ? 'true' : undefined" :data-block-id="block.id" @click="activateBlock(block.id)"><span class="block-list-meta"><el-tag size="small">{{ zh(block.blockType) }}</el-tag><small>块 #{{ block.seq }}</small><i v-if="isBlockDirty(block)">未保存</i></span><strong>{{ blockSummary(block) }}</strong></button>
               <el-button v-if="nextCursor" plain :loading="nodeLoading" @click="loadBlocks(true)">加载更多内容块</el-button>
-            </div>
+            </aside>
+
+            <section class="block-detail-panel">
+              <el-empty v-if="!activeBlock" description="从左侧选择一个内容块开始编辑" :image-size="72" />
+              <template v-else>
+                <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><el-button type="primary" :loading="savingBlockId === activeBlock.id" @click="saveBlock(activeBlock)">保存</el-button></header>
+                <div class="block-edit-controls"><el-select v-model="activeBlock.blockType" aria-label="内容块类型" @change="scheduleBlockSave"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="activeBlock.blockType === 'code'" v-model="activeBlock.language" clearable placeholder="代码语言" @input="scheduleBlockSave" /></div>
+                <el-input v-model="activeBlock.plainText" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
+                <el-collapse v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
+              </template>
+            </section>
 
             <aside class="editor-preview-panel">
-              <header><div><p class="eyebrow">实时预览</p><strong>{{ selectedNode?.title }}</strong></div><span>阅读视图</span></header>
-              <div class="editor-preview-scroll">
-                <article class="editor-preview-article">
-                  <h1>{{ selectedNode?.title }}</h1>
-                  <div v-for="block in previewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activePreviewBlockId === block.id }" @click="activePreviewBlockId = block.id">
-                    <ContentBlockView :block="block" />
-                  </div>
-                  <el-empty v-if="!previewBlocks.length" description="暂无可预览内容" :image-size="72" />
-                </article>
+              <header><div><p class="eyebrow">实时预览</p><strong>{{ selectedNode?.title }}</strong></div><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group></header>
+              <div ref="previewScrollRef" class="editor-preview-scroll">
+                <article class="editor-preview-article"><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
               </div>
             </aside>
           </div>

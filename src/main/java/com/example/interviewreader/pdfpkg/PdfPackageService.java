@@ -200,13 +200,44 @@ public class PdfPackageService {
             }
         }
 
-        var blocks = new ArrayList<DocumentPackage.BlockInfo>();
+        var leafSections = outlineSections.stream()
+                .filter(section -> !parentKeys.contains(section.sectionKey()))
+                .toList();
+        var sectionEndPages = new LinkedHashMap<String, Integer>();
         for (var index = 0; index < outlineSections.size(); index++) {
             var section = outlineSections.get(index);
-            if (parentKeys.contains(section.sectionKey())) {
+            sectionEndPages.put(section.sectionKey(), sectionEndPage(outlineSections, index, pageCount));
+        }
+        var candidatesBySection = new LinkedHashMap<String, List<PdfBlockCandidate>>();
+        for (var section : leafSections) {
+            candidatesBySection.put(section.sectionKey(), new ArrayList<>());
+        }
+
+        // A page can contain several bookmarked sections. Parse it once, then let its headings move
+        // the active owner so a physical PDF block is never copied into sibling sections.
+        for (var page = 1; page <= pageCount; page++) {
+            var currentPage = page;
+            var pageSections = leafSections.stream()
+                    .filter(section -> section.pageStart() <= currentPage && currentPage <= sectionEndPages.get(section.sectionKey()))
+                    .toList();
+            if (pageSections.isEmpty()) {
                 continue;
             }
-            var candidates = blockCandidates(document, section.pageStart(), sectionEndPage(outlineSections, index, pageCount));
+            OutlineSection activeSection = null;
+            for (var candidate : blockCandidates(document, page, page, pageSections)) {
+                var headingSection = sectionForHeading(candidate.plainText(), pageSections);
+                if (headingSection != null) {
+                    activeSection = headingSection;
+                } else if (activeSection == null || !pageSections.contains(activeSection)) {
+                    activeSection = pageSections.getFirst();
+                }
+                candidatesBySection.get(activeSection.sectionKey()).add(candidate);
+            }
+        }
+
+        var blocks = new ArrayList<DocumentPackage.BlockInfo>();
+        for (var section : leafSections) {
+            var candidates = candidatesBySection.get(section.sectionKey());
             if (candidates.isEmpty()) {
                 issues.add(new ImportIssueDto(
                         "WARNING",
@@ -248,6 +279,25 @@ public class PdfPackageService {
         return blocks;
     }
 
+    private OutlineSection sectionForHeading(String candidateText, List<OutlineSection> sections) {
+        var normalizedCandidate = normalizeHeading(candidateText);
+        OutlineSection match = null;
+        var longestTitle = 0;
+        for (var section : sections) {
+            var normalizedTitle = normalizeHeading(section.title());
+            if (!normalizedTitle.isBlank()
+                    && normalizedCandidate.startsWith(normalizedTitle)
+                    && normalizedTitle.length() > longestTitle) {
+                match = section;
+                longestTitle = normalizedTitle.length();
+            }
+        }
+        return match;
+    }
+
+    private static String normalizeHeading(String value) {
+        return value == null ? "" : value.replaceAll("[\\s\\p{P}\\p{S}]+", "").toLowerCase(Locale.ROOT);
+    }
     private PdfRawExtraction rawExtraction(
             PDDocument document,
             String sourceFileName,
@@ -362,7 +412,7 @@ public class PdfPackageService {
         return pageCount;
     }
 
-    private List<PdfBlockCandidate> blockCandidates(PDDocument document, int startPage, int endPage) throws IOException {
+    private List<PdfBlockCandidate> blockCandidates(PDDocument document, int startPage, int endPage, List<OutlineSection> pageSections) throws IOException {
         var result = new ArrayList<PdfBlockCandidate>();
         for (var page = startPage; page <= endPage; page++) {
             var stripper = new PositionedTextStripper();
@@ -370,13 +420,13 @@ public class PdfPackageService {
             stripper.setStartPage(page);
             stripper.setEndPage(page);
             var firstCandidate = result.size();
-            addBlockCandidates(result, stripper.getText(document), page, document.getPage(page - 1).getMediaBox());
+            addBlockCandidates(result, stripper.getText(document), page, document.getPage(page - 1).getMediaBox(), pageSections);
             attachLineBounds(result, firstCandidate, stripper.lines());
         }
         return result;
     }
 
-    private void addBlockCandidates(List<PdfBlockCandidate> result, String text, int pageNumber, PDRectangle mediaBox) {
+    private void addBlockCandidates(List<PdfBlockCandidate> result, String text, int pageNumber, PDRectangle mediaBox, List<OutlineSection> pageSections) {
         var paragraph = new StringBuilder();
         var code = new StringBuilder();
         var listItems = new ArrayList<String>();
@@ -386,6 +436,14 @@ public class PdfPackageService {
             var rawText = rawLine.stripTrailing();
             var line = rawLine.strip();
             if (looksLikeRunningHeader(line)) {
+                continue;
+            }
+            if (sectionForHeading(line, pageSections) != null) {
+                flushParagraph(result, paragraph, pageNumber, mediaBox);
+                flushCode(result, code, pageNumber, mediaBox);
+                flushList(result, listItems, listType, pageNumber, mediaBox);
+                flushTableSnapshot(result, tableLines, pageNumber, mediaBox);
+                appendLine(paragraph, line);
                 continue;
             }
             var headingAnnotation = splitHeadingAndAnnotation(rawText);

@@ -19,7 +19,7 @@ management:
         include: health,info
 
 interview-reader:
-  converter-version: json-package-0.1.0
+  converter-version: json-package-0.2.0
   storage-dir: ./data/import-sources
   security:
     enabled: true
