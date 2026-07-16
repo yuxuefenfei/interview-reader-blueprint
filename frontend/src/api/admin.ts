@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { AdminDocumentPage, AdminDocumentSummary, EditableVersion, EditorBlock, EditorSnapshot, ImportIssue, ImportJob, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
+import type { AdminDocumentPage, AdminDocumentSummary, BlockMutationResult, EditableVersion, EditorBlock, EditorSnapshot, ImportIssue, ImportJob, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
 
 export const adminApi = {
   documents: (query = "", page = 1, size = 20) => http.get<AdminDocumentPage>("/admin/documents", { params: { query: query || undefined, page, size } }).then(({ data }) => data),
@@ -14,6 +14,8 @@ export const adminApi = {
   updateNode: (versionId: string, nodeId: string, draftRevision: number, node: Pick<EditorSnapshot["nodes"][number], "title" | "nodeType" | "semanticRole" | "anchor">) => http.patch<EditorSnapshot>(`/admin/versions/${versionId}/editor/nodes/${nodeId}`, { draftRevision, ...node }).then(({ data }) => data),
   updateStructure: (versionId: string, draftRevision: number, nodes: StructureNode[]) => http.patch<EditorSnapshot>(`/admin/versions/${versionId}/editor/structure`, { draftRevision, nodes }).then(({ data }) => data),
   updateBlock: (versionId: string, blockId: string, draftRevision: number, block: Pick<EditorBlock, "blockType" | "payload" | "plainText" | "language">) => http.patch<EditorBlock>(`/admin/versions/${versionId}/editor/blocks/${blockId}`, { draftRevision, ...block }).then(({ data }) => data),
+  deleteBlock: (versionId: string, blockId: string, draftRevision: number) => http.delete<BlockMutationResult>(`/admin/versions/${versionId}/editor/blocks/${blockId}`, { params: { draftRevision } }).then(({ data }) => data),
+  cleanupEmptyBlocks: (versionId: string, draftRevision: number) => http.post<BlockMutationResult>(`/admin/versions/${versionId}/editor/blocks/cleanup-empty`, { draftRevision }).then(({ data }) => data),
   saveEditor: (versionId: string, draftRevision: number, documentPackage: EditableVersion["documentPackage"]) => http.put<EditableVersion>(`/admin/versions/${versionId}/editor`, { draftRevision, documentPackage }).then(({ data }) => data),
   upload: (file: File, targetDocumentId?: string) => { const body = new FormData(); body.set("file", file); if (targetDocumentId) body.set("targetDocumentId", targetDocumentId); return http.post<ImportJob>("/admin/import-jobs", body).then(({ data }) => data); },
   importJob: (jobId: string) => http.get<ImportJob>(`/admin/import-jobs/${jobId}`).then(({ data }) => data),

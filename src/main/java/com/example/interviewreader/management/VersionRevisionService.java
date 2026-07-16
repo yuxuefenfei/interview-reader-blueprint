@@ -3,6 +3,7 @@ package com.example.interviewreader.management;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.document.DocumentQueryService;
+import com.example.interviewreader.importpkg.DocumentBlockContent;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.importpkg.DocumentPackageValidator;
 import com.example.interviewreader.persistence.entity.*;
@@ -342,6 +343,55 @@ public class VersionRevisionService {
     }
 
     @Transactional
+    public ManagementDtos.BlockMutationResult deleteBlock(UUID versionId, UUID blockId, long draftRevision) {
+        var version = requireDraft(versionId);
+        requireRevision(version, draftRevision);
+        var block = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.id))
+                .and(CONTENT_BLOCK_ENTITY.ID.eq(id(blockId))));
+        if (block == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "内容块不存在。");
+        }
+        contentBlockMapper.deleteById(block.id);
+        resequenceBlocks(version.id, block.nodeId);
+        refreshNodeSearchText(version.id, block.nodeId);
+        advanceDraft(version);
+        return new ManagementDtos.BlockMutationResult(version.draftRevision, 1);
+    }
+
+    @Transactional
+    public ManagementDtos.BlockMutationResult cleanupEmptyBlocks(UUID versionId, ManagementDtos.BlockCleanupRequest request) {
+        var version = requireDraft(versionId);
+        if (request == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BLOCK_CLEANUP_REQUEST_REQUIRED", "清理请求不能为空。");
+        }
+        requireRevision(version, request.draftRevision());
+        var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.id)));
+        var affectedNodeIds = new HashSet<String>();
+        var removedCount = 0;
+        for (var block : blocks) {
+            if (DocumentBlockContent.isMeaningful(block.blockType, block.plainText, treeOrNull(block.payload))) {
+                continue;
+            }
+            contentBlockMapper.deleteById(block.id);
+            affectedNodeIds.add(block.nodeId);
+            removedCount++;
+        }
+        if (removedCount > 0) {
+            affectedNodeIds.forEach(nodeId -> {
+                resequenceBlocks(version.id, nodeId);
+                refreshNodeSearchText(version.id, nodeId);
+            });
+            advanceDraft(version);
+        }
+        return new ManagementDtos.BlockMutationResult(version.draftRevision, removedCount);
+    }
+    @Transactional
     public void publish(UUID documentId, UUID versionId) {
         requireDocument(documentId);
         documentQueryService.publish(documentId, versionId);
@@ -370,6 +420,22 @@ public class VersionRevisionService {
         return node;
     }
 
+    private void resequenceBlocks(String versionId, String nodeId) {
+        var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
+                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
+                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc(), CONTENT_BLOCK_ENTITY.ID.asc()));
+        for (var index = 0; index < blocks.size(); index++) {
+            var block = blocks.get(index);
+            var sequence = (index + 1) * 10;
+            if (block.seq != sequence) {
+                block.seq = sequence;
+                contentBlockMapper.update(block);
+            }
+        }
+    }
     private void refreshNodeSearchText(String versionId, String nodeId) {
         var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
                 .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)

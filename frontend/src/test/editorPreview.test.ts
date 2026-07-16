@@ -25,6 +25,11 @@ describe("editor preview payload", () => {
     expect(preview.payload).toEqual({ text: "编辑后的正文" });
   });
 
+  it("carries the selected code language into the preview payload", () => {
+    const preview = previewPayload(block({ blockType: "code", language: "sql", plainText: "SELECT 1" }), {});
+
+    expect(preview).toMatchObject({ language: "sql", text: "SELECT 1" });
+  });
   it("turns list lines into reader list items", () => {
     const preview = previewPayload(block({ blockType: "unordered_list", plainText: "第一项\n\n 第二项 " }), {});
 

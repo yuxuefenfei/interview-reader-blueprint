@@ -65,6 +65,7 @@ public class ImportPackageService {
 
     private final ObjectMapper objectMapper;
     private final DocumentPackageValidator validator;
+    private final DocumentPackageNormalizer normalizer;
     private final ExcelPackageService excelPackageService;
     private final MarkdownPackageService markdownPackageService;
     private final PdfPackageService pdfPackageService;
@@ -84,6 +85,7 @@ public class ImportPackageService {
     public ImportPackageService(
             ObjectMapper objectMapper,
             DocumentPackageValidator validator,
+            DocumentPackageNormalizer normalizer,
             ExcelPackageService excelPackageService,
             MarkdownPackageService markdownPackageService,
             PdfPackageService pdfPackageService,
@@ -102,6 +104,7 @@ public class ImportPackageService {
     ) {
         this.objectMapper = objectMapper;
         this.validator = validator;
+        this.normalizer = normalizer;
         this.excelPackageService = excelPackageService;
         this.markdownPackageService = markdownPackageService;
         this.pdfPackageService = pdfPackageService;
@@ -178,11 +181,18 @@ public class ImportPackageService {
             updateImportStage(jobId, "PREFLIGHT", 15, baseStatistics);
             updateImportStage(jobId, "EXTRACTING", 35, baseStatistics);
             var parsed = parseSource(sourceType, fileBytes, sourceFileName, sourceSha256);
+            updateImportStage(jobId, "NORMALIZING", 55, baseStatistics);
+            var normalization = normalizer.normalize(parsed.documentPackage());
+            var documentPackage = normalization.documentPackage();
+            var issues = new ArrayList<>(parsed.issues());
+            issues.addAll(normalization.issues());
+            if (documentPackage != null) {
+                issues.addAll(validator.validate(documentPackage));
+            }
             updateImportStage(jobId, "VALIDATING", 75, baseStatistics);
             ensureNotCanceled(jobId);
-            var documentPackage = parsed.documentPackage();
-            var issues = parsed.issues();
             var statistics = new LinkedHashMap<>(baseStatistics);
+            statistics.put("removedEmptyBlockCount", normalization.issues().size());
             statistics.put("issueCount", issues.size());
             statistics.put("blockingIssueCount", issues.stream().filter(issue -> "BLOCKING".equals(issue.severity())).count());
             if (documentPackage != null) {
@@ -752,28 +762,20 @@ public class ImportPackageService {
                         null)), null);
             }
             var parsed = excelPackageService.parse(fileBytes);
-            var issues = new ArrayList<>(parsed.issues());
-            if (parsed.documentPackage() != null) {
-                issues.addAll(validator.validate(parsed.documentPackage()));
-            }
-            return new ParsedSource(parsed.documentPackage(), issues, null);
+            return new ParsedSource(parsed.documentPackage(), new ArrayList<>(parsed.issues()), null);
         }
         if ("MARKDOWN".equals(sourceType)) {
             var documentPackage = markdownPackageService.parse(fileBytes, sourceFileName, sourceSha256, converterVersion);
-            return new ParsedSource(documentPackage, validator.validate(documentPackage), null);
+            return new ParsedSource(documentPackage, List.of(), null);
         }
         if ("PDF".equals(sourceType)) {
             var parsed = pdfPackageService.parse(fileBytes, sourceFileName, sourceSha256, converterVersion);
-            var issues = new ArrayList<>(parsed.issues());
-            if (parsed.documentPackage() != null) {
-                issues.addAll(validator.validate(parsed.documentPackage()));
-            }
-            return new ParsedSource(parsed.documentPackage(), issues, parsed.rawExtraction());
+            return new ParsedSource(parsed.documentPackage(), new ArrayList<>(parsed.issues()), parsed.rawExtraction());
         }
         var json = new String(fileBytes, StandardCharsets.UTF_8);
         try {
             var documentPackage = objectMapper.readValue(json, DocumentPackage.class);
-            return new ParsedSource(documentPackage, validator.validate(documentPackage), null);
+            return new ParsedSource(documentPackage, List.of(), null);
         } catch (JsonProcessingException exception) {
             return new ParsedSource(null, List.of(new ImportIssueDto("BLOCKING", "JSON_INVALID", exception.getOriginalMessage(), null, null, null)), null);
         }

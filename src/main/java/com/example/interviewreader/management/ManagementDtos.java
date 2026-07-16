@@ -68,4 +68,10 @@ public final class ManagementDtos {
 
     public record UpdateBlockRequest(long draftRevision, String blockType, JsonNode payload, String plainText, String language) {
     }
+
+    public record BlockCleanupRequest(long draftRevision) {
+    }
+
+    public record BlockMutationResult(long draftRevision, int removedCount) {
+    }
 }

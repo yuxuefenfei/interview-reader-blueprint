@@ -144,6 +144,9 @@ public class DocumentPackageValidator {
             if (block.payload() == null || block.payload().isNull()) {
                 issues.add(blocking("BLOCK_PAYLOAD_REQUIRED", "payload is required", block.sectionKey(), block.blockKey()));
             }
+            if (!DocumentBlockContent.isMeaningful(block.blockType(), block.plainText(), block.payload())) {
+                issues.add(blocking("EMPTY_CONTENT_BLOCK", "block has no meaningful content", block.sectionKey(), block.blockKey()));
+            }
             if (block.confidence() != null && (block.confidence().signum() < 0 || block.confidence().compareTo(java.math.BigDecimal.ONE) > 0)) {
                 issues.add(blocking("BLOCK_CONFIDENCE_INVALID", "confidence must be between 0 and 1", block.sectionKey(), block.blockKey()));
             }

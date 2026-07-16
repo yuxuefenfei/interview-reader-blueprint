@@ -44,6 +44,8 @@ export function previewPayload(block: EditorBlock, payload: Payload): Payload {
       return { ...payload, latex: text };
     case "image":
       return { ...payload, alt: text };
+    case "code":
+      return { ...payload, text, language: block.language ?? payload.language ?? "text" };
     default:
       return { ...payload, text };
   }

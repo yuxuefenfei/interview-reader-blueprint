@@ -102,6 +102,22 @@ public class AdminDocumentController {
         return service.updateBlock(versionId, blockId, request);
     }
 
+    @DeleteMapping("/versions/{versionId}/editor/blocks/{blockId}")
+    public ManagementDtos.BlockMutationResult deleteBlock(
+            @PathVariable UUID versionId,
+            @PathVariable UUID blockId,
+            @RequestParam long draftRevision
+    ) {
+        return service.deleteBlock(versionId, blockId, draftRevision);
+    }
+
+    @PostMapping("/versions/{versionId}/editor/blocks/cleanup-empty")
+    public ManagementDtos.BlockMutationResult cleanupEmptyBlocks(
+            @PathVariable UUID versionId,
+            @Valid @RequestBody ManagementDtos.BlockCleanupRequest request
+    ) {
+        return service.cleanupEmptyBlocks(versionId, request);
+    }
     /** Kept temporarily for external clients that still save a complete package. */
     @PutMapping("/versions/{versionId}/editor")
     public ManagementDtos.EditableVersion save(@PathVariable UUID versionId, @Valid @RequestBody ManagementDtos.SaveDraftRequest request) {

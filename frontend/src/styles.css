@@ -210,6 +210,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .block-heading-actions > span { color: #758194; font-size: 13px; }
 .node-form { display: grid; grid-template-columns: minmax(220px, 2fr) minmax(150px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr); gap: 0 12px; }
 .node-form .el-form-item { margin-bottom: 0; }
+.node-property-drawer .el-drawer__body { padding-top: 8px; }
+.node-property-drawer .node-form { grid-template-columns: 1fr; gap: 0; }
+.node-property-drawer .node-form .el-form-item { margin-bottom: 18px; }
+.drawer-description { margin: 0 0 22px; color: #65758a; font-size: 13px; line-height: 1.6; }
+.drawer-footer { display: flex; justify-content: flex-end; gap: 8px; }
 .block-editor { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; overflow: hidden; }
 .editor-content-workbench { display: grid; grid-template-columns: minmax(168px, .32fr) minmax(0, 1fr); min-height: 0; height: 100%; overflow: hidden; border: 1px solid #dce5eb; background: #fbfcfd; }
 .editor-block-list { min-width: 0; min-height: 0; display: grid; align-content: start; gap: 6px; padding: 10px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; border-right: 1px solid #e1e8ed; background: #f8fafb; }
@@ -221,10 +226,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .block-list-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .block-list-meta small { color: #7b8796; font-size: 11px; }
 .block-list-meta i { margin-left: auto; color: #aa6b00; font-size: 11px; font-style: normal; }
+.block-list-meta .block-empty-flag { color: #9a6d19; }
 .block-detail-panel { min-width: 0; min-height: 0; display: grid; align-content: start; gap: 14px; padding: 18px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; background: #fff; }
 .block-detail-panel > * { min-width: 0; max-width: 100%; }
 .block-detail-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .block-detail-panel > header > div { display: flex; align-items: center; min-width: 0; gap: 8px; }
+.block-detail-actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .block-detail-panel > header span { overflow: hidden; color: #758194; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .block-detail-panel .el-input, .block-detail-panel .el-select { min-width: 0; max-width: 100%; }
 .block-main-editor textarea { box-sizing: border-box; min-width: 0; max-width: 100%; min-height: 280px !important; line-height: 1.7; }

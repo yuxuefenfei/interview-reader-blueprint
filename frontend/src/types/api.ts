@@ -24,3 +24,4 @@ export interface EditorSnapshot { version: VersionSummary; document: EditorDocum
 export interface EditorBlock { id: string; blockKey: string; seq: number; blockType: BlockType; payload: Record<string, unknown>; plainText: string; language: string | null; sourcePage: number | null; sourceBbox: SourceBbox | null; confidence: number | null; }
 export interface NodeBlocksPage { items: EditorBlock[]; nextCursor: string | null; }
 export interface StructureNode { id: string; parentId: string | null; sortOrder: number; }
+export interface BlockMutationResult { draftRevision: number; removedCount: number; }

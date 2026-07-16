@@ -32,6 +32,8 @@ const nodeSaving = ref(false);
 const structureSaving = ref(false);
 const savingBlockId = ref<string | null>(null);
 const creatingBlock = ref(false);
+const deletingBlockId = ref<string | null>(null);
+const cleaningEmptyBlocks = ref(false);
 const activeBlockId = ref<string | null>(null);
 const expandedPayload = ref<string[]>([]);
 const previewMode = ref<PreviewMode>("block");
@@ -53,6 +55,7 @@ const emptyBlockDescription = computed(() => selectedNodeHasChildren.value ? "�
 const previewBlocks = computed(() => blocks.value.map((block) => previewBlock(block, payloadTexts[block.id])));
 const visiblePreviewBlocks = computed(() => previewMode.value === "node" ? previewBlocks.value : previewBlocks.value.filter((block) => block.id === activeBlockId.value));
 const dirtyBlockCount = computed(() => blocks.value.filter(isBlockDirty).length);
+const emptyBlockCount = computed(() => blocks.value.filter(isBlankBlock).length);
 const defaultExpandedKeys = computed(() => treeData.value.slice(0, 2).map((node) => node.id));
 const filteredTreeData = computed(() => filterTree(treeData.value, treeFilter.value));
 const previewHeading = computed(() => previewMode.value === "node"
@@ -143,6 +146,10 @@ function fillNodeForm(node: EditorNode): void {
   nodeForm.anchor = node.anchor;
 }
 
+function resetNodeForm(): void {
+  if (selectedNode.value) fillNodeForm(selectedNode.value);
+}
+
 async function loadBlocks(append = false): Promise<void> {
   if (!selectedId.value) return;
   nodeLoading.value = true;
@@ -167,6 +174,7 @@ async function saveNode(): Promise<void> {
   try {
     const snapshot = await adminApi.updateNode(versionId, selectedId.value, editor.value.version.draftRevision, nodeForm);
     applySnapshot(snapshot, selectedId.value);
+    nodePropertiesOpen.value = false;
     ElMessage.success("节点属性已保存");
   } catch (caught) { ElMessage.error(message(caught)); }
   finally { nodeSaving.value = false; }
@@ -220,8 +228,17 @@ function payloadIsInvalid(block: EditorBlock): boolean {
   return parseEditorPayload(payloadTexts[block.id], block.payload) === null;
 }
 
+function isBlankBlock(block: EditorBlock): boolean {
+  if (block.blockType === "divider" || block.plainText.trim()) return false;
+  const payload = parseEditorPayload(payloadTexts[block.id], block.payload);
+  if (!payload) return false;
+  if (block.blockType === "image") return !["assetKey", "src", "url"].some((key) => typeof payload[key] === "string" && payload[key].trim());
+  if (block.blockType === "unordered_list" || block.blockType === "ordered_list") return !Array.isArray(payload.items) || !payload.items.some((item) => String(item ?? "").trim());
+  return !["text", "latex"].some((key) => typeof payload[key] === "string" && payload[key].trim());
+}
+
 function blockSummary(block: EditorBlock): string {
-  const firstLine = block.plainText.split(/\r?\n/).find((line) => line.trim())?.trim() || "空内容块";
+  const firstLine = block.plainText.split(/\r?\n/).find((line) => line.trim())?.trim() || "待填写内容";
   return firstLine.length > 44 ? `${firstLine.slice(0, 44)}...` : firstLine;
 }
 
@@ -243,19 +260,25 @@ function startPreviewDrag(event: PointerEvent): void {
   const startY = event.clientY;
   const originX = previewOffset.x;
   const originY = previewOffset.y;
-  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+  const desktopSidebarWidth = window.matchMedia("(min-width: 761px)").matches ? 232 : 0;
+  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
+  const minOffsetX = originX + desktopSidebarWidth + 12 - panelRect.left;
+  const maxOffsetX = originX + window.innerWidth - panelRect.width - 12 - panelRect.left;
+  const minOffsetY = originY + 12 - panelRect.top;
+  const maxOffsetY = originY + window.innerHeight - panelRect.height - 12 - panelRect.top;
   const move = (moveEvent: PointerEvent) => {
-    const minX = originX + 12 - panelRect.left;
-    const maxX = originX + window.innerWidth - panelRect.width - 12 - panelRect.left;
-    const minY = originY + 12 - panelRect.top;
-    const maxY = originY + window.innerHeight - panelRect.height - 12 - panelRect.top;
-    previewOffset.x = clamp(originX + moveEvent.clientX - startX, minX, maxX);
-    previewOffset.y = clamp(originY + moveEvent.clientY - startY, minY, maxY);
+    previewOffset.x = clamp(originX + moveEvent.clientX - startX, minOffsetX, maxOffsetX);
+    previewOffset.y = clamp(originY + moveEvent.clientY - startY, minOffsetY, maxOffsetY);
   };
   const stop = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); clearPreviewDrag = null; };
   clearPreviewDrag = stop;
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", stop, { once: true });
+}
+
+function resetPreviewPosition(): void {
+  previewOffset.x = 0;
+  previewOffset.y = 0;
 }
 
 function activateBlock(blockId: string, scroll = true): void {
@@ -320,6 +343,34 @@ async function saveAllBlocks(): Promise<void> {
   ElMessage.success("当前节点内容已保存");
 }
 
+async function deleteActiveBlock(): Promise<void> {
+  const block = activeBlock.value;
+  if (!editor.value || !block) return;
+  try {
+    await ElMessageBox.confirm(`将删除“${blockSummary(block)}”，无法恢复。`, "删除内容块", { type: "warning", confirmButtonText: "删除", cancelButtonText: "取消" });
+    deletingBlockId.value = block.id;
+    const result = await adminApi.deleteBlock(versionId, block.id, editor.value.version.draftRevision);
+    editor.value.version.draftRevision = result.draftRevision;
+    activeBlockId.value = null;
+    await loadBlocks();
+    ElMessage.success("内容块已删除");
+  } catch (caught) { if (caught !== "cancel") ElMessage.error(message(caught)); }
+  finally { deletingBlockId.value = null; }
+}
+
+async function cleanupEmptyBlocks(): Promise<void> {
+  if (!editor.value) return;
+  try {
+    await ElMessageBox.confirm("将删除当前草稿中所有没有有效内容的块，并重新排列块序号。", "清理空内容块", { type: "warning", confirmButtonText: "清理", cancelButtonText: "取消" });
+    cleaningEmptyBlocks.value = true;
+    const result = await adminApi.cleanupEmptyBlocks(versionId, editor.value.version.draftRevision);
+    editor.value.version.draftRevision = result.draftRevision;
+    activeBlockId.value = null;
+    await loadBlocks();
+    ElMessage.success(result.removedCount ? `已清理 ${result.removedCount} 个空内容块` : "未发现需要清理的空内容块");
+  } catch (caught) { if (caught !== "cancel") ElMessage.error(message(caught)); }
+  finally { cleaningEmptyBlocks.value = false; }
+}
 async function discard(): Promise<void> {
   try {
     await ElMessageBox.confirm("将永久删除这份草稿，无法恢复。", "丢弃草稿", { type: "warning", confirmButtonText: "丢弃", cancelButtonText: "取消" });
@@ -350,23 +401,22 @@ function message(value: unknown): string { return value instanceof Error ? value
 
       <main class="editor-content-panel">
         <section v-if="selectedNode" class="node-inspector">
-          <div class="section-heading"><div><p class="eyebrow">当前节点</p><h2>{{ selectedNode.title }}</h2><span class="node-path">{{ nodePath }}</span></div><div class="node-actions"><el-button :icon="Setting" @click="nodePropertiesOpen = !nodePropertiesOpen">节点属性</el-button><el-button v-if="nodePropertiesOpen" type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div></div>
-          <el-form v-show="nodePropertiesOpen" label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
+          <div class="section-heading"><div><p class="eyebrow">当前节点</p><h2>{{ selectedNode.title }}</h2><span class="node-path">{{ nodePath }}</span></div><div class="node-actions"><el-button :icon="Setting" @click="nodePropertiesOpen = true">节点属性</el-button></div></div>
         </section>
 
         <section class="block-editor" v-loading="nodeLoading">
-          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-button v-if="!previewVisible" :icon="View" @click="previewVisible = true">显示预览</el-button><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
+          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-button v-if="!previewVisible" :icon="View" @click="previewVisible = true">显示预览</el-button><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="emptyBlockCount" type="warning" plain :icon="Delete" :loading="cleaningEmptyBlocks" @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）</el-button><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
           <div class="editor-content-workbench">
             <aside ref="blockListRef" class="editor-block-list" aria-label="内容块列表">
               <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
-              <button v-for="block in blocks" :key="block.id" type="button" class="block-list-item" :class="{ active: activeBlockId === block.id, dirty: isBlockDirty(block) }" :aria-current="activeBlockId === block.id ? 'true' : undefined" :data-block-id="block.id" @click="activateBlock(block.id)"><span class="block-list-meta"><el-tag size="small">{{ zh(block.blockType) }}</el-tag><small>块 #{{ block.seq }}</small><i v-if="isBlockDirty(block)">未保存</i></span><strong>{{ blockSummary(block) }}</strong></button>
+              <button v-for="block in blocks" :key="block.id" type="button" class="block-list-item" :class="{ active: activeBlockId === block.id, dirty: isBlockDirty(block) }" :aria-current="activeBlockId === block.id ? 'true' : undefined" :data-block-id="block.id" @click="activateBlock(block.id)"><span class="block-list-meta"><el-tag size="small">{{ zh(block.blockType) }}</el-tag><small>块 #{{ block.seq }}</small><i v-if="isBlockDirty(block)">未保存</i><i v-else-if="isBlankBlock(block)" class="block-empty-flag">待填写</i></span><strong>{{ blockSummary(block) }}</strong></button>
               <el-button v-if="nextCursor" plain :loading="nodeLoading" @click="loadBlocks(true)">加载更多内容块</el-button>
             </aside>
 
             <section class="block-detail-panel">
               <el-empty v-if="!activeBlock" description="从左侧选择一个内容块开始编辑" :image-size="72" />
               <template v-else>
-                <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><el-button type="primary" :loading="savingBlockId === activeBlock.id" @click="saveBlock(activeBlock)">保存</el-button></header>
+                <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><div class="block-detail-actions"><el-button type="danger" plain :icon="Delete" :loading="deletingBlockId === activeBlock.id" @click="deleteActiveBlock">删除</el-button><el-button type="primary" :loading="savingBlockId === activeBlock.id" @click="saveBlock(activeBlock)">保存</el-button></div></header>
                 <div class="block-edit-controls"><el-select v-model="activeBlock.blockType" aria-label="内容块类型" @change="scheduleBlockSave"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="activeBlock.blockType === 'code'" v-model="activeBlock.language" clearable placeholder="代码语言" @input="scheduleBlockSave" /></div>
                 <el-input v-model="activeBlock.plainText" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
                 <el-collapse v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
@@ -376,13 +426,18 @@ function message(value: unknown): string { return value instanceof Error ? value
         </section>
         <Teleport to="body">
           <aside v-show="previewVisible" ref="previewPanelRef" class="editor-preview-panel" :style="{ transform: `translate(${previewOffset.x}px, ${previewOffset.y}px)` }">
-            <header><div><p class="eyebrow">实时预览</p><strong>{{ selectedNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="Hide" aria-label="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
+            <header><div><p class="eyebrow">实时预览</p><strong>{{ selectedNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="RefreshRight" aria-label="还原实时预览位置" title="还原到右侧" @click="resetPreviewPosition" /><el-button circle :icon="Hide" aria-label="隐藏实时预览" title="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
             <div ref="previewScrollRef" class="editor-preview-scroll">
               <article class="editor-preview-article"><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
             </div>
           </aside>
         </Teleport>
       </main>
+      <el-drawer v-model="nodePropertiesOpen" class="node-property-drawer" title="节点属性" direction="rtl" size="420px" append-to-body @closed="resetNodeForm">
+        <p class="drawer-description">修改节点名称、层级类型与阅读定位信息。</p>
+        <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
+        <template #footer><div class="drawer-footer"><el-button @click="nodePropertiesOpen = false">取消</el-button><el-button type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div></template>
+      </el-drawer>
     </div>
   </section>
 </template>
