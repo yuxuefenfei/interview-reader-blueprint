@@ -6,6 +6,7 @@ const AdminDocumentsView = () => import("../views/AdminDocumentsView.vue");
 const AdminDocumentDetailView = () => import("../views/AdminDocumentDetailView.vue");
 const ImportCenterView = () => import("../views/ImportCenterView.vue");
 const VersionEditorView = () => import("../views/VersionEditorView.vue");
+const DetachedPreviewView = () => import("../views/DetachedPreviewView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -13,6 +14,7 @@ const router = createRouter({
     { path: "/", redirect: "/reader" },
     { path: "/reader", component: ReaderView },
     { path: "/reader/documents/:documentId", component: ReaderView },
+    { path: "/admin/versions/:versionId/preview", component: DetachedPreviewView },
     { path: "/admin", component: AdminLayout, children: [
       { path: "", redirect: "/admin/documents" },
       { path: "documents", component: AdminDocumentsView },

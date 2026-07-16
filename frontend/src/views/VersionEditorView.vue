@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ArrowLeft, Delete, EditPen, FolderOpened, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { ArrowLeft, Delete, EditPen, FolderOpened, FullScreen, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { adminApi } from "../api/admin";
@@ -8,6 +8,7 @@ import ContentBlockView from "../components/ContentBlockView.vue";
 import { zh } from "../shared/presentation";
 import type { EditorBlock, EditorNode, EditorSnapshot, StructureNode } from "../types/api";
 import { editorTextPlaceholder, parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
+import { detachedPreviewChannelName, isDetachedPreviewMessage, type DetachedPreviewState } from "../utils/detachedPreviewChannel";
 
 type TreeNode = EditorNode & { children: TreeNode[] };
 type NodeForm = Pick<EditorNode, "title" | "nodeType" | "semanticRole" | "anchor">;
@@ -47,8 +48,14 @@ const previewScrollRef = ref<HTMLElement>();
 const previewPanelRef = ref<HTMLElement>();
 let autoSaveTimer: number | null = null;
 let clearPreviewDrag: (() => void) | null = null;
+let detachedPreviewChannel: BroadcastChannel | null = null;
+let detachedPreviewPublishTimer: number | null = null;
 
 const selectedNode = computed(() => editor.value?.nodes.find((node) => node.id === selectedId.value) ?? null);
+const previewNode = computed<EditorNode | null>(() => {
+  const node = selectedNode.value;
+  return node && nodePropertiesOpen.value ? { ...node, ...nodeForm } : node;
+});
 const activeBlock = computed(() => blocks.value.find((block) => block.id === activeBlockId.value) ?? null);
 const selectedNodeHasChildren = computed(() => !!selectedId.value && editor.value?.nodes.some((node) => node.parentId === selectedId.value));
 const emptyBlockDescription = computed(() => selectedNodeHasChildren.value ? "该结构节点没有直接内容块。请选择子节点编辑正文，或在此新增内容。" : "该节点暂无内容块，可直接新增正文。");
@@ -59,7 +66,7 @@ const emptyBlockCount = computed(() => blocks.value.filter(isBlankBlock).length)
 const defaultExpandedKeys = computed(() => treeData.value.slice(0, 2).map((node) => node.id));
 const filteredTreeData = computed(() => filterTree(treeData.value, treeFilter.value));
 const previewHeading = computed(() => previewMode.value === "node"
-  ? selectedNode.value?.title ?? "当前节点"
+  ? previewNode.value?.title ?? "当前节点"
   : activeBlock.value ? `块 #${activeBlock.value.seq} · ${zh(activeBlock.value.blockType)}` : "当前内容块");
 const nodePath = computed(() => {
   if (!editor.value || !selectedNode.value) return "";
@@ -73,6 +80,7 @@ const nodePath = computed(() => {
   return path.join(" / ");
 });
 const saveStateLabel = computed(() => ({ saved: "已保存", dirty: "有未保存修改", saving: "保存中", error: "保存失败" }[saveState.value]));
+watch(nodeForm, () => { if (nodePropertiesOpen.value) publishDetachedPreview(); }, { deep: true });
 const blockTypes = ["paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote", "callout", "formula", "image", "divider", "table_snapshot"];
 const nodeTypes = [
   { value: "PART", label: "篇章" }, { value: "CHAPTER", label: "章节" }, { value: "SECTION", label: "小节" },
@@ -83,8 +91,61 @@ const semanticRoles = [
   { value: "CONCLUSION", label: "结论" }, { value: "INTRODUCTION", label: "导读" }, { value: "DIRECTORY", label: "目录" }
 ];
 
-onMounted(() => { void load(); });
-onBeforeUnmount(() => { if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer); clearPreviewDrag?.(); });
+onMounted(() => {
+  detachedPreviewChannel = new BroadcastChannel(detachedPreviewChannelName(versionId));
+  detachedPreviewChannel.onmessage = (event: MessageEvent<unknown>) => {
+    if (isDetachedPreviewMessage(event.data) && event.data.type === "preview-state-request") publishDetachedPreview();
+  };
+  void load();
+});
+onBeforeUnmount(() => {
+  if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer);
+  if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
+  detachedPreviewPublishTimer = null;
+  clearPreviewDrag?.();
+  detachedPreviewChannel?.close();
+  detachedPreviewChannel = null;
+});
+
+function publishDetachedPreview(): void {
+  const currentNode = previewNode.value;
+  const channel = detachedPreviewChannel;
+  if (!editor.value || !currentNode || !channel) return;
+
+  try {
+    const state: DetachedPreviewState = {
+      versionId,
+      document: { title: editor.value.document.title },
+      node: { ...currentNode },
+      blocks: previewBlocks.value.map((block) => ({
+        ...block,
+        payload: JSON.parse(JSON.stringify(block.payload)) as Record<string, unknown>,
+        sourceBbox: block.sourceBbox ? JSON.parse(JSON.stringify(block.sourceBbox)) : null
+      })),
+      activeBlockId: activeBlockId.value,
+      updatedAt: Date.now()
+    };
+    channel.postMessage({ type: "preview-state", state });
+  } catch {
+    if (detachedPreviewChannel === channel) detachedPreviewChannel = null;
+  }
+}
+
+function openDetachedPreview(): void {
+  if (!editor.value || !selectedNode.value) return;
+  const href = router.resolve({ path: `/admin/versions/${versionId}/preview`, query: { nodeId: selectedNode.value.id } }).href;
+  const previewWindow = window.open(href, "interview-reader-editor-preview");
+  if (!previewWindow) {
+    ElMessage.warning("浏览器阻止了独立预览窗口，请允许本站点打开新标签页。");
+    return;
+  }
+  previewWindow.focus();
+  if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
+  detachedPreviewPublishTimer = window.setTimeout(() => {
+    detachedPreviewPublishTimer = null;
+    publishDetachedPreview();
+  }, 120);
+}
 
 async function load(): Promise<void> {
   loading.value = true;
@@ -165,7 +226,10 @@ async function loadBlocks(append = false): Promise<void> {
     if (!activeBlockId.value && firstBlock) activateBlock(firstBlock.id, false);
     saveState.value = "saved";
   } catch (caught) { ElMessage.error(message(caught)); }
-  finally { nodeLoading.value = false; }
+  finally {
+    nodeLoading.value = false;
+    publishDetachedPreview();
+  }
 }
 
 async function saveNode(): Promise<void> {
@@ -175,6 +239,7 @@ async function saveNode(): Promise<void> {
     const snapshot = await adminApi.updateNode(versionId, selectedId.value, editor.value.version.draftRevision, nodeForm);
     applySnapshot(snapshot, selectedId.value);
     nodePropertiesOpen.value = false;
+    publishDetachedPreview();
     ElMessage.success("节点属性已保存");
   } catch (caught) { ElMessage.error(message(caught)); }
   finally { nodeSaving.value = false; }
@@ -260,7 +325,7 @@ function startPreviewDrag(event: PointerEvent): void {
   const startY = event.clientY;
   const originX = previewOffset.x;
   const originY = previewOffset.y;
-  const desktopSidebarWidth = window.matchMedia("(min-width: 761px)").matches ? 232 : 0;
+  const desktopSidebarWidth = window.matchMedia("(min-width: 761px)").matches ? document.querySelector<HTMLElement>(".admin-sidebar")?.getBoundingClientRect().width ?? 0 : 0;
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
   const minOffsetX = originX + desktopSidebarWidth + 12 - panelRect.left;
   const maxOffsetX = originX + window.innerWidth - panelRect.width - 12 - panelRect.left;
@@ -287,6 +352,7 @@ function activateBlock(blockId: string, scroll = true): void {
     centerInScrollContainer(blockListRef.value, `[data-block-id="${blockId}"]`, scroll);
     centerInScrollContainer(previewScrollRef.value, `[data-preview-block-id="${blockId}"]`, scroll);
   });
+  publishDetachedPreview();
 }
 
 function scrollTreeTo(nodeId: string): void {
@@ -296,6 +362,7 @@ function scrollTreeTo(nodeId: string): void {
 function scheduleBlockSave(): void {
   const editedBlockId = activeBlock.value?.id;
   if (!editedBlockId) return;
+  publishDetachedPreview();
   if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer);
   saveState.value = "dirty";
   autoSaveTimer = window.setTimeout(() => {
@@ -323,6 +390,7 @@ async function saveBlock(block: EditorBlock, quiet = false): Promise<boolean> {
     });
     Object.assign(block, updated);
     payloadTexts[block.id] = JSON.stringify(updated.payload ?? {}, null, 2);
+    publishDetachedPreview();
     savedBlockStates[block.id] = blockState(block);
     editor.value.version.draftRevision++;
     saveState.value = "saved";
@@ -405,7 +473,7 @@ function message(value: unknown): string { return value instanceof Error ? value
         </section>
 
         <section class="block-editor" v-loading="nodeLoading">
-          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-button v-if="!previewVisible" :icon="View" @click="previewVisible = true">显示预览</el-button><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="emptyBlockCount" type="warning" plain :icon="Delete" :loading="cleaningEmptyBlocks" @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）</el-button><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
+          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-button v-if="!previewVisible" :icon="View" @click="previewVisible = true">显示预览</el-button><el-button :icon="FullScreen" @click="openDetachedPreview">独立预览</el-button><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="emptyBlockCount" type="warning" plain :icon="Delete" :loading="cleaningEmptyBlocks" @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）</el-button><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
           <div class="editor-content-workbench">
             <aside ref="blockListRef" class="editor-block-list" aria-label="内容块列表">
               <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
@@ -426,9 +494,9 @@ function message(value: unknown): string { return value instanceof Error ? value
         </section>
         <Teleport to="body">
           <aside v-show="previewVisible" ref="previewPanelRef" class="editor-preview-panel" :style="{ transform: `translate(${previewOffset.x}px, ${previewOffset.y}px)` }">
-            <header><div><p class="eyebrow">实时预览</p><strong>{{ selectedNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="RefreshRight" aria-label="还原实时预览位置" title="还原到右侧" @click="resetPreviewPosition" /><el-button circle :icon="Hide" aria-label="隐藏实时预览" title="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
+            <header><div><p class="eyebrow">实时预览</p><strong>{{ previewNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="RefreshRight" aria-label="还原实时预览位置" title="还原到右侧" @click="resetPreviewPosition" /><el-button circle :icon="Hide" aria-label="隐藏实时预览" title="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
             <div ref="previewScrollRef" class="editor-preview-scroll">
-              <article class="editor-preview-article"><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
+              <article class="editor-preview-article"><div v-if="previewNode" class="preview-node-meta"><el-tag effect="plain">{{ zh(previewNode.nodeType) }}</el-tag><el-tag v-if="previewNode.semanticRole" type="success" effect="plain">{{ zh(previewNode.semanticRole) }}</el-tag></div><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
             </div>
           </aside>
         </Teleport>
