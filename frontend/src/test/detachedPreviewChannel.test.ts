@@ -10,6 +10,7 @@ describe("detached preview channel", () => {
   it("accepts only the supported editor preview message kinds", () => {
     expect(isDetachedPreviewMessage({ type: "preview-state-request" })).toBe(true);
     expect(isDetachedPreviewMessage({ type: "preview-state", state: {} })).toBe(true);
+    expect(isDetachedPreviewMessage({ type: "preview-close" })).toBe(true);
     expect(isDetachedPreviewMessage({ type: "other" })).toBe(false);
     expect(isDetachedPreviewMessage(null)).toBe(false);
   });

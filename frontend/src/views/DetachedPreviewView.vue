@@ -26,7 +26,17 @@ const statusLabel = computed(() => connected.value ? "正在同步编辑器" : "
 onMounted(() => {
   channel = new BroadcastChannel(detachedPreviewChannelName(versionId));
   channel.onmessage = (event: MessageEvent<unknown>) => {
-    if (!isDetachedPreviewMessage(event.data) || event.data.type !== "preview-state") return;
+    if (!isDetachedPreviewMessage(event.data)) return;
+    if (event.data.type === "preview-close") {
+      connected.value = false;
+      node.value = null;
+      blocks.value = [];
+      activeBlockId.value = null;
+      error.value = "预览已切换回编辑器。";
+      window.close();
+      return;
+    }
+    if (event.data.type !== "preview-state") return;
     applyState(event.data.state);
   };
   channel.postMessage({ type: "preview-state-request" });

@@ -39,6 +39,7 @@ const activeBlockId = ref<string | null>(null);
 const expandedPayload = ref<string[]>([]);
 const previewMode = ref<PreviewMode>("block");
 const previewVisible = ref(true);
+const detachedPreviewActive = ref(false);
 const previewOffset = reactive({ x: 0, y: 0 });
 const saveState = ref<SaveState>("saved");
 const nodePropertiesOpen = ref(false);
@@ -50,6 +51,7 @@ let autoSaveTimer: number | null = null;
 let clearPreviewDrag: (() => void) | null = null;
 let detachedPreviewChannel: BroadcastChannel | null = null;
 let detachedPreviewPublishTimer: number | null = null;
+let detachedPreviewWindow: Window | null = null;
 
 const selectedNode = computed(() => editor.value?.nodes.find((node) => node.id === selectedId.value) ?? null);
 const previewNode = computed<EditorNode | null>(() => {
@@ -81,6 +83,11 @@ const nodePath = computed(() => {
 });
 const saveStateLabel = computed(() => ({ saved: "已保存", dirty: "有未保存修改", saving: "保存中", error: "保存失败" }[saveState.value]));
 watch(nodeForm, () => { if (nodePropertiesOpen.value) publishDetachedPreview(); }, { deep: true });
+watch(nodePropertiesOpen, (open) => {
+  if (open) return;
+  resetNodeForm();
+  publishDetachedPreview();
+});
 const blockTypes = ["paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote", "callout", "formula", "image", "divider", "table_snapshot"];
 const nodeTypes = [
   { value: "PART", label: "篇章" }, { value: "CHAPTER", label: "章节" }, { value: "SECTION", label: "小节" },
@@ -139,12 +146,23 @@ function openDetachedPreview(): void {
     ElMessage.warning("浏览器阻止了独立预览窗口，请允许本站点打开新标签页。");
     return;
   }
+  detachedPreviewWindow = previewWindow;
+  detachedPreviewActive.value = true;
+  previewVisible.value = false;
   previewWindow.focus();
   if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
   detachedPreviewPublishTimer = window.setTimeout(() => {
     detachedPreviewPublishTimer = null;
     publishDetachedPreview();
   }, 120);
+}
+
+function showEmbeddedPreview(): void {
+  detachedPreviewChannel?.postMessage({ type: "preview-close" });
+  if (detachedPreviewWindow && !detachedPreviewWindow.closed) detachedPreviewWindow.close();
+  detachedPreviewWindow = null;
+  detachedPreviewActive.value = false;
+  previewVisible.value = true;
 }
 
 async function load(): Promise<void> {
@@ -455,7 +473,7 @@ function message(value: unknown): string { return value instanceof Error ? value
   <section class="admin-view editor-view" v-loading="loading">
     <header class="admin-view-header editor-header">
       <div><el-button text :icon="ArrowLeft" @click="router.push('/admin/documents')">返回文档管理</el-button><p class="eyebrow">版本修订</p><h1>{{ editor?.document.title || "草稿编辑器" }}</h1><span v-if="editor">v{{ editor.version.versionNo }} · {{ zh(editor.version.status) }} · 修订 {{ editor.version.draftRevision }}</span></div>
-      <div class="header-buttons"><el-button :icon="RefreshRight" @click="load">刷新</el-button><el-button type="danger" plain :icon="Delete" @click="discard">丢弃草稿</el-button></div>
+      <div class="header-buttons"><el-button-group aria-label="预览方式"><el-button :type="previewVisible ? 'primary' : 'default'" :plain="!previewVisible" :icon="View" @click="showEmbeddedPreview">显示预览</el-button><el-button :type="detachedPreviewActive ? 'primary' : 'default'" :plain="!detachedPreviewActive" :icon="FullScreen" @click="openDetachedPreview">独立预览</el-button></el-button-group><el-button :icon="RefreshRight" @click="load">刷新</el-button><el-button type="danger" plain :icon="Delete" @click="discard">丢弃草稿</el-button></div>
     </header>
 
     <div v-if="editor" class="editor-workbench">
@@ -473,7 +491,7 @@ function message(value: unknown): string { return value instanceof Error ? value
         </section>
 
         <section class="block-editor" v-loading="nodeLoading">
-          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-button v-if="!previewVisible" :icon="View" @click="previewVisible = true">显示预览</el-button><el-button :icon="FullScreen" @click="openDetachedPreview">独立预览</el-button><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="emptyBlockCount" type="warning" plain :icon="Delete" :loading="cleaningEmptyBlocks" @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）</el-button><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
+          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="emptyBlockCount" type="warning" plain :icon="Delete" :loading="cleaningEmptyBlocks" @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）</el-button><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
           <div class="editor-content-workbench">
             <aside ref="blockListRef" class="editor-block-list" aria-label="内容块列表">
               <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
@@ -501,7 +519,7 @@ function message(value: unknown): string { return value instanceof Error ? value
           </aside>
         </Teleport>
       </main>
-      <el-drawer v-model="nodePropertiesOpen" class="node-property-drawer" title="节点属性" direction="rtl" size="420px" append-to-body @closed="resetNodeForm">
+      <el-drawer v-model="nodePropertiesOpen" class="node-property-drawer" title="节点属性" direction="rtl" size="420px" append-to-body>
         <p class="drawer-description">修改节点名称、层级类型与阅读定位信息。</p>
         <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
         <template #footer><div class="drawer-footer"><el-button @click="nodePropertiesOpen = false">取消</el-button><el-button type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div></template>
