@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Delete, EditPen, FolderOpened, MoreFilled, Plus, RefreshRight, Search, Setting } from "@element-plus/icons-vue";
+import { ArrowLeft, Delete, EditPen, FolderOpened, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -35,13 +35,16 @@ const creatingBlock = ref(false);
 const activeBlockId = ref<string | null>(null);
 const expandedPayload = ref<string[]>([]);
 const previewMode = ref<PreviewMode>("block");
-const compactPane = ref<"editor" | "preview">("editor");
+const previewVisible = ref(true);
+const previewOffset = reactive({ x: 0, y: 0 });
 const saveState = ref<SaveState>("saved");
 const nodePropertiesOpen = ref(false);
 const treePanelRef = ref<HTMLElement>();
 const blockListRef = ref<HTMLElement>();
 const previewScrollRef = ref<HTMLElement>();
+const previewPanelRef = ref<HTMLElement>();
 let autoSaveTimer: number | null = null;
+let clearPreviewDrag: (() => void) | null = null;
 
 const selectedNode = computed(() => editor.value?.nodes.find((node) => node.id === selectedId.value) ?? null);
 const activeBlock = computed(() => blocks.value.find((block) => block.id === activeBlockId.value) ?? null);
@@ -78,7 +81,7 @@ const semanticRoles = [
 ];
 
 onMounted(() => { void load(); });
-onBeforeUnmount(() => { if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer); });
+onBeforeUnmount(() => { if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer); clearPreviewDrag?.(); });
 
 async function load(): Promise<void> {
   loading.value = true;
@@ -230,10 +233,33 @@ function centerInScrollContainer(container: HTMLElement | undefined, selector: s
   const top = container.scrollTop + targetRect.top - containerRect.top - (container.clientHeight - target.clientHeight) / 2;
   container.scrollTo({ top: Math.max(0, top), behavior: smooth ? "smooth" : "auto" });
 }
+function startPreviewDrag(event: PointerEvent): void {
+  if (event.button !== 0) return;
+  const panel = previewPanelRef.value;
+  if (!panel) return;
+  clearPreviewDrag?.();
+  const panelRect = panel.getBoundingClientRect();
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const originX = previewOffset.x;
+  const originY = previewOffset.y;
+  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+  const move = (moveEvent: PointerEvent) => {
+    const minX = originX + 12 - panelRect.left;
+    const maxX = originX + window.innerWidth - panelRect.width - 12 - panelRect.left;
+    const minY = originY + 12 - panelRect.top;
+    const maxY = originY + window.innerHeight - panelRect.height - 12 - panelRect.top;
+    previewOffset.x = clamp(originX + moveEvent.clientX - startX, minX, maxX);
+    previewOffset.y = clamp(originY + moveEvent.clientY - startY, minY, maxY);
+  };
+  const stop = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); clearPreviewDrag = null; };
+  clearPreviewDrag = stop;
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", stop, { once: true });
+}
 
 function activateBlock(blockId: string, scroll = true): void {
   activeBlockId.value = blockId;
-  compactPane.value = "editor";
   void nextTick(() => {
     centerInScrollContainer(blockListRef.value, `[data-block-id="${blockId}"]`, scroll);
     centerInScrollContainer(previewScrollRef.value, `[data-preview-block-id="${blockId}"]`, scroll);
@@ -318,7 +344,7 @@ function message(value: unknown): string { return value instanceof Error ? value
         <div class="panel-title"><div><strong>文档结构</strong><span>{{ editor.nodes.length }} 个节点</span></div><el-icon><FolderOpened /></el-icon></div>
         <el-input v-model="treeFilter" class="tree-search" clearable placeholder="搜索节点" :prefix-icon="Search" />
         <el-tree :data="filteredTreeData" node-key="id" :props="{ label: 'title', children: 'children' }" highlight-current :default-expanded-keys="defaultExpandedKeys" :draggable="!treeFilter" expand-on-click-node :current-node-key="selectedId" :allow-drop="() => true" @node-click="selectNode" @node-drop="persistStructure">
-          <template #default="{ data }"><span class="editor-tree-label" :data-node-id="data.id"><span>{{ data.title }}</span><small v-if="data.id === selectedId">{{ zh(data.nodeType) }}</small></span></template>
+          <template #default="{ data }"><span class="editor-tree-label" :data-node-id="data.id"><span>{{ data.title }}</span></span></template>
         </el-tree>
       </aside>
 
@@ -329,8 +355,8 @@ function message(value: unknown): string { return value instanceof Error ? value
         </section>
 
         <section class="block-editor" v-loading="nodeLoading">
-          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-radio-group v-model="compactPane" class="compact-pane-toggle" size="small" aria-label="编辑工作区"><el-radio-button value="editor">编辑</el-radio-button><el-radio-button value="preview">预览</el-radio-button></el-radio-group><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
-          <div class="editor-content-workbench" :class="{ 'show-preview': compactPane === 'preview' }">
+          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><el-button v-if="!previewVisible" :icon="View" @click="previewVisible = true">显示预览</el-button><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="dirtyBlockCount" type="primary" :loading="saveState === 'saving'" @click="saveAllBlocks">保存当前节点</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
+          <div class="editor-content-workbench">
             <aside ref="blockListRef" class="editor-block-list" aria-label="内容块列表">
               <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
               <button v-for="block in blocks" :key="block.id" type="button" class="block-list-item" :class="{ active: activeBlockId === block.id, dirty: isBlockDirty(block) }" :aria-current="activeBlockId === block.id ? 'true' : undefined" :data-block-id="block.id" @click="activateBlock(block.id)"><span class="block-list-meta"><el-tag size="small">{{ zh(block.blockType) }}</el-tag><small>块 #{{ block.seq }}</small><i v-if="isBlockDirty(block)">未保存</i></span><strong>{{ blockSummary(block) }}</strong></button>
@@ -346,15 +372,16 @@ function message(value: unknown): string { return value instanceof Error ? value
                 <el-collapse v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
               </template>
             </section>
-
-            <aside class="editor-preview-panel">
-              <header><div><p class="eyebrow">实时预览</p><strong>{{ selectedNode?.title }}</strong></div><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group></header>
-              <div ref="previewScrollRef" class="editor-preview-scroll">
-                <article class="editor-preview-article"><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
-              </div>
-            </aside>
           </div>
         </section>
+        <Teleport to="body">
+          <aside v-show="previewVisible" ref="previewPanelRef" class="editor-preview-panel" :style="{ transform: `translate(${previewOffset.x}px, ${previewOffset.y}px)` }">
+            <header><div><p class="eyebrow">实时预览</p><strong>{{ selectedNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="Hide" aria-label="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
+            <div ref="previewScrollRef" class="editor-preview-scroll">
+              <article class="editor-preview-article"><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
+            </div>
+          </aside>
+        </Teleport>
       </main>
     </div>
   </section>
