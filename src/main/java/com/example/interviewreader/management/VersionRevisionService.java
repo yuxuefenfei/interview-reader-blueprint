@@ -130,6 +130,7 @@ public class VersionRevisionService {
         draft.documentId = source.documentId;
         draft.versionNo = nextVersionNo(source.documentId);
         draft.parentVersionId = source.id;
+        draft.parentVersionNo = source.versionNo;
         draft.originImportJobId = source.originImportJobId;
         draft.draftRevision = 0;
         draft.sourceType = source.sourceType;
@@ -679,7 +680,7 @@ public class VersionRevisionService {
     }
 
     private ManagementDtos.VersionSummary summary(DocumentVersionEntity version) {
-        return new ManagementDtos.VersionSummary(uuid(version.id), version.versionNo, uuid(version.parentVersionId), uuid(version.originImportJobId),
+        return new ManagementDtos.VersionSummary(uuid(version.id), version.versionNo, uuid(version.parentVersionId), version.parentVersionNo, uuid(version.originImportJobId),
                 version.sourceType, version.sourceFileName, version.status, version.draftRevision, version.publishedAt, version.createdAt);
     }
 

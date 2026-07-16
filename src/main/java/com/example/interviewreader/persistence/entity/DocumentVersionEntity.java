@@ -13,6 +13,7 @@ public class DocumentVersionEntity {
     public String documentId;
     public int versionNo;
     public String parentVersionId;
+    public Integer parentVersionNo;
     public String originImportJobId;
     public long draftRevision;
     public String sourceType;

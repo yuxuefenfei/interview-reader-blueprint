@@ -22,6 +22,18 @@ async function load(): Promise<void> {
   catch (caught) { ElMessage.error(message(caught)); }
   finally { loading.value = false; }
 }
+function revisionSourceLabel(version: VersionSummary): string | null {
+  const parentVersionNo = version.parentVersionNo
+    ?? versions.value.find((candidate) => candidate.id === version.parentVersionId)?.versionNo
+    ?? null;
+
+  if (parentVersionNo === null) {
+    return version.parentVersionId ? "基于已删除版本修订" : null;
+  }
+
+  const deletedSuffix = version.parentVersionId ? "" : "（源版本已删除）";
+  return `基于 v${parentVersionNo} 修订${deletedSuffix}`;
+}
 async function createRevision(version: VersionSummary): Promise<void> {
   actionVersion.value = version.id;
   try {
@@ -71,7 +83,7 @@ function message(value: unknown): string { return value instanceof Error ? value
       <div v-else class="version-history">
         <article v-for="version in versions" :key="version.id" class="version-row" :class="{ published: version.status === 'PUBLISHED' }">
           <div class="version-number"><strong>v{{ version.versionNo }}</strong><span>{{ formatTime(version.createdAt) }}</span></div>
-          <div class="version-meta"><div><el-tag :type="version.status === 'PUBLISHED' ? 'success' : version.status === 'DRAFT' ? 'warning' : 'info'">{{ zh(version.status) }}</el-tag><el-tag effect="plain">{{ zh(version.sourceType) }}</el-tag></div><strong>{{ version.sourceFileName || '未命名来源文件' }}</strong><span v-if="version.parentVersionId">基于上一版本修订</span></div>
+          <div class="version-meta"><div><el-tag :type="version.status === 'PUBLISHED' ? 'success' : version.status === 'DRAFT' ? 'warning' : 'info'">{{ zh(version.status) }}</el-tag><el-tag effect="plain">{{ zh(version.sourceType) }}</el-tag></div><strong>{{ version.sourceFileName || '未命名来源文件' }}</strong><span v-if="revisionSourceLabel(version)">{{ revisionSourceLabel(version) }}</span></div>
           <div class="version-row-actions">
             <el-button :loading="actionVersion === version.id" :icon="Plus" @click="createRevision(version)">创建修订</el-button>
             <template v-if="version.status === 'DRAFT'"><el-button type="primary" :icon="EditPen" @click="router.push(`/admin/versions/${version.id}/edit`)">编辑</el-button><el-button type="success" :icon="Promotion" @click="publish(version)">发布</el-button><el-button type="danger" plain :icon="Delete" @click="discard(version)">丢弃</el-button></template>

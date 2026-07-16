@@ -473,7 +473,7 @@ function message(value: unknown): string { return value instanceof Error ? value
   <section class="admin-view editor-view" v-loading="loading">
     <header class="admin-view-header editor-header">
       <div><el-button text :icon="ArrowLeft" @click="router.push('/admin/documents')">返回文档管理</el-button><p class="eyebrow">版本修订</p><h1>{{ editor?.document.title || "草稿编辑器" }}</h1><span v-if="editor">v{{ editor.version.versionNo }} · {{ zh(editor.version.status) }} · 修订 {{ editor.version.draftRevision }}</span></div>
-      <div class="header-buttons"><el-button-group aria-label="预览方式"><el-button :type="previewVisible ? 'primary' : 'default'" :plain="!previewVisible" :icon="View" @click="showEmbeddedPreview">显示预览</el-button><el-button :type="detachedPreviewActive ? 'primary' : 'default'" :plain="!detachedPreviewActive" :icon="FullScreen" @click="openDetachedPreview">独立预览</el-button></el-button-group><el-button :icon="RefreshRight" @click="load">刷新</el-button><el-button type="danger" plain :icon="Delete" @click="discard">丢弃草稿</el-button></div>
+      <div class="header-buttons editor-header-actions"><el-button-group class="editor-preview-switch" aria-label="预览方式"><el-button :type="previewVisible ? 'primary' : 'default'" :plain="!previewVisible" :icon="View" @click="showEmbeddedPreview">显示预览</el-button><el-button :type="detachedPreviewActive ? 'primary' : 'default'" :plain="!detachedPreviewActive" :icon="FullScreen" @click="openDetachedPreview">独立预览</el-button></el-button-group><div class="editor-document-actions"><el-button :icon="RefreshRight" @click="load">刷新</el-button><el-button type="danger" plain :icon="Delete" @click="discard">丢弃草稿</el-button></div></div>
     </header>
 
     <div v-if="editor" class="editor-workbench">

@@ -1039,6 +1039,32 @@ class InterviewReaderApiTests {
                 .andExpect(status().isNoContent());
     }
     @Test
+    void revisionSummaryKeepsSourceVersionNumberWhenParentIsDeleted() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "revision-parent-" + UUID.randomUUID());
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+
+        var revision = objectMapper.readTree(mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/revisions", imported.documentId(), imported.versionId()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.versionNo").value(2))
+                .andExpect(jsonPath("$.parentVersionId").value(imported.versionId().toString()))
+                .andExpect(jsonPath("$.parentVersionNo").value(1))
+                .andReturn().getResponse().getContentAsString());
+        var revisionId = UUID.fromString(revision.get("id").asText());
+
+        mockMvc.perform(delete("/api/admin/versions/{versionId}/editor", imported.versionId()))
+                .andExpect(status().isNoContent());
+
+        var versions = objectMapper.readTree(mockMvc.perform(get("/api/admin/documents/{documentId}/versions", imported.documentId()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertThat(versions.size()).isEqualTo(1);
+        assertThat(versions.get(0).get("id").asText()).isEqualTo(revisionId.toString());
+        assertThat(versions.get(0).get("parentVersionId").isNull()).isTrue();
+        assertThat(versions.get(0).get("parentVersionNo").asInt()).isEqualTo(1);
+    }
+
+    @Test
     void editorUsesLightweightSnapshotAndDiscardReleasesImportJobReference() throws Exception {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "editor-snapshot-" + UUID.randomUUID());

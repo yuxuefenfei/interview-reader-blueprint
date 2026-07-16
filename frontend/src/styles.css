@@ -18,24 +18,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .brand-mark { width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #0f766e 0 50%, #315f9c 50%); }
 
 .admin-layout { --admin-sidebar-width: 236px; min-height: 100vh; display: grid; grid-template-columns: var(--admin-sidebar-width) minmax(0, 1fr); background: #f5f7fa; transition: grid-template-columns 200ms ease; }
-.admin-layout.sidebar-collapsed { --admin-sidebar-width: 80px; }
-.admin-sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 14px 0; overflow: hidden; border-right: 1px solid rgba(150, 177, 202, .10); background: #071c2f; color: #d9e5ef; box-shadow: 4px 0 18px rgba(20, 38, 56, .10); }
-.admin-brand { width: 100%; min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 8px 10px 22px; border: 0; background: transparent; color: #fff; font-size: 15px; font-weight: 750; text-align: left; white-space: nowrap; cursor: pointer; }
-.admin-brand .brand-mark { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 7px; }
-.admin-sidebar nav { display: grid; gap: 8px; }
+.admin-layout.sidebar-collapsed { --admin-sidebar-width: 72px; }
+.admin-sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 18px 10px 0; overflow: hidden; border-right: 1px solid rgba(150, 177, 202, .10); background: #071c2f; color: #d9e5ef; box-shadow: 4px 0 18px rgba(20, 38, 56, .10); }
+.admin-brand { width: 100%; min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 6px 10px 18px; border: 0; background: transparent; color: #fff; font-size: 15px; font-weight: 750; text-align: left; white-space: nowrap; cursor: pointer; }
+.admin-brand .brand-mark { width: 36px; height: 36px; flex: 0 0 auto; border-radius: 8px; }
+.admin-sidebar nav { display: grid; gap: 6px; }
 .admin-nav-label { padding: 0 12px 2px; color: #6f879c; font-size: 11px; font-weight: 700; letter-spacing: .10em; white-space: nowrap; }
-.admin-sidebar nav a, .admin-sidebar-foot button { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 13px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: #9fb2c3; font-weight: 400; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
-.admin-sidebar nav a .el-icon, .admin-sidebar-foot button .el-icon { flex: 0 0 auto; font-size: 21px; }
+.admin-sidebar nav a, .admin-sidebar-foot button { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 13px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: #9fb2c3; font-weight: 400; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.admin-sidebar nav a .el-icon, .admin-sidebar-foot button .el-icon { flex: 0 0 auto; font-size: 19px; }
 .admin-sidebar nav a:hover, .admin-sidebar-foot button:hover { background: #112f48; color: #fff; }
-.admin-sidebar nav a.router-link-active { background: #1677ff; color: #fff; box-shadow: 0 8px 20px rgba(0, 105, 255, .25); }
+.admin-sidebar nav a.router-link-active { background: #126fe8; color: #fff; box-shadow: 0 6px 16px rgba(0, 105, 255, .20); }
 .admin-sidebar nav a:active, .admin-sidebar-foot button:active { transform: scale(.98); }
-.admin-sidebar-foot { margin-top: auto; display: grid; gap: 6px; padding-bottom: 14px; }
-.admin-sidebar-toggle { width: calc(100% + 28px); min-height: 64px; display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 12px; margin: 0 -14px; padding: 0 22px; border: 0; border-top: 1px solid rgba(159, 178, 195, .08); background: #0c2942; color: #d9e5ef; font-weight: 400; white-space: nowrap; cursor: pointer; transition: background-color 160ms ease, color 160ms ease; }
+.admin-sidebar-foot { margin-top: auto; display: grid; gap: 4px; padding-bottom: 12px; }
+.admin-sidebar-toggle { width: calc(100% + 20px); min-height: 56px; display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 12px; margin: 0 -10px; padding: 0 20px; border: 0; border-top: 1px solid rgba(159, 178, 195, .08); background: #0c2942; color: #d9e5ef; font-weight: 400; white-space: nowrap; cursor: pointer; transition: background-color 160ms ease, color 160ms ease; }
 .admin-sidebar-toggle:hover { background: #123653; color: #fff; }
-.admin-sidebar-toggle .el-icon { flex: 0 0 auto; font-size: 20px; }
+.admin-sidebar-toggle .el-icon { flex: 0 0 auto; font-size: 18px; }
 .admin-layout.sidebar-collapsed .admin-brand { justify-content: center; padding-right: 0; padding-left: 0; }
 .admin-layout.sidebar-collapsed .admin-brand > span:last-child, .admin-layout.sidebar-collapsed .admin-nav-label, .admin-layout.sidebar-collapsed .admin-sidebar nav a > span, .admin-layout.sidebar-collapsed .admin-sidebar-foot button > span, .admin-layout.sidebar-collapsed .admin-sidebar-toggle > span { display: none; }
-.admin-layout.sidebar-collapsed .admin-sidebar nav a, .admin-layout.sidebar-collapsed .admin-sidebar-foot button { justify-content: center; padding-right: 0; padding-left: 0; }
+.admin-layout.sidebar-collapsed .admin-sidebar nav a, .admin-layout.sidebar-collapsed .admin-sidebar-foot button { width: 44px; min-height: 44px; justify-content: center; margin-right: auto; margin-left: auto; padding-right: 0; padding-left: 0; }
 .admin-main { min-width: 0; padding: 34px 42px 48px; }
 .admin-view { max-width: 1440px; margin: 0 auto; }
 .admin-view-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
@@ -198,6 +198,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .job-actions { display: flex; justify-content: flex-end; padding-top: 2px; }
 .editor-view { width: min(1500px, 100%); height: calc(100dvh - 82px); display: grid; grid-template-rows: auto minmax(0, 1fr); container-type: inline-size; }
 .editor-header { margin-bottom: 14px; }
+.editor-header-actions { align-items: center; flex-wrap: nowrap; gap: 12px; padding-top: 2px; }
+.editor-header-actions .el-button { height: 36px; margin-left: 0 !important; padding-right: 14px; padding-left: 14px; }
+.editor-header-actions .el-button .el-icon { font-size: 16px; }
+.editor-preview-switch { display: inline-flex; flex: 0 0 auto; }
+.editor-preview-switch .el-button { min-width: 108px; }
+.editor-document-actions { display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid #d9e2e9; }
+.editor-document-actions .el-button:first-child { min-width: 82px; }
+.editor-document-actions .el-button:last-child { min-width: 108px; }
 .editor-workbench { display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: 0; height: 100%; overflow: hidden; border: 1px solid #d9e2e9; background: #fff; }
 .editor-tree-panel { min-width: 0; min-height: 0; padding: 16px 10px; border-right: 1px solid #d9e2e9; background: #fbfcfd; overflow: auto; overscroll-behavior: contain; }
 .panel-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 10px; }
@@ -288,6 +296,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   .node-form { grid-template-columns: 1fr 1fr; }
 }
 @container (max-width: 850px) {
+  .editor-header { align-items: stretch; flex-direction: column; gap: 14px; }
+  .editor-header-actions { align-self: flex-start; }
   .editor-workbench { grid-template-columns: 200px minmax(0, 1fr); }
   .editor-tree-panel { padding: 14px 8px; }
   .editor-content-panel { padding: 16px; }

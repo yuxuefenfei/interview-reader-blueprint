@@ -20,7 +20,7 @@ public final class ManagementDtos {
     }
 
     public record VersionSummary(
-            UUID id, int versionNo, UUID parentVersionId, UUID originImportJobId,
+            UUID id, int versionNo, UUID parentVersionId, Integer parentVersionNo, UUID originImportJobId,
             String sourceType, String sourceFileName, String status, long draftRevision,
             OffsetDateTime publishedAt, OffsetDateTime createdAt
     ) {
