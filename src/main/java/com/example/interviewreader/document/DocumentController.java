@@ -1,19 +1,17 @@
 package com.example.interviewreader.document;
 
 import com.example.interviewreader.document.DocumentDtos.DocumentSummary;
-import org.springframework.http.HttpStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reader/documents")
+@RequiredArgsConstructor
 public class DocumentController {
     private final DocumentQueryService service;
 
-    public DocumentController(DocumentQueryService service) {
-        this.service = service;
-    }
 
     @GetMapping
     public DocumentDtos.DocumentPage list(

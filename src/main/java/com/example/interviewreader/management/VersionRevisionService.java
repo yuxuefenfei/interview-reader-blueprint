@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.update.UpdateWrapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ import static com.example.interviewreader.persistence.entity.table.DocumentVersi
 import static com.example.interviewreader.persistence.entity.table.ImportJobEntityTableDef.IMPORT_JOB_ENTITY;
 
 @Service
+@RequiredArgsConstructor
 public class VersionRevisionService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
 
@@ -44,30 +46,6 @@ public class VersionRevisionService {
     private final DocumentDeletionJobMapper deletionJobMapper;
     private final DocumentQueryService documentQueryService;
     private final ObjectMapper objectMapper;
-
-    public VersionRevisionService(
-            DocumentMapper documentMapper,
-            DocumentVersionMapper documentVersionMapper,
-            ContentNodeMapper contentNodeMapper,
-            ContentBlockMapper contentBlockMapper,
-            AssetMapper assetMapper,
-            ImportJobMapper importJobMapper,
-            DocumentPackageValidator validator,
-            DocumentDeletionJobMapper deletionJobMapper,
-            DocumentQueryService documentQueryService,
-            ObjectMapper objectMapper
-    ) {
-        this.documentMapper = documentMapper;
-        this.documentVersionMapper = documentVersionMapper;
-        this.contentNodeMapper = contentNodeMapper;
-        this.contentBlockMapper = contentBlockMapper;
-        this.assetMapper = assetMapper;
-        this.importJobMapper = importJobMapper;
-        this.validator = validator;
-        this.deletionJobMapper = deletionJobMapper;
-        this.documentQueryService = documentQueryService;
-        this.objectMapper = objectMapper;
-    }
 
     public ManagementDtos.AdminDocumentPage documents(Integer page, Integer size) {
         return documents(null, page, size);

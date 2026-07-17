@@ -6,17 +6,7 @@ import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.importpkg.ImportIssueDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
@@ -29,7 +19,14 @@ import org.apache.pdfbox.text.TextPosition;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+
 @Service
+@RequiredArgsConstructor
 public class PdfPackageService {
     private static final int MAX_PAGES = 300;
     private static final int MAX_PARAGRAPH_CHARS = 1_200;
@@ -42,10 +39,6 @@ public class PdfPackageService {
     private static final Pattern TABLE_GAP_PATTERN = Pattern.compile("\\S+\\s{2,}\\S+");
 
     private final ObjectMapper objectMapper;
-
-    public PdfPackageService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     public PdfParseResult parse(byte[] fileBytes, String sourceFileName, String sourceSha256, String converterVersion) {
         if (!looksLikePdf(fileBytes)) {

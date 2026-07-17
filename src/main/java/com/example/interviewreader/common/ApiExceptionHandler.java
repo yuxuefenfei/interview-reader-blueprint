@@ -1,6 +1,6 @@
 package com.example.interviewreader.common;
 
-import java.util.LinkedHashMap;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -11,14 +11,14 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import java.util.LinkedHashMap;
+
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class ApiExceptionHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
     private final ApiProblemFactory problemFactory;
 
-    public ApiExceptionHandler(ApiProblemFactory problemFactory) {
-        this.problemFactory = problemFactory;
-    }
 
     @ExceptionHandler(ApiException.class)
     ProblemDetail handleApiException(ApiException exception) {

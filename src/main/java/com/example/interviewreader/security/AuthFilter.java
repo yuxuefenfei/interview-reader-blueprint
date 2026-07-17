@@ -6,35 +6,26 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
+@RequiredArgsConstructor
 public class AuthFilter extends OncePerRequestFilter {
     private final AuthProperties properties;
     private final AuthSessionService sessionService;
     private final ObjectMapper objectMapper;
     private final ApiProblemFactory problemFactory;
-
-    public AuthFilter(
-            AuthProperties properties,
-            AuthSessionService sessionService,
-            ObjectMapper objectMapper,
-            ApiProblemFactory problemFactory) {
-        this.properties = properties;
-        this.sessionService = sessionService;
-        this.objectMapper = objectMapper;
-        this.problemFactory = problemFactory;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

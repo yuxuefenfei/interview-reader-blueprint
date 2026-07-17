@@ -2,31 +2,21 @@ package com.example.interviewreader.document;
 
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
-import com.example.interviewreader.document.DocumentDtos.BookmarkDto;
-import com.example.interviewreader.document.DocumentDtos.BookmarkRequest;
-import com.example.interviewreader.document.DocumentDtos.NoteDto;
-import com.example.interviewreader.document.DocumentDtos.NoteRequest;
-import com.example.interviewreader.document.DocumentDtos.ReviewQueueItem;
-import com.example.interviewreader.document.DocumentDtos.ReviewStateDto;
-import com.example.interviewreader.document.DocumentDtos.ReviewStateRequest;
+import com.example.interviewreader.document.DocumentDtos.*;
 import com.example.interviewreader.persistence.entity.BookmarkEntity;
 import com.example.interviewreader.persistence.entity.NoteEntity;
 import com.example.interviewreader.persistence.entity.ReviewStateEntity;
-import com.example.interviewreader.persistence.mapper.BookmarkMapper;
-import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
-import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
-import com.example.interviewreader.persistence.mapper.DocumentMapper;
-import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
-import com.example.interviewreader.persistence.mapper.NoteMapper;
-import com.example.interviewreader.persistence.mapper.ReviewStateMapper;
+import com.example.interviewreader.persistence.mapper.*;
 import com.mybatisflex.core.query.QueryWrapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import static com.example.interviewreader.persistence.entity.table.BookmarkEntityTableDef.BOOKMARK_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
@@ -37,6 +27,7 @@ import static com.example.interviewreader.persistence.entity.table.NoteEntityTab
 import static com.example.interviewreader.persistence.entity.table.ReviewStateEntityTableDef.REVIEW_STATE_ENTITY;
 
 @Service
+@RequiredArgsConstructor
 public class InteractionService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
 
@@ -47,24 +38,6 @@ public class InteractionService {
     private final DocumentVersionMapper documentVersionMapper;
     private final ContentNodeMapper contentNodeMapper;
     private final ContentBlockMapper contentBlockMapper;
-
-    public InteractionService(
-            BookmarkMapper bookmarkMapper,
-            NoteMapper noteMapper,
-            ReviewStateMapper reviewStateMapper,
-            DocumentMapper documentMapper,
-            DocumentVersionMapper documentVersionMapper,
-            ContentNodeMapper contentNodeMapper,
-            ContentBlockMapper contentBlockMapper
-    ) {
-        this.bookmarkMapper = bookmarkMapper;
-        this.noteMapper = noteMapper;
-        this.reviewStateMapper = reviewStateMapper;
-        this.documentMapper = documentMapper;
-        this.documentVersionMapper = documentVersionMapper;
-        this.contentNodeMapper = contentNodeMapper;
-        this.contentBlockMapper = contentBlockMapper;
-    }
 
     @Transactional
     public BookmarkDto createBookmark(BookmarkRequest request) {

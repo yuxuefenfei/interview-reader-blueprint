@@ -5,31 +5,21 @@ import com.example.interviewreader.importpkg.ImportIssueDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Stream;
-
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
+import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.stream.Stream;
+
 @Service
+@RequiredArgsConstructor
 public class ExcelPackageService {
     private static final String DOCUMENTS = "Documents";
     private static final String SECTIONS = "Sections";
@@ -51,10 +41,6 @@ public class ExcelPackageService {
             "version_key", "asset_key", "path", "mime_type", "sha256", "alt", "enabled");
 
     private final ObjectMapper objectMapper;
-
-    public ExcelPackageService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     public ParsedExcelPackage parse(byte[] workbookBytes) {
         var issues = new ArrayList<ImportIssueDto>();

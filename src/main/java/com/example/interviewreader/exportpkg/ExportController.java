@@ -2,9 +2,8 @@ package com.example.interviewreader.exportpkg;
 
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.excelpkg.ExcelPackageService;
-import com.example.interviewreader.importpkg.DocumentPackage;
 import jakarta.validation.Valid;
-import java.util.Locale;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -13,25 +12,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Locale;
+
 @RestController
 @RequestMapping("/api/admin/exports")
+@RequiredArgsConstructor
 public class ExportController {
     private final DocumentPackageExportService exportService;
     private final ExcelPackageService excelPackageService;
     private final MarkdownPackageService markdownPackageService;
     private final StaticHtmlPackageService staticHtmlPackageService;
 
-    public ExportController(
-            DocumentPackageExportService exportService,
-            ExcelPackageService excelPackageService,
-            MarkdownPackageService markdownPackageService,
-            StaticHtmlPackageService staticHtmlPackageService
-    ) {
-        this.exportService = exportService;
-        this.excelPackageService = excelPackageService;
-        this.markdownPackageService = markdownPackageService;
-        this.staticHtmlPackageService = staticHtmlPackageService;
-    }
 
     @PostMapping
     public ResponseEntity<?> export(@Valid @RequestBody ExportRequest request) {

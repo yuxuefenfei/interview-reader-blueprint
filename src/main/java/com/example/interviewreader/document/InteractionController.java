@@ -2,6 +2,7 @@ package com.example.interviewreader.document;
 
 import com.example.interviewreader.document.DocumentDtos.*;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,12 +11,10 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reader")
+@RequiredArgsConstructor
 public class InteractionController {
     private final InteractionService service;
 
-    public InteractionController(InteractionService service) {
-        this.service = service;
-    }
 
     @PostMapping("/bookmarks")
     @ResponseStatus(HttpStatus.CREATED)

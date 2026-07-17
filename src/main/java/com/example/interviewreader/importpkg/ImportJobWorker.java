@@ -1,17 +1,16 @@
 package com.example.interviewreader.importpkg;
 
 import jakarta.annotation.PreDestroy;
+import lombok.Getter;
+import org.springframework.stereotype.Component;
+
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ConcurrentHashMap;
-import org.springframework.stereotype.Component;
+import java.util.concurrent.*;
 
 @Component
 public class ImportJobWorker {
+    @Getter
     private final boolean enabled;
     private final Semaphore permits;
     private final ExecutorService executor;
@@ -22,10 +21,6 @@ public class ImportJobWorker {
         this.enabled = worker.enabled();
         this.permits = new Semaphore(worker.maxConcurrency());
         this.executor = Executors.newVirtualThreadPerTaskExecutor();
-    }
-
-    public boolean isEnabled() {
-        return enabled;
     }
 
     public void submit(UUID jobId, Runnable task) {

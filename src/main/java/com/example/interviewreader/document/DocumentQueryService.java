@@ -2,42 +2,23 @@ package com.example.interviewreader.document;
 
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
-import com.example.interviewreader.document.DocumentDtos.ContentBlock;
-import com.example.interviewreader.document.DocumentDtos.DocumentPage;
-import com.example.interviewreader.document.DocumentDtos.DocumentSummary;
-import com.example.interviewreader.document.DocumentDtos.NodeContent;
-import com.example.interviewreader.document.DocumentDtos.ReadingProgress;
-import com.example.interviewreader.document.DocumentDtos.SearchHit;
-import com.example.interviewreader.document.DocumentDtos.TocNode;
-import com.example.interviewreader.persistence.entity.ContentBlockEntity;
-import com.example.interviewreader.persistence.entity.ContentNodeEntity;
-import com.example.interviewreader.persistence.entity.DocumentEntity;
-import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
-import com.example.interviewreader.persistence.entity.ReadingProgressEntity;
-import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
-import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
-import com.example.interviewreader.persistence.mapper.DocumentMapper;
-import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
-import com.example.interviewreader.persistence.mapper.ReadingProgressMapper;
+import com.example.interviewreader.document.DocumentDtos.*;
+import com.example.interviewreader.persistence.entity.*;
+import com.example.interviewreader.persistence.mapper.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.update.UpdateWrapper;
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.util.*;
 
 import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentNodeEntityTableDef.CONTENT_NODE_ENTITY;
@@ -46,6 +27,7 @@ import static com.example.interviewreader.persistence.entity.table.DocumentVersi
 import static com.example.interviewreader.persistence.entity.table.ReadingProgressEntityTableDef.READING_PROGRESS_ENTITY;
 
 @Service
+@RequiredArgsConstructor
 public class DocumentQueryService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
 
@@ -55,22 +37,6 @@ public class DocumentQueryService {
     private final ContentBlockMapper contentBlockMapper;
     private final ReadingProgressMapper readingProgressMapper;
     private final ObjectMapper objectMapper;
-
-    public DocumentQueryService(
-            DocumentMapper documentMapper,
-            DocumentVersionMapper documentVersionMapper,
-            ContentNodeMapper contentNodeMapper,
-            ContentBlockMapper contentBlockMapper,
-            ReadingProgressMapper readingProgressMapper,
-            ObjectMapper objectMapper
-    ) {
-        this.documentMapper = documentMapper;
-        this.documentVersionMapper = documentVersionMapper;
-        this.contentNodeMapper = contentNodeMapper;
-        this.contentBlockMapper = contentBlockMapper;
-        this.readingProgressMapper = readingProgressMapper;
-        this.objectMapper = objectMapper;
-    }
 
     public DocumentPage listDocuments(String query, String cursor, Integer limit) {
         var normalizedQuery = query == null ? "" : query.trim();
@@ -145,12 +111,11 @@ public class DocumentQueryService {
         version.publishedAt = now;
         documentVersionMapper.update(version);
 
-        var document = targetDocument;
         {
-            document.status = "PUBLISHED";
-            document.currentVersionId = id(versionId);
-            document.updatedAt = now;
-            documentMapper.update(document);
+            targetDocument.status = "PUBLISHED";
+            targetDocument.currentVersionId = id(versionId);
+            targetDocument.updatedAt = now;
+            documentMapper.update(targetDocument);
         }
         migrateReadingProgress(documentId, previousVersionId, versionId);
     }

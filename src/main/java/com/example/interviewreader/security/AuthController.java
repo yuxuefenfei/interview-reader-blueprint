@@ -5,29 +5,19 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class AuthController {
     static final String SESSION_COOKIE = "IR_SESSION";
 
     private final AuthProperties properties;
     private final AuthSessionService sessionService;
 
-    public AuthController(AuthProperties properties, AuthSessionService sessionService) {
-        this.properties = properties;
-        this.sessionService = sessionService;
-    }
 
     @PostMapping("/login")
     ResponseEntity<AuthSessionResponse> login(@Valid @RequestBody LoginRequest request) {

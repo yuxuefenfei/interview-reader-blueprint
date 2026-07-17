@@ -6,24 +6,18 @@ import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.persistence.entity.AssetEntity;
 import com.example.interviewreader.persistence.entity.ContentBlockEntity;
 import com.example.interviewreader.persistence.entity.ContentNodeEntity;
-import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
-import com.example.interviewreader.persistence.mapper.AssetMapper;
-import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
-import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
-import com.example.interviewreader.persistence.mapper.DocumentMapper;
-import com.example.interviewreader.persistence.mapper.DocumentTagMapper;
-import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
-import com.example.interviewreader.persistence.mapper.TagMapper;
+import com.example.interviewreader.persistence.mapper.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
 
 import static com.example.interviewreader.persistence.entity.table.AssetEntityTableDef.ASSET_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
@@ -34,6 +28,7 @@ import static com.example.interviewreader.persistence.entity.table.DocumentVersi
 import static com.example.interviewreader.persistence.entity.table.TagEntityTableDef.TAG_ENTITY;
 
 @Service
+@RequiredArgsConstructor
 public class DocumentPackageExportService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
 
@@ -45,26 +40,6 @@ public class DocumentPackageExportService {
     private final DocumentTagMapper documentTagMapper;
     private final TagMapper tagMapper;
     private final ObjectMapper objectMapper;
-
-    public DocumentPackageExportService(
-            DocumentMapper documentMapper,
-            DocumentVersionMapper documentVersionMapper,
-            ContentNodeMapper contentNodeMapper,
-            ContentBlockMapper contentBlockMapper,
-            AssetMapper assetMapper,
-            DocumentTagMapper documentTagMapper,
-            TagMapper tagMapper,
-            ObjectMapper objectMapper
-    ) {
-        this.documentMapper = documentMapper;
-        this.documentVersionMapper = documentVersionMapper;
-        this.contentNodeMapper = contentNodeMapper;
-        this.contentBlockMapper = contentBlockMapper;
-        this.assetMapper = assetMapper;
-        this.documentTagMapper = documentTagMapper;
-        this.tagMapper = tagMapper;
-        this.objectMapper = objectMapper;
-    }
 
     public DocumentPackage exportJsonPackage(UUID documentId, UUID versionId) {
         var header = loadHeader(documentId, versionId);

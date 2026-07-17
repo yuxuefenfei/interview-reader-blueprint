@@ -9,17 +9,20 @@ import com.example.interviewreader.persistence.mapper.DocumentMapper;
 import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.update.UpdateWrapper;
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import static com.example.interviewreader.persistence.entity.table.DocumentEntityTableDef.DOCUMENT_ENTITY;
 
 @Service
+@RequiredArgsConstructor
 public class DocumentLifecycleService {
     private static final String OWNER_ID = AppConstants.LOCAL_USER_ID.toString();
 
@@ -27,14 +30,6 @@ public class DocumentLifecycleService {
     private final DocumentVersionMapper versionMapper;
     private final DocumentDeletionJobMapper deletionJobMapper;
     private final DocumentDeletionWorker deletionWorker;
-
-    public DocumentLifecycleService(DocumentMapper documentMapper, DocumentVersionMapper versionMapper,
-                                    DocumentDeletionJobMapper deletionJobMapper, DocumentDeletionWorker deletionWorker) {
-        this.documentMapper = documentMapper;
-        this.versionMapper = versionMapper;
-        this.deletionJobMapper = deletionJobMapper;
-        this.deletionWorker = deletionWorker;
-    }
 
     @Transactional
     public void takeDown(UUID documentId) {

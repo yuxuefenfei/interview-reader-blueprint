@@ -5,38 +5,28 @@ import com.example.interviewreader.importpkg.ImportJobWorker;
 import com.example.interviewreader.importpkg.SourceFileStorage;
 import com.example.interviewreader.persistence.entity.DocumentDeletionJobEntity;
 import com.example.interviewreader.persistence.mapper.DocumentDeletionJobMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class DocumentDeletionProcessor {
-    private static final Logger log = LoggerFactory.getLogger(DocumentDeletionProcessor.class);
-
     private final DocumentDeletionJobMapper jobMapper;
     private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final SourceFileStorage storage;
     private final ImportJobWorker importWorker;
     private final DocumentDeletionProperties properties;
-
-    public DocumentDeletionProcessor(DocumentDeletionJobMapper jobMapper, NamedParameterJdbcTemplate jdbc,
-                                     TransactionTemplate transactions, SourceFileStorage storage,
-                                     ImportJobWorker importWorker, DocumentDeletionProperties properties) {
-        this.jobMapper = jobMapper;
-        this.jdbc = jdbc;
-        this.transactions = transactions;
-        this.storage = storage;
-        this.importWorker = importWorker;
-        this.properties = properties;
-    }
 
     public void process(UUID jobId) {
         while (true) {

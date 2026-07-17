@@ -4,6 +4,7 @@ import com.example.interviewreader.common.Hashes;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -12,12 +13,9 @@ import java.util.*;
 import java.util.stream.Stream;
 
 @Service("markdownImportPackageService")
+@RequiredArgsConstructor
 public class MarkdownPackageService {
     private final ObjectMapper objectMapper;
-
-    public MarkdownPackageService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     public DocumentPackage parse(byte[] bytes, String sourceFileName, String sourceSha256, String converterVersion) {
         var markdown = new String(bytes, StandardCharsets.UTF_8).replace("\r\n", "\n").replace('\r', '\n');

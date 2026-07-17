@@ -2,21 +2,19 @@ package com.example.interviewreader.management;
 
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.persistence.mapper.DocumentDeletionJobMapper;
-import java.time.OffsetDateTime;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
+import java.util.List;
+
 @Service
+@RequiredArgsConstructor
 public class DeletedDocumentTombstoneService {
     private static final int MAX_TOMBSTONES_PER_SYNC = 1000;
     private final DocumentDeletionJobMapper jobMapper;
     private final DocumentDeletionProperties properties;
-
-    public DeletedDocumentTombstoneService(DocumentDeletionJobMapper jobMapper, DocumentDeletionProperties properties) {
-        this.jobMapper = jobMapper;
-        this.properties = properties;
-    }
 
     public List<ManagementDtos.DeletedDocumentTombstone> recent() {
         var cutoff = OffsetDateTime.now().minus(properties.tombstoneRetention());

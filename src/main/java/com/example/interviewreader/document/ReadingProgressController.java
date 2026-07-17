@@ -2,23 +2,18 @@ package com.example.interviewreader.document;
 
 import com.example.interviewreader.document.DocumentDtos.ReadingProgress;
 import jakarta.validation.Valid;
-import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reader/reading-progress")
+@RequiredArgsConstructor
 public class ReadingProgressController {
     private final DocumentQueryService service;
 
-    public ReadingProgressController(DocumentQueryService service) {
-        this.service = service;
-    }
 
     @GetMapping("/{documentId}")
     public ResponseEntity<ReadingProgress> get(@PathVariable UUID documentId) {
