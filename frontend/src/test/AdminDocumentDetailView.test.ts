@@ -71,7 +71,7 @@ const documentSummary: AdminDocumentSummary = {
   id: "document-1",
   code: "java-guide",
   title: "Java 高级开发面试题",
-  status: "ACTIVE",
+  status: "PUBLISHED",
   currentVersionId: "v2",
   versionCount: 4,
   draftCount: 2,

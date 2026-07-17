@@ -8,7 +8,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ConcurrentHashMap;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,12 +17,10 @@ public class ImportJobWorker {
     private final ExecutorService executor;
     private final Map<UUID, Future<?>> futures = new ConcurrentHashMap<>();
 
-    public ImportJobWorker(
-            @Value("${interview-reader.import-worker.enabled:true}") boolean enabled,
-            @Value("${interview-reader.import-worker.max-concurrency:2}") int maxConcurrency
-    ) {
-        this.enabled = enabled;
-        this.permits = new Semaphore(Math.max(1, maxConcurrency));
+    public ImportJobWorker(ImportProperties properties) {
+        var worker = properties.importWorker();
+        this.enabled = worker.enabled();
+        this.permits = new Semaphore(worker.maxConcurrency());
         this.executor = Executors.newVirtualThreadPerTaskExecutor();
     }
 

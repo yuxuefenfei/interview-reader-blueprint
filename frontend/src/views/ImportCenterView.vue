@@ -7,6 +7,7 @@ import { ElMessage } from "element-plus/es/components/message/index";
 import { adminApi } from "../api/admin";
 import { importIssueMessage, zh } from "../shared/presentation";
 import { importStageState, importStageSummary, processingStages } from "../utils/importProgress";
+import { TERMINAL_IMPORT_STATUSES } from "../types/api";
 import type { AdminDocumentSummary, ImportIssue, ImportJob } from "../types/api";
 
 const route = useRoute();
@@ -19,7 +20,7 @@ const job = ref<ImportJob | null>(null);
 const issues = ref<ImportIssue[]>([]);
 const uploading = ref(false);
 let pollTimer: number | null = null;
-const terminal = new Set(["READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED"]);
+
 const recognizedType = computed(() => selectedFile.value ? inferSourceType(selectedFile.value.name) : null);
 const jobStageSummary = computed(() => job.value ? importStageSummary(job.value.status, job.value.currentStage) : "");
 
@@ -53,7 +54,7 @@ async function refreshJob(): Promise<void> {
   if (!job.value) return;
   try {
     job.value = await adminApi.importJob(job.value.id);
-    if (terminal.has(job.value.status)) {
+    if (TERMINAL_IMPORT_STATUSES.has(job.value.status)) {
       stopPolling();
       issues.value = await adminApi.importIssues(job.value.id);
     }

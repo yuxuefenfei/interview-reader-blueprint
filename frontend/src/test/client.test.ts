@@ -1,6 +1,8 @@
+import { AxiosError } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { adminApi } from "../api/admin";
-import { http } from "../api/http";
+import { AppError, http, normalizeHttpError } from "../api/http";
+import type { ProblemDetail } from "../api/http";
 import { readerApi } from "../api/reader";
 
 describe("Axios API domains", () => {
@@ -36,5 +38,29 @@ describe("Axios API domains", () => {
     const get = vi.spyOn(http, "get").mockResolvedValue({ data: { version: {}, document: {}, nodes: [] } } as never);
     await adminApi.editor("version-1");
     expect(get).toHaveBeenCalledWith("/admin/versions/version-1/editor");
+  });
+  it("normalizes RFC Problem Details into an actionable AppError", () => {
+    const cause = {
+      message: "Request failed",
+      response: {
+        status: 409,
+        data: {
+          title: "Conflict",
+          detail: "草稿版本已过期",
+          code: "DRAFT_REVISION_CONFLICT",
+          traceId: "12345678-1234-1234-1234-123456789abc",
+          fieldErrors: { draftRevision: "must match current revision" }
+        }
+      }
+    } as unknown as AxiosError<ProblemDetail>;
+
+    const error = normalizeHttpError(cause);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.kind).toBe("conflict");
+    expect(error.code).toBe("DRAFT_REVISION_CONFLICT");
+    expect(error.message).toContain("追踪号：12345678");
+    expect(error.fieldErrors).toEqual({ draftRevision: "must match current revision" });
+    expect(error.retryable).toBe(false);
   });
 });

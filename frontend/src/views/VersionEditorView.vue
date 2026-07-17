@@ -7,6 +7,8 @@ import { ElMessageBox } from "element-plus/es/components/message-box/index";
 import { adminApi } from "../api/admin";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import { zh } from "../shared/presentation";
+import { ADMIN_DESKTOP_MEDIA_QUERY } from "../shared/responsive";
+import { BLOCK_TYPES, NODE_TYPES, SEMANTIC_ROLES } from "../types/api";
 import type { EditorBlock, EditorNode, EditorSnapshot, StructureNode } from "../types/api";
 import { editorTextPlaceholder, parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
 import { detachedPreviewChannelName, isDetachedPreviewMessage, type DetachedPreviewState } from "../utils/detachedPreviewChannel";
@@ -89,15 +91,9 @@ watch(nodePropertiesOpen, (open) => {
   resetNodeForm();
   publishDetachedPreview();
 });
-const blockTypes = ["paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote", "callout", "formula", "image", "divider", "table_snapshot"];
-const nodeTypes = [
-  { value: "PART", label: "篇章" }, { value: "CHAPTER", label: "章节" }, { value: "SECTION", label: "小节" },
-  { value: "SUBSECTION", label: "子节" }, { value: "QUESTION", label: "面试问题" }, { value: "APPENDIX", label: "附录" }, { value: "OTHER", label: "其他" }
-];
-const semanticRoles = [
-  { value: "QUESTION", label: "面试问题" }, { value: "ANSWER", label: "答案" }, { value: "EXPLANATION", label: "解析" },
-  { value: "CONCLUSION", label: "结论" }, { value: "INTRODUCTION", label: "导读" }, { value: "DIRECTORY", label: "目录" }
-];
+const blockTypes = BLOCK_TYPES;
+const nodeTypes = NODE_TYPES.map((value) => ({ value, label: zh(value) }));
+const semanticRoles = SEMANTIC_ROLES.map((value) => ({ value, label: zh(value) }));
 
 onMounted(() => {
   detachedPreviewChannel = new BroadcastChannel(detachedPreviewChannelName(versionId));
@@ -344,7 +340,7 @@ function startPreviewDrag(event: PointerEvent): void {
   const startY = event.clientY;
   const originX = previewOffset.x;
   const originY = previewOffset.y;
-  const desktopSidebarWidth = window.matchMedia("(min-width: 761px)").matches ? document.querySelector<HTMLElement>(".admin-sidebar")?.getBoundingClientRect().width ?? 0 : 0;
+  const desktopSidebarWidth = window.matchMedia(ADMIN_DESKTOP_MEDIA_QUERY).matches ? document.querySelector<HTMLElement>(".admin-sidebar")?.getBoundingClientRect().width ?? 0 : 0;
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
   const minOffsetX = originX + desktopSidebarWidth + 12 - panelRect.left;
   const maxOffsetX = originX + window.innerWidth - panelRect.width - 12 - panelRect.left;

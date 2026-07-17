@@ -3,6 +3,7 @@ package com.example.interviewreader.document;
 import com.example.interviewreader.document.DocumentDtos.ReadingProgress;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,8 +21,9 @@ public class ReadingProgressController {
     }
 
     @GetMapping("/{documentId}")
-    public ReadingProgress get(@PathVariable UUID documentId) {
-        return service.getProgress(documentId);
+    public ResponseEntity<ReadingProgress> get(@PathVariable UUID documentId) {
+        var progress = service.getProgress(documentId);
+        return progress == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(progress);
     }
 
     @PutMapping("/{documentId}")

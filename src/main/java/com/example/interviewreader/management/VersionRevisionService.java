@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.*;
 
+import static com.example.interviewreader.document.ApiContractValues.BLOCK_TYPES;
+import static com.example.interviewreader.document.ApiContractValues.NODE_TYPES;
 import static com.example.interviewreader.persistence.entity.table.AssetEntityTableDef.ASSET_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentNodeEntityTableDef.CONTENT_NODE_ENTITY;
@@ -31,11 +33,6 @@ import static com.example.interviewreader.persistence.entity.table.ImportJobEnti
 @Service
 public class VersionRevisionService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
-    private static final Set<String> EDITABLE_BLOCK_TYPES = Set.of(
-            "paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote",
-            "callout", "formula", "image", "divider", "table_snapshot");
-    private static final Set<String> EDITABLE_NODE_TYPES = Set.of(
-            "PART", "CHAPTER", "SECTION", "SUBSECTION", "QUESTION", "APPENDIX", "OTHER");
 
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
@@ -515,7 +512,7 @@ public class VersionRevisionService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "内容块类型不能为空。");
         }
         var blockType = value.trim().toLowerCase(Locale.ROOT);
-        if (!EDITABLE_BLOCK_TYPES.contains(blockType)) {
+        if (!BLOCK_TYPES.contains(blockType)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "BLOCK_TYPE_INVALID", "不支持的内容块类型：" + value);
         }
         return blockType;
@@ -525,7 +522,7 @@ public class VersionRevisionService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "节点类型不能为空。");
         }
         var nodeType = value.trim().toUpperCase(Locale.ROOT);
-        if (!EDITABLE_NODE_TYPES.contains(nodeType)) {
+        if (!NODE_TYPES.contains(nodeType)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "NODE_TYPE_INVALID", "不支持的节点类型：" + value);
         }
         return nodeType;

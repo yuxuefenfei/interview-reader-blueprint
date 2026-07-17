@@ -10,3 +10,10 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+interview-reader:
+  security:
+    enabled: true
+    username: ${INTERVIEW_READER_USERNAME:admin}
+    password: ${INTERVIEW_READER_PASSWORD:admin}
+    secure-cookie: false

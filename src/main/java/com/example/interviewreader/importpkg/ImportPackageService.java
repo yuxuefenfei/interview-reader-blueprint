@@ -42,7 +42,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -100,7 +99,7 @@ public class ImportPackageService {
             AssetMapper assetMapper,
             TagMapper tagMapper,
             DocumentTagMapper documentTagMapper,
-            @Value("${interview-reader.converter-version}") String converterVersion
+            ImportProperties properties
     ) {
         this.objectMapper = objectMapper;
         this.validator = validator;
@@ -119,7 +118,7 @@ public class ImportPackageService {
         this.assetMapper = assetMapper;
         this.tagMapper = tagMapper;
         this.documentTagMapper = documentTagMapper;
-        this.converterVersion = converterVersion;
+        this.converterVersion = properties.converterVersion();
     }
 
     @Transactional

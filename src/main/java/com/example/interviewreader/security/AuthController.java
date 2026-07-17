@@ -5,7 +5,6 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import java.util.Map;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,12 +33,7 @@ public class AuthController {
     ResponseEntity<AuthSessionResponse> login(@Valid @RequestBody LoginRequest request) {
         var token = sessionService.createSession(request.username(), request.password())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "用户名或密码错误"));
-        var cookie = ResponseCookie.from(SESSION_COOKIE, token)
-                .httpOnly(true)
-                .sameSite("Lax")
-                .path("/")
-                .maxAge(properties.sessionTtl())
-                .build();
+        var cookie = sessionCookie(token, properties.sessionTtl());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .cacheControl(CacheControl.noStore())
@@ -58,18 +52,23 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    ResponseEntity<Map<String, Boolean>> logout(HttpServletRequest request) {
+    ResponseEntity<AuthSessionResponse> logout(HttpServletRequest request) {
         sessionToken(request).ifPresent(sessionService::destroySession);
-        var cookie = ResponseCookie.from(SESSION_COOKIE, "")
-                .httpOnly(true)
-                .sameSite("Lax")
-                .path("/")
-                .maxAge(0)
-                .build();
+        var cookie = sessionCookie("", java.time.Duration.ZERO);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("authenticated", false));
+                .body(new AuthSessionResponse(false, null));
+    }
+
+    private ResponseCookie sessionCookie(String value, java.time.Duration maxAge) {
+        return ResponseCookie.from(SESSION_COOKIE, value)
+                .httpOnly(true)
+                .secure(properties.secureCookie())
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(maxAge)
+                .build();
     }
 
     static java.util.Optional<String> sessionToken(HttpServletRequest request) {

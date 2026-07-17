@@ -21,6 +21,7 @@
         <java.version>21</java.version>
         <mybatis-flex.version>1.10.9</mybatis-flex.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <skipFrontend>false</skipFrontend>
     </properties>
 
     <dependencies>
@@ -111,6 +112,28 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce-build-toolchain</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,22)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9,)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <annotationProcessorPaths>
@@ -136,8 +159,9 @@
                         <configuration>
                             <workingDirectory>${project.basedir}/frontend</workingDirectory>
                             <executable>npm</executable>
+                            <skip>${skipFrontend}</skip>
                             <arguments>
-                                <argument>install</argument>
+                                <argument>ci</argument>
                             </arguments>
                         </configuration>
                     </execution>
@@ -150,6 +174,7 @@
                         <configuration>
                             <workingDirectory>${project.basedir}/frontend</workingDirectory>
                             <executable>npm</executable>
+                            <skip>${skipFrontend}</skip>
                             <arguments>
                                 <argument>run</argument>
                                 <argument>build</argument>

@@ -1,8 +1,10 @@
+import { FRONTEND_DEV_PORT, LOCAL_DEV_HOSTS } from "../shared/runtimeConfig";
+
 export function registerServiceWorker(): void {
   if (!("serviceWorker" in navigator)) {
     return;
   }
-  const isViteDevServer = location.port === "5173" && ["localhost", "127.0.0.1"].includes(location.hostname);
+  const isViteDevServer = location.port === String(FRONTEND_DEV_PORT) && LOCAL_DEV_HOSTS.some((host) => host === location.hostname);
   if (isViteDevServer) {
     void navigator.serviceWorker.getRegistrations().then((registrations) => {
       return Promise.all(registrations.map((registration) => registration.unregister()));

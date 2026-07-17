@@ -1,9 +1,10 @@
 import type { ReadingProgress } from "../types/api";
+import { openOfflineDatabase, PROGRESS_STORE_NAME } from "./database";
 
-const DB_NAME = "interview-reader-offline";
-const DB_VERSION = 2;
-const STORE_NAME = "reading-progress-queue";
-const CONTENT_STORE_NAME = "node-content-cache";
+
+
+
+
 const FALLBACK_KEY = "reader.offlineProgressQueue";
 var memoryFallbackQueue: QueuedProgress[] = [];
 
@@ -27,7 +28,7 @@ export async function enqueueReadingProgress(documentId: string, progress: Readi
     writeFallbackQueue([...readFallbackQueue(), item]);
     return;
   }
-  const db = await openDb();
+  const db = await openOfflineDatabase();
   await transaction(db, "readwrite", (store) => store.add(item));
   db.close();
 }
@@ -36,7 +37,7 @@ export async function flushReadingProgressQueue(send: SendProgress): Promise<num
   if (!hasIndexedDb()) {
     return flushFallbackQueue(send);
   }
-  const db = await openDb();
+  const db = await openOfflineDatabase();
   try {
     const items = await listQueuedProgress(db);
     var sent = 0;
@@ -55,29 +56,11 @@ function hasIndexedDb(): boolean {
   return typeof indexedDB !== "undefined";
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(CONTENT_STORE_NAME)) {
-        const store = db.createObjectStore(CONTENT_STORE_NAME, { keyPath: "cacheKey" });
-        store.createIndex("updatedAt", "updatedAt");
-      }
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
-        store.createIndex("createdAt", "createdAt");
-      }
-    };
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-  });
-}
 
 function transaction<T>(db: IDBDatabase, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, mode);
-    const request = action(tx.objectStore(STORE_NAME));
+    const tx = db.transaction(PROGRESS_STORE_NAME, mode);
+    const request = action(tx.objectStore(PROGRESS_STORE_NAME));
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
     tx.onerror = () => reject(tx.error);

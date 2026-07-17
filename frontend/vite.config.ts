@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
+import { DEFAULT_API_PROXY_TARGET, FRONTEND_DEV_PORT } from "./src/shared/runtimeConfig";
 
 const vueUsePureAnnotationCompatibility = {
   name: "strip-invalid-vueuse-pure-annotations",
@@ -18,11 +19,12 @@ const vueUsePureAnnotationCompatibility = {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "VITE_");
-  const backendTarget = env.VITE_API_PROXY_TARGET || "http://127.0.0.1:28080";
+  const backendTarget = env.VITE_API_PROXY_TARGET || DEFAULT_API_PROXY_TARGET;
 
   return {
     plugins: [vueUsePureAnnotationCompatibility, vue()],
     server: {
+      port: FRONTEND_DEV_PORT,
       proxy: {
         "/api": { target: backendTarget, changeOrigin: true },
         "/actuator": { target: backendTarget, changeOrigin: true }

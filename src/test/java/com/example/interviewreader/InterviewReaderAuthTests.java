@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "interview-reader.security.enabled=true",
         "interview-reader.security.username=tester",
-        "interview-reader.security.password=secret"
+        "interview-reader.security.password=secret",
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -34,6 +34,9 @@ class InterviewReaderAuthTests {
         mockMvc.perform(get("/api/reader/documents"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store"))
+                .andExpect(result -> assertThat(result.getResponse().getContentType()).startsWith("application/problem+json"))
+                .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.error").value("请先登录"));
     }
 
@@ -111,7 +114,9 @@ class InterviewReaderAuthTests {
         mockMvc.perform(post("/api/auth/logout").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store"))
-                .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0"));
+                .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0"))
+                .andExpect(jsonPath("$.authenticated").value(false))
+                .andExpect(jsonPath("$.username").value(org.hamcrest.Matchers.nullValue()));
 
         mockMvc.perform(get("/api/reader/documents").cookie(new Cookie("IR_SESSION", session.getValue())))
                 .andExpect(status().isUnauthorized());

@@ -1,5 +1,6 @@
 package com.example.interviewreader.security;
 
+import com.example.interviewreader.common.ApiProblemFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -7,7 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
+
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -22,11 +23,17 @@ public class AuthFilter extends OncePerRequestFilter {
     private final AuthProperties properties;
     private final AuthSessionService sessionService;
     private final ObjectMapper objectMapper;
+    private final ApiProblemFactory problemFactory;
 
-    public AuthFilter(AuthProperties properties, AuthSessionService sessionService, ObjectMapper objectMapper) {
+    public AuthFilter(
+            AuthProperties properties,
+            AuthSessionService sessionService,
+            ObjectMapper objectMapper,
+            ApiProblemFactory problemFactory) {
         this.properties = properties;
         this.sessionService = sessionService;
         this.objectMapper = objectMapper;
+        this.problemFactory = problemFactory;
     }
 
     @Override
@@ -45,9 +52,9 @@ public class AuthFilter extends OncePerRequestFilter {
         }
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-        objectMapper.writeValue(response.getWriter(), Map.of("error", "请先登录"));
+        objectMapper.writeValue(response.getWriter(), problemFactory.create(HttpStatus.UNAUTHORIZED, "AUTH_REQUIRED", "请先登录"));
     }
 
     private boolean isPublicRequest(HttpServletRequest request) {

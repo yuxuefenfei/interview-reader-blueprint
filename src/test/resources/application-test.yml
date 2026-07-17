@@ -11,5 +11,6 @@ interview-reader:
   storage-dir: ./target/test-import-sources
   security:
     enabled: false
+    secure-cookie: false
   import-worker:
     enabled: false

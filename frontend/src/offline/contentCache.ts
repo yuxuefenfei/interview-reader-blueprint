@@ -1,9 +1,10 @@
 import type { NodeContent } from "../types/api";
+import { CONTENT_STORE_NAME, openOfflineDatabase } from "./database";
 
-const DB_NAME = "interview-reader-offline";
-const DB_VERSION = 2;
-const CONTENT_STORE_NAME = "node-content-cache";
-const PROGRESS_STORE_NAME = "reading-progress-queue";
+
+
+
+
 const FALLBACK_KEY = "reader.nodeContentCache";
 const MAX_CACHE_ITEMS = 30;
 var memoryFallbackCache: CachedNodeContent[] = [];
@@ -36,7 +37,7 @@ export async function cacheNodeContent(
       .slice(0, MAX_CACHE_ITEMS));
     return;
   }
-  const db = await openDb();
+  const db = await openOfflineDatabase();
   try {
     await transaction(db, CONTENT_STORE_NAME, "readwrite", (store) => store.put(item));
     await trimCache(db);
@@ -53,7 +54,7 @@ export async function getCachedNodeContent(
   if (!hasIndexedDb()) {
     return readFallbackCache().find((item) => item.cacheKey === cacheKey(versionId, nodeId, limit))?.content ?? null;
   }
-  const db = await openDb();
+  const db = await openOfflineDatabase();
   try {
     const item = await transaction(db, CONTENT_STORE_NAME, "readonly", (store) => store.get(cacheKey(versionId, nodeId, limit)));
     return (item as CachedNodeContent | undefined)?.content ?? null;
@@ -67,7 +68,7 @@ export async function clearNodeContentCache(): Promise<void> {
     writeFallbackCache([]);
     return;
   }
-  const db = await openDb();
+  const db = await openOfflineDatabase();
   try {
     await transaction(db, CONTENT_STORE_NAME, "readwrite", (store) => store.clear());
   } finally {
@@ -83,25 +84,6 @@ function hasIndexedDb(): boolean {
   return typeof indexedDB !== "undefined";
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => createStores(request.result);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-  });
-}
-
-function createStores(db: IDBDatabase): void {
-  if (!db.objectStoreNames.contains(CONTENT_STORE_NAME)) {
-    const store = db.createObjectStore(CONTENT_STORE_NAME, { keyPath: "cacheKey" });
-    store.createIndex("updatedAt", "updatedAt");
-  }
-  if (!db.objectStoreNames.contains(PROGRESS_STORE_NAME)) {
-    const store = db.createObjectStore(PROGRESS_STORE_NAME, { keyPath: "id" });
-    store.createIndex("createdAt", "createdAt");
-  }
-}
 
 function transaction<T>(
   db: IDBDatabase,

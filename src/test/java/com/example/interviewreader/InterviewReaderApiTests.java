@@ -58,6 +58,12 @@ class InterviewReaderApiTests {
     private JdbcTemplate jdbc;
 
     @Test
+    void missingReadingProgressReturnsNoContent() throws Exception {
+        mockMvc.perform(get("/api/reader/reading-progress/{documentId}", UUID.randomUUID()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void pdfBoxFontCacheDefaultsToBuildDirectory() {
         var fontCache = System.getProperty("pdfbox.fontcache");
 

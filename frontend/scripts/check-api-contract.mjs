@@ -1,0 +1,127 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
+
+const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const projectRoot = path.resolve(frontendRoot, "..");
+const openApiPath = path.join(projectRoot, "docs", "api", "openapi.yaml");
+const document = parse(fs.readFileSync(openApiPath, "utf8"));
+const failures = [];
+const httpMethods = new Set(["get", "post", "put", "patch", "delete"]);
+
+const specEndpoints = new Set();
+for (const [route, pathItem] of Object.entries(document.paths ?? {})) {
+  for (const method of Object.keys(pathItem)) {
+    if (!httpMethods.has(method)) continue;
+    specEndpoints.add(`${method.toUpperCase()} ${route}`);
+    const responses = pathItem[method].responses ?? {};
+    if (responses.default?.$ref !== "#/components/responses/Problem") {
+      failures.push(`${method.toUpperCase()} ${route} does not declare the shared Problem response`);
+    }
+  }
+}
+
+const javaEndpoints = new Set();
+const javaRoot = path.join(projectRoot, "src", "main", "java");
+for (const file of walk(javaRoot).filter((candidate) => candidate.endsWith("Controller.java"))) {
+  const source = fs.readFileSync(file, "utf8");
+  const classIndex = source.search(/\bclass\s+\w+/);
+  const classPrefixMatches = [...source.slice(0, classIndex).matchAll(/@RequestMapping\("([^"]+)"\)/g)];
+  const classPrefix = classPrefixMatches.at(-1)?.[1] ?? "";
+  const mappingPattern = /@(GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)(?:\("([^"]*)"\))?/g;
+  for (const match of source.slice(classIndex).matchAll(mappingPattern)) {
+    const method = match[1].replace("Mapping", "").toUpperCase();
+    const route = normalizeRoute(classPrefix + (match[2] ?? ""));
+    if (route.startsWith("/api/")) javaEndpoints.add(`${method} ${route.slice(4)}`);
+  }
+}
+compareSets("Java controllers", javaEndpoints, "OpenAPI", specEndpoints);
+
+if (document.components?.responses?.Json) failures.push("The generic Json response must not be reintroduced");
+if (!document.components?.schemas?.Problem) failures.push("Problem schema is missing");
+
+const tsSource = fs.readFileSync(path.join(frontendRoot, "src", "types", "api.ts"), "utf8");
+const javaContract = fs.readFileSync(path.join(javaRoot, "com", "example", "interviewreader", "document", "ApiContractValues.java"), "utf8");
+for (const [constantName, schemaName] of [
+  ["SOURCE_TYPES", "SourceType"], ["NODE_TYPES", "NodeType"], ["BLOCK_TYPES", "BlockType"],
+  ["SEMANTIC_ROLES", "SemanticRole"], ["VERSION_STATUSES", "VersionStatus"],
+  ["IMPORT_STATUSES", "ImportStatus"], ["IMPORT_STAGES", "ImportStage"]
+]) {
+  const schemaValues = new Set(document.components.schemas[schemaName]?.enum ?? []);
+  compareSets(`frontend ${constantName}`, new Set(readTsArray(tsSource, constantName)), `OpenAPI ${schemaName}`, schemaValues);
+  compareSets(`backend ${constantName}`, new Set(readJavaSet(javaContract, constantName)), `OpenAPI ${schemaName}`, schemaValues);
+}
+
+const interfaceSchemas = {
+  AuthSession: "AuthSession", DocumentSummary: "DocumentSummary", DocumentListResponse: "DocumentPage",
+  TocNode: "TocNode", ContentBlock: "ContentBlock", NodeContent: "NodeContent", SearchHit: "SearchHit",
+  ReadingProgress: "ReadingProgress", ImportJob: "ImportJob", ImportIssue: "ImportIssue",
+  StagedSection: "DocumentPackageSection", StagedBlock: "DocumentPackageBlock", DocumentInfo: "DocumentInfo",
+  VersionInfo: "VersionInfo", AssetInfo: "AssetInfo", DocumentPackage: "DocumentPackage",
+  VersionSummary: "VersionSummary", EditableVersion: "EditableVersion", AdminDocumentSummary: "AdminDocumentSummary",
+  AdminDocumentPage: "AdminDocumentPage", EditorDocument: "EditorDocument", EditorNode: "EditorNode",
+  EditorSnapshot: "EditorSnapshot", EditorBlock: "EditorBlock", NodeBlocksPage: "NodeBlocksPage",
+  StructureNode: "StructureNode", BlockMutationResult: "BlockMutationResult"
+};
+for (const [interfaceName, schemaName] of Object.entries(interfaceSchemas)) {
+  const fields = readTsInterface(tsSource, interfaceName);
+  const schema = document.components.schemas[schemaName];
+  if (!schema) {
+    failures.push(`OpenAPI schema ${schemaName} is missing`);
+    continue;
+  }
+  compareSets(`frontend ${interfaceName} fields`, new Set(fields.keys()), `OpenAPI ${schemaName} fields`, new Set(Object.keys(schema.properties ?? {})));
+  const required = new Set(schema.required ?? []);
+  const frontendRequired = new Set([...fields].filter(([, optional]) => !optional).map(([name]) => name));
+  compareSets(`frontend ${interfaceName} required fields`, frontendRequired, `OpenAPI ${schemaName} required fields`, required);
+}
+
+const responsiveSource = fs.readFileSync(path.join(frontendRoot, "src", "shared", "responsive.ts"), "utf8");
+const mobileWidth = Number(responsiveSource.match(/ADMIN_MOBILE_MAX_WIDTH = (\d+)/)?.[1]);
+const styles = fs.readFileSync(path.join(frontendRoot, "src", "styles.css"), "utf8");
+if (!styles.includes(`@media (max-width: ${mobileWidth}px)`)) failures.push("CSS mobile breakpoint differs from responsive.ts");
+if (!styles.includes(`(min-width: ${mobileWidth + 1}px)`)) failures.push("CSS desktop breakpoint differs from responsive.ts");
+
+const applicationYaml = fs.readFileSync(path.join(projectRoot, "src", "main", "resources", "application.yml"), "utf8");
+const nginx = fs.readFileSync(path.join(projectRoot, "deploy", "nginx", "interview-reader.conf.example"), "utf8");
+if (!applicationYaml.includes("max-size: 10MB") || !nginx.includes("client_max_body_size 10m;")) {
+  failures.push("Spring and Nginx upload limits must both remain 10 MiB");
+}
+
+if (failures.length) {
+  console.error(failures.map((failure) => `- ${failure}`).join("\n"));
+  process.exit(1);
+}
+console.log(`Contract check passed: ${specEndpoints.size} endpoints, concrete schemas, aligned enums and operational limits.`);
+
+function walk(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const candidate = path.join(directory, entry.name);
+    return entry.isDirectory() ? walk(candidate) : [candidate];
+  });
+}
+function normalizeRoute(route) {
+  const normalized = route.replace(/\/+/g, "/");
+  return normalized.length > 1 && normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+}
+function compareSets(leftName, left, rightName, right) {
+  const missing = [...right].filter((value) => !left.has(value));
+  const extra = [...left].filter((value) => !right.has(value));
+  if (missing.length || extra.length) failures.push(`${leftName} differs from ${rightName}; missing=[${missing}], extra=[${extra}]`);
+}
+function readTsArray(source, name) {
+  const body = source.match(new RegExp(`export const ${name} = \\[([^\\]]+)\\] as const`))?.[1];
+  if (!body) throw new Error(`Cannot read TypeScript constant ${name}`);
+  return [...body.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+}
+function readJavaSet(source, name) {
+  const body = source.match(new RegExp(`${name} = Set\\.of\\(([\\s\\S]*?)\\);`))?.[1];
+  if (!body) throw new Error(`Cannot read Java constant ${name}`);
+  return [...body.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+}
+function readTsInterface(source, name) {
+  const body = source.match(new RegExp(`export interface ${name} \\{([^}]*)\\}`))?.[1];
+  if (!body) throw new Error(`Cannot read TypeScript interface ${name}`);
+  return new Map([...body.matchAll(/(?:^|;)\s*([A-Za-z][A-Za-z0-9]*)(\?)?:/g)].map((match) => [match[1], Boolean(match[2])]));
+}

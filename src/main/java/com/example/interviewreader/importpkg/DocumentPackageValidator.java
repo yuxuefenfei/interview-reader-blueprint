@@ -6,18 +6,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
+
+import static com.example.interviewreader.document.ApiContractValues.BLOCK_TYPES;
+import static com.example.interviewreader.document.ApiContractValues.NODE_TYPES;
+import static com.example.interviewreader.document.ApiContractValues.SOURCE_TYPES;
 
 @Component
 public class DocumentPackageValidator {
     private static final Pattern SHA256 = Pattern.compile("^[0-9a-fA-F]{64}$");
-    private static final Set<String> SOURCE_TYPES = Set.of("PDF", "EXCEL", "JSON_PACKAGE", "MARKDOWN", "MANUAL");
-    private static final Set<String> NODE_TYPES = Set.of("PART", "CHAPTER", "SECTION", "SUBSECTION", "QUESTION", "APPENDIX", "OTHER");
-    private static final Set<String> BLOCK_TYPES = Set.of(
-            "paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table",
-            "quote", "callout", "formula", "image", "divider", "table_snapshot");
 
     public List<ImportIssueDto> validate(DocumentPackage documentPackage) {
         var issues = new ArrayList<ImportIssueDto>();

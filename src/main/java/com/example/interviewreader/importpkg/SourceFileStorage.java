@@ -4,7 +4,6 @@ import com.example.interviewreader.common.ApiException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -12,8 +11,8 @@ import org.springframework.stereotype.Service;
 public class SourceFileStorage {
     private final Path root;
 
-    public SourceFileStorage(@Value("${interview-reader.storage-dir:./data/import-sources}") String storageDir) {
-        this.root = Path.of(storageDir).toAbsolutePath().normalize();
+    public SourceFileStorage(ImportProperties properties) {
+        this.root = properties.storageDir().toAbsolutePath().normalize();
     }
 
     public String save(byte[] bytes, String sha256, String fileName) {

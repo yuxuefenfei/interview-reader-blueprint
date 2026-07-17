@@ -7,3 +7,4 @@ frontend/dist/
 *.original
 /.idea/
 /.playwright-mcp/*
+frontend/.env.local
