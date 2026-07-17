@@ -1,0 +1,500 @@
+openapi: 3.1.0
+info:
+  title: Interview Reader API
+  version: 0.2.0
+  description: Reader APIs are read-only study endpoints; desktop administration uses the isolated /admin namespace.
+servers:
+  - url: /api
+security:
+  - cookieAuth: []
+paths:
+  /health:
+    get:
+      summary: Get application health
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /auth/login:
+    post:
+      summary: Create a cookie-backed session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/AuthSession" }
+        "401": { description: Invalid credentials }
+  /auth/session:
+    get:
+      summary: Get the current session
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/AuthSession" }
+  /auth/logout:
+    post:
+      summary: Destroy the current session
+      responses:
+        "200": { $ref: "#/components/responses/AuthSession" }
+  /reader/documents:
+    get:
+      summary: List published documents for reading
+      parameters:
+        - { name: query, in: query, schema: { type: string } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 16 } }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /reader/documents/{documentId}:
+    get:
+      summary: Get published document metadata
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "404": { description: Published document not found }
+  /reader/versions/{versionId}/toc:
+    get:
+      summary: Get the published table of contents
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /reader/versions/{versionId}/nodes/{nodeId}/content:
+    get:
+      summary: Get a reading node and its content blocks
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - $ref: "#/components/parameters/NodeId"
+        - { name: afterSeq, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /reader/search:
+    get:
+      summary: Search published content
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
+        - { name: documentId, in: query, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /reader/reading-progress/{documentId}:
+    get:
+      summary: Get the latest reading position
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+    put:
+      summary: Save reading position
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReadingProgress" }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /reader/bookmarks:
+    post:
+      summary: Create or update a bookmark
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201": { $ref: "#/components/responses/Json" }
+  /reader/bookmarks/{bookmarkId}:
+    delete:
+      summary: Delete a bookmark
+      parameters:
+        - { name: bookmarkId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Deleted }
+  /reader/notes:
+    post:
+      summary: Create a note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201": { $ref: "#/components/responses/Json" }
+  /reader/review-states/{nodeId}:
+    put:
+      summary: Update review state
+      parameters:
+        - $ref: "#/components/parameters/NodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /reader/review-queue:
+    get:
+      summary: Get due or random review items
+      parameters:
+        - { name: documentId, in: query, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 5 } }
+        - { name: dueOnly, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/documents:
+    get:
+      summary: List documents and draft counts for desktop management
+      parameters:
+        - { name: query, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/documents/{documentId}:
+    get:
+      summary: Get one document with version and draft counts
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "404": { description: Document not found }
+  /admin/documents/{documentId}/versions:
+    get:
+      summary: List published, retired, and draft versions
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/documents/{documentId}/versions/{sourceVersionId}/revisions:
+    post:
+      summary: Create an editable draft from a selected version
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+        - { name: sourceVersionId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "201": { $ref: "#/components/responses/Json" }
+  /admin/versions/{versionId}/editor:
+    get:
+      summary: Load draft metadata and the node tree without block bodies
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+    put:
+      summary: Save a draft document package with draftRevision optimistic concurrency
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveDraftRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "409": { description: Draft revision conflict }
+    delete:
+      summary: Delete an unpublished draft
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+      responses:
+        "204": { description: Deleted }
+  /admin/versions/{versionId}/editor/nodes/{nodeId}/blocks:
+    get:
+      summary: Load one page of blocks for a draft node
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - $ref: "#/components/parameters/NodeId"
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 40 } }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+    post:
+      summary: Append a block to a draft node
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - $ref: "#/components/parameters/NodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlockWriteRequest" }
+      responses:
+        "201": { $ref: "#/components/responses/Json" }
+        "409": { description: Draft revision conflict }
+  /admin/versions/{versionId}/editor/nodes/{nodeId}:
+    patch:
+      summary: Update draft node properties
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - $ref: "#/components/parameters/NodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateNodeRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "409": { description: Draft revision conflict }
+  /admin/versions/{versionId}/editor/structure:
+    patch:
+      summary: Replace parent and sibling order for all draft nodes
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StructureUpdateRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "409": { description: Draft revision conflict }
+  /admin/versions/{versionId}/editor/blocks/{blockId}:
+    patch:
+      summary: Update one draft block
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - { name: blockId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlockWriteRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "409": { description: Draft revision conflict }
+    delete:
+      summary: Delete one draft block
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - { name: blockId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: draftRevision, in: query, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "409": { description: Draft revision conflict }
+  /admin/versions/{versionId}/editor/blocks/cleanup-empty:
+    post:
+      summary: Delete empty blocks and resequence affected nodes
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlockCleanupRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+        "409": { description: Draft revision conflict }
+  /admin/documents/{documentId}/versions/{versionId}/publish:
+    post:
+      summary: Publish a draft and retire the previous published version
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+        - $ref: "#/components/parameters/VersionId"
+      responses:
+        "204": { description: Published }
+        "409": { description: Version is not a draft }
+  /admin/import-jobs:
+    post:
+      summary: Create an import job for a new document or target an existing document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF, XLSX, Markdown, or JSON package; the server detects the source type.
+                targetDocumentId: { type: string, format: uuid }
+      responses:
+        "202": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}:
+    get:
+      summary: Get import progress and terminal status
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}/issues:
+    get:
+      summary: List import validation issues
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}/raw-extraction:
+    get:
+      summary: Get converter extraction data for diagnostics
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}/source-file:
+    get:
+      summary: Get original uploaded source file
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { description: Source file }
+  /admin/import-jobs/{jobId}/normalized-package:
+    get:
+      summary: Get the staged document package
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}/normalized-package/sections/{sectionKey}:
+    patch:
+      summary: Revise a staged section before commit
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - { name: sectionKey, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}/normalized-package/blocks/{blockKey}:
+    patch:
+      summary: Revise a staged content block before commit
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - { name: blockKey, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}/commit:
+    post:
+      summary: Commit a validated package as a draft version
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "201": { $ref: "#/components/responses/Json" }
+  /admin/import-jobs/{jobId}/cancel:
+    post:
+      summary: Cancel an active import job
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { $ref: "#/components/responses/Json" }
+  /admin/exports:
+    post:
+      summary: Export a selected document version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [documentId, versionId, format]
+              properties:
+                documentId: { type: string, format: uuid }
+                versionId: { type: string, format: uuid }
+                format: { type: string, enum: [JSON_PACKAGE, EXCEL, MARKDOWN, STATIC_HTML] }
+      responses:
+        "200": { description: Export content }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: IR_SESSION
+  parameters:
+    DocumentId: { name: documentId, in: path, required: true, schema: { type: string, format: uuid } }
+    VersionId: { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+    NodeId: { name: nodeId, in: path, required: true, schema: { type: string, format: uuid } }
+    JobId: { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Json:
+      description: JSON response
+      content:
+        application/json:
+          schema: { type: object, additionalProperties: true }
+    AuthSession:
+      description: Authentication state
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AuthSession" }
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+    AuthSession:
+      type: object
+      required: [authenticated]
+      properties:
+        authenticated: { type: boolean }
+        username: { type: [string, "null"] }
+    ReadingProgress:
+      type: object
+      required: [versionId, progressRatio]
+      properties:
+        versionId: { type: string, format: uuid }
+        sectionId: { type: [string, "null"], format: uuid }
+        blockId: { type: [string, "null"], format: uuid }
+        charOffset: { type: integer, minimum: 0 }
+        blockViewportOffset: { type: integer, minimum: 0 }
+        progressRatio: { type: number, minimum: 0, maximum: 1 }
+        clientUpdatedAt: { type: [string, "null"], format: date-time }
+        deviceId: { type: [string, "null"], maxLength: 200 }
+        revision: { type: integer, minimum: 0 }
+    UpdateNodeRequest:
+      type: object
+      required: [draftRevision, title, nodeType]
+      properties:
+        draftRevision: { type: integer, minimum: 0 }
+        title: { type: string, minLength: 1 }
+        nodeType: { type: string, minLength: 1 }
+        semanticRole: { type: [string, "null"] }
+        anchor: { type: [string, "null"] }
+    StructureUpdateRequest:
+      type: object
+      required: [draftRevision, nodes]
+      properties:
+        draftRevision: { type: integer, minimum: 0 }
+        nodes:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, sortOrder]
+            properties:
+              id: { type: string, format: uuid }
+              parentId: { type: [string, "null"], format: uuid }
+              sortOrder: { type: integer }
+    BlockWriteRequest:
+      type: object
+      required: [draftRevision, blockType]
+      properties:
+        draftRevision: { type: integer, minimum: 0 }
+        blockType: { type: string, minLength: 1 }
+        payload: { type: [object, "null"], additionalProperties: true }
+        plainText: { type: [string, "null"] }
+        language: { type: [string, "null"] }
+    BlockCleanupRequest:
+      type: object
+      required: [draftRevision]
+      properties:
+        draftRevision: { type: integer, minimum: 0 }
+    SaveDraftRequest:
+      type: object
+      required: [draftRevision, documentPackage]
+      properties:
+        draftRevision: { type: integer, minimum: 0 }
+        documentPackage: { type: object, additionalProperties: true }

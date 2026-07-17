@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { ADMIN_MOBILE_MEDIA_QUERY } from "../shared/responsive";
 
 const ReaderView = () => import("../views/ReaderView.vue");
 const AdminLayout = () => import("../layouts/AdminLayout.vue");
@@ -26,9 +27,16 @@ const router = createRouter({
   ]
 });
 
+const adminViewport = window.matchMedia(ADMIN_MOBILE_MEDIA_QUERY);
+const isAdminPath = (path: string): boolean => path === "/admin" || path.startsWith("/admin/");
+
 router.beforeEach((to) => {
-  if (to.path.startsWith("/admin") && window.matchMedia("(max-width: 760px)").matches) return "/reader";
+  if (isAdminPath(to.path) && adminViewport.matches) return "/reader";
   return true;
+});
+
+adminViewport.addEventListener("change", (event) => {
+  if (event.matches && isAdminPath(router.currentRoute.value.path)) void router.replace("/reader");
 });
 
 export default router;

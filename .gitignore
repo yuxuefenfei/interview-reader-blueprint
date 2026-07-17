@@ -6,12 +6,4 @@ frontend/dist/
 *.pid
 *.original
 /.idea/
-/docs/
-/.playwright-mcp/page-2026-07-14T01-38-04-782Z.yml
-/.playwright-mcp/page-2026-07-14T01-38-38-840Z.yml
-/.playwright-mcp/page-2026-07-14T01-38-54-377Z.yml
-/.playwright-mcp/page-2026-07-14T01-39-05-851Z.yml
-/.playwright-mcp/page-2026-07-14T01-46-29-434Z.yml
-/.playwright-mcp/page-2026-07-14T01-46-52-147Z.yml
-/.playwright-mcp/page-2026-07-14T01-47-07-181Z.yml
-/.playwright-mcp/page-2026-07-14T01-47-18-383Z.yml
+/.playwright-mcp/*

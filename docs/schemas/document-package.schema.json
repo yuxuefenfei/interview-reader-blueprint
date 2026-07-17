@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/interview-reader-document-package-1.0.json",
+  "title": "Interview Reader Document Package",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "document",
+    "version",
+    "sections",
+    "blocks",
+    "assets"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "document": {
+      "type": "object",
+      "required": [
+        "documentKey",
+        "title"
+      ],
+      "properties": {
+        "documentKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "default": "zh-CN"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "version": {
+      "type": "object",
+      "required": [
+        "versionKey",
+        "sourceType"
+      ],
+      "properties": {
+        "versionKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceType": {
+          "enum": [
+            "PDF",
+            "EXCEL",
+            "JSON_PACKAGE",
+            "MARKDOWN",
+            "MANUAL"
+          ]
+        },
+        "sourceFileName": {
+          "type": "string"
+        },
+        "sourceSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "converterVersion": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "sectionKey",
+          "level",
+          "nodeType",
+          "title",
+          "sortOrder"
+        ],
+        "properties": {
+          "sectionKey": {
+            "type": "string"
+          },
+          "parentSectionKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32
+          },
+          "nodeType": {
+            "enum": [
+              "PART",
+              "CHAPTER",
+              "SECTION",
+              "SUBSECTION",
+              "QUESTION",
+              "APPENDIX",
+              "OTHER"
+            ]
+          },
+          "semanticRole": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "anchor": {
+            "type": "string"
+          },
+          "sourcePageStart": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourcePageEnd": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceBbox": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "contentHash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "blockKey",
+          "sectionKey",
+          "seq",
+          "blockType",
+          "payload"
+        ],
+        "properties": {
+          "blockKey": {
+            "type": "string"
+          },
+          "sectionKey": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "blockType": {
+            "enum": [
+              "paragraph",
+              "heading_note",
+              "unordered_list",
+              "ordered_list",
+              "code",
+              "table",
+              "quote",
+              "callout",
+              "formula",
+              "image",
+              "divider",
+              "table_snapshot"
+            ]
+          },
+          "payload": {
+            "type": "object"
+          },
+          "plainText": {
+            "type": "string"
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourcePage": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceBbox": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "contentHash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "assetKey",
+          "path",
+          "mimeType",
+          "sha256"
+        ],
+        "properties": {
+          "assetKey": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
