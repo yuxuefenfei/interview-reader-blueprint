@@ -15,6 +15,19 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "PURGE_DOCUMENT" || typeof event.data.documentId !== "string") return;
+  const documentId = event.data.documentId;
+  event.waitUntil(caches.keys().then(async (names) => {
+    for (const name of names) {
+      const cache = await caches.open(name);
+      const requests = await cache.keys();
+      await Promise.all(requests
+        .filter((request) => request.url.includes(documentId))
+        .map((request) => cache.delete(request)));
+    }
+  }));
+});
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);

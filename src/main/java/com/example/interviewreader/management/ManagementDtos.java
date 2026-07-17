@@ -15,10 +15,22 @@ public final class ManagementDtos {
 
     public record AdminDocumentSummary(
             UUID id, String code, String title, String status, UUID currentVersionId,
-            long versionCount, long draftCount, OffsetDateTime updatedAt
+            long versionCount, long draftCount, OffsetDateTime updatedAt, DeletionJobSummary deletionJob
     ) {
     }
 
+    public record DeleteDocumentRequest(String confirmationTitle) {
+    }
+
+    public record DeletionJobSummary(
+            UUID id, UUID documentId, String status, String currentStage, int attemptCount,
+            String errorCode, String errorMessage, OffsetDateTime requestedAt,
+            OffsetDateTime startedAt, OffsetDateTime completedAt, OffsetDateTime updatedAt
+    ) {
+    }
+
+    public record DeletedDocumentTombstone(UUID documentId, OffsetDateTime deletedAt) {
+    }
     public record VersionSummary(
             UUID id, int versionNo, UUID parentVersionId, Integer parentVersionNo, UUID originImportJobId,
             String sourceType, String sourceFileName, String status, long draftRevision,

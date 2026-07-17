@@ -51,7 +51,7 @@ function message(value: unknown): string { return value instanceof Error ? value
         <el-table-column prop="title" label="文档" min-width="300">
           <template #default="{ row }"><div class="document-cell"><strong>{{ row.title }}</strong><span>{{ row.code }}</span></div></template>
         </el-table-column>
-        <el-table-column label="当前状态" width="128"><template #default="{ row }"><el-tag :type="row.status === 'PUBLISHED' ? 'success' : 'info'">{{ zh(row.status) }}</el-tag></template></el-table-column>
+        <el-table-column label="当前状态" width="160"><template #default="{ row }"><el-tag :type="row.status === 'PUBLISHED' ? 'success' : row.status === 'DELETE_FAILED' ? 'danger' : 'info'">{{ zh(row.status) }}</el-tag><small v-if="row.deletionJob" class="deletion-stage-label">{{ zh(row.deletionJob.currentStage) }}</small></template></el-table-column>
         <el-table-column label="版本" width="88"><template #default="{ row }">{{ row.versionCount }}</template></el-table-column>
         <el-table-column label="草稿" width="88"><template #default="{ row }"><el-tag v-if="row.draftCount" type="warning" effect="plain">{{ row.draftCount }}</el-tag><span v-else>-</span></template></el-table-column>
         <el-table-column label="最近更新" width="190"><template #default="{ row }">{{ formatTime(row.updatedAt) }}</template></el-table-column>

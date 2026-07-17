@@ -117,6 +117,11 @@ public class DocumentQueryService {
 
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
+        var targetDocument = documentMapper.selectOneById(id(documentId));
+        if (targetDocument == null) throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
+        if ("DELETING".equals(targetDocument.status) || "DELETE_FAILED".equals(targetDocument.status)) {
+            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
+        }
         var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
@@ -140,8 +145,8 @@ public class DocumentQueryService {
         version.publishedAt = now;
         documentVersionMapper.update(version);
 
-        var document = documentMapper.selectOneById(id(documentId));
-        if (document != null) {
+        var document = targetDocument;
+        {
             document.status = "PUBLISHED";
             document.currentVersionId = id(versionId);
             document.updatedAt = now;

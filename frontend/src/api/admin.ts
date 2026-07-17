@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { AdminDocumentPage, AdminDocumentSummary, BlockMutationResult, EditableVersion, EditorBlock, EditorSnapshot, ImportIssue, ImportJob, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
+import type { AdminDocumentPage, AdminDocumentSummary, BlockMutationResult, DeletionJob, EditableVersion, EditorBlock, EditorSnapshot, ImportIssue, ImportJob, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
 
 export const adminApi = {
   documents: (query = "", page = 1, size = 20) => http.get<AdminDocumentPage>("/admin/documents", { params: { query: query || undefined, page, size } }).then(({ data }) => data),
@@ -7,6 +7,11 @@ export const adminApi = {
   versions: (documentId: string) => http.get<VersionSummary[]>(`/admin/documents/${documentId}/versions`).then(({ data }) => data),
   createRevision: (documentId: string, sourceVersionId: string) => http.post<VersionSummary>(`/admin/documents/${documentId}/versions/${sourceVersionId}/revisions`).then(({ data }) => data),
   publish: (documentId: string, versionId: string) => http.post(`/admin/documents/${documentId}/versions/${versionId}/publish`),
+  takeDown: (documentId: string) => http.post(`/admin/documents/${documentId}/take-down`),
+  restore: (documentId: string) => http.post(`/admin/documents/${documentId}/restore`),
+  deleteDocument: (documentId: string, confirmationTitle: string) => http.post<DeletionJob>(`/admin/documents/${documentId}/deletion`, { confirmationTitle }).then(({ data }) => data),
+  deletionJob: (jobId: string) => http.get<DeletionJob>(`/admin/document-deletions/${jobId}`).then(({ data }) => data),
+  retryDeletion: (jobId: string) => http.post<DeletionJob>(`/admin/document-deletions/${jobId}/retry`).then(({ data }) => data),
   deleteDraft: (versionId: string) => http.delete(`/admin/versions/${versionId}/editor`),
   editor: (versionId: string) => http.get<EditorSnapshot>(`/admin/versions/${versionId}/editor`).then(({ data }) => data),
   nodeBlocks: (versionId: string, nodeId: string, cursor?: string) => http.get<NodeBlocksPage>(`/admin/versions/${versionId}/editor/nodes/${nodeId}/blocks`, { params: { cursor, limit: 40 } }).then(({ data }) => data),

@@ -1,10 +1,11 @@
 import { http } from "./http";
-import type { AuthSession, DocumentListResponse, DocumentSummary, NodeContent, ReadingProgress, SearchHit, TocNode } from "../types/api";
+import type { AuthSession, DeletedDocumentTombstone, DocumentListResponse, DocumentSummary, NodeContent, ReadingProgress, SearchHit, TocNode } from "../types/api";
 
 export const readerApi = {
   session: () => http.get<AuthSession>("/auth/session").then(({ data }) => data),
   login: (username: string, password: string) => http.post<AuthSession>("/auth/login", { username, password }).then(({ data }) => data),
   logout: () => http.post<AuthSession>("/auth/logout").then(({ data }) => data),
+  deletedDocuments: () => http.get<DeletedDocumentTombstone[]>("/reader/document-deletions").then(({ data }) => data),
   documents: (query = "", cursor: string | null = null, limit = 16) => http.get<DocumentListResponse>("/reader/documents", { params: { query: query || undefined, cursor: cursor || undefined, limit } }).then(({ data }) => data),
   document: (documentId: string) => http.get<DocumentSummary>(`/reader/documents/${documentId}`).then(({ data }) => data),
   toc: (versionId: string) => http.get<TocNode[]>(`/reader/versions/${versionId}/toc`).then(({ data }) => data),

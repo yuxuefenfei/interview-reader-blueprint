@@ -14,3 +14,9 @@ interview-reader:
     secure-cookie: false
   import-worker:
     enabled: false
+  deletion:
+    worker-enabled: false
+    max-concurrency: 1
+    max-attempts: 3
+    retry-delay: PT0.001S
+    tombstone-retention: P30D

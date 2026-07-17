@@ -92,7 +92,7 @@ async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
     let nextContent: NodeContent;
     try {
       nextContent = await readerApi.content(versionId, node.id);
-      void cacheNodeContent(versionId, node.id, 100, nextContent).catch(() => undefined);
+      void cacheNodeContent(selected.value!.id, versionId, node.id, 100, nextContent).catch(() => undefined);
     } catch (caught) {
       const cached = await getCachedNodeContent(versionId, node.id, 100);
       if (!cached) throw caught;
@@ -126,7 +126,7 @@ async function loadMoreContent(): Promise<void> {
       blocks: [...current.blocks, ...page.blocks],
       nextAfterSeq: page.nextAfterSeq
     };
-    void cacheNodeContent(versionId, node.id, 100, content.value).catch(() => undefined);
+    void cacheNodeContent(selected.value!.id, versionId, node.id, 100, content.value).catch(() => undefined);
   } catch (caught) {
     error.value = message(caught);
   } finally {

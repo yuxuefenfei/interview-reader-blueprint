@@ -186,6 +186,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .current-version-identity h3 { margin: 0; font-size: 24px; }
 .current-version-identity small, .current-version-meta > span { color: #536274; font-size: 12px; font-variant-numeric: tabular-nums; }
 .current-version-meta > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.current-version-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.current-version-actions .el-button { margin-left: 0; }
 .history-section-heading { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 10px; border-bottom: 1px solid #dfe7ec; }
 .history-section-heading > div { display: grid; gap: 3px; }
 .history-section-heading h3 { margin: 0; font-size: 14px; }
@@ -332,3 +334,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   .version-row { grid-template-columns: 92px minmax(160px, 1fr); }
   .version-row-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
+
+.document-lifecycle-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.deletion-stage-label { display: block; margin-top: 4px; color: var(--text-secondary); }
+.document-detail-view > .el-alert { margin-bottom: 16px; }

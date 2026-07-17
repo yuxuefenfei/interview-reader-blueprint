@@ -41,6 +41,7 @@ public class VersionRevisionService {
     private final AssetMapper assetMapper;
     private final ImportJobMapper importJobMapper;
     private final DocumentPackageValidator validator;
+    private final DocumentDeletionJobMapper deletionJobMapper;
     private final DocumentQueryService documentQueryService;
     private final ObjectMapper objectMapper;
 
@@ -52,6 +53,7 @@ public class VersionRevisionService {
             AssetMapper assetMapper,
             ImportJobMapper importJobMapper,
             DocumentPackageValidator validator,
+            DocumentDeletionJobMapper deletionJobMapper,
             DocumentQueryService documentQueryService,
             ObjectMapper objectMapper
     ) {
@@ -62,6 +64,7 @@ public class VersionRevisionService {
         this.assetMapper = assetMapper;
         this.importJobMapper = importJobMapper;
         this.validator = validator;
+        this.deletionJobMapper = deletionJobMapper;
         this.documentQueryService = documentQueryService;
         this.objectMapper = objectMapper;
     }
@@ -94,8 +97,11 @@ public class VersionRevisionService {
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.in(ids)));
         var byDocument = new HashMap<String, List<DocumentVersionEntity>>();
         versions.forEach(version -> byDocument.computeIfAbsent(version.documentId, ignored -> new ArrayList<>()).add(version));
+        var deletionByDocument = ids.isEmpty() ? Map.<String, DocumentDeletionJobEntity>of() : deletionJobMapper.selectListByQuery(QueryWrapper.create()
+                .where(com.example.interviewreader.persistence.entity.table.DocumentDeletionJobEntityTableDef.DOCUMENT_DELETION_JOB_ENTITY.DOCUMENT_ID.in(ids)))
+                .stream().collect(java.util.stream.Collectors.toMap(job -> job.documentId, job -> job));
         return new ManagementDtos.AdminDocumentPage(pageItems.stream()
-                .map(document -> documentSummary(document, byDocument.getOrDefault(document.id, List.of())))
+                .map(document -> documentSummary(document, byDocument.getOrDefault(document.id, List.of()), deletionByDocument.get(document.id)))
                 .toList(), safePage, safeSize, hasNext);
     }
 
@@ -105,7 +111,7 @@ public class VersionRevisionService {
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(document.id)));
-        return documentSummary(document, versions);
+        return documentSummary(document, versions, deletionJobMapper.selectByDocument(document.id, LOCAL_USER_ID));
     }
 
     public List<ManagementDtos.VersionSummary> versions(UUID documentId) {
@@ -120,7 +126,7 @@ public class VersionRevisionService {
 
     @Transactional
     public ManagementDtos.VersionSummary createRevision(UUID documentId, UUID sourceVersionId) {
-        requireDocument(documentId);
+        DocumentLifecycleService.rejectLocked(requireDocument(documentId));
         var source = version(documentId, sourceVersionId);
         var draft = new DocumentVersionEntity();
         draft.id = UUID.randomUUID().toString();
@@ -170,27 +176,12 @@ public class VersionRevisionService {
     @Transactional
     public void deleteDraft(UUID versionId) {
         var version = requireDraft(versionId);
-        var jobs = importJobMapper.selectListByQuery(QueryWrapper.create()
-                .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
-                .from(IMPORT_JOB_ENTITY)
-                .where(IMPORT_JOB_ENTITY.RESULT_VERSION_ID.eq(version.id)));
-        for (var job : jobs) {
-            var update = UpdateWrapper.of(ImportJobEntity.class)
-                    .set(IMPORT_JOB_ENTITY.RESULT_VERSION_ID, null)
-                    .set(IMPORT_JOB_ENTITY.STATUS, "READY")
-                    .set(IMPORT_JOB_ENTITY.CURRENT_STAGE, "DRAFT_DISCARDED")
-                    .set(IMPORT_JOB_ENTITY.ERROR_CODE, null)
-                    .set(IMPORT_JOB_ENTITY.ERROR_MESSAGE, null);
-            importJobMapper.updateByQuery(
-                    update.toEntity(),
-                    false,
-                    QueryWrapper.create().where(IMPORT_JOB_ENTITY.ID.eq(job.id))
-            );
-        }
+        resetImportJobs(version.id, "DRAFT_DISCARDED");
         deleteContent(version.id);
         documentVersionMapper.deleteById(version.id);
         touchDocument(version.documentId);
     }
+
 
     public ManagementDtos.EditorSnapshot editorSnapshot(UUID versionId) {
         var version = requireDraft(versionId);
@@ -389,7 +380,7 @@ public class VersionRevisionService {
     }
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
-        requireDocument(documentId);
+        DocumentLifecycleService.rejectLocked(requireDocument(documentId));
         documentQueryService.publish(documentId, versionId);
     }
 
@@ -632,6 +623,26 @@ public class VersionRevisionService {
         }
     }
 
+    private void resetImportJobs(String versionId, String currentStage) {
+        var jobs = importJobMapper.selectListByQuery(QueryWrapper.create()
+                .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
+                .from(IMPORT_JOB_ENTITY)
+                .where(IMPORT_JOB_ENTITY.RESULT_VERSION_ID.eq(versionId)));
+        for (var job : jobs) {
+            var update = UpdateWrapper.of(ImportJobEntity.class)
+                    .set(IMPORT_JOB_ENTITY.RESULT_VERSION_ID, null)
+                    .set(IMPORT_JOB_ENTITY.STATUS, "READY")
+                    .set(IMPORT_JOB_ENTITY.CURRENT_STAGE, currentStage)
+                    .set(IMPORT_JOB_ENTITY.ERROR_CODE, null)
+                    .set(IMPORT_JOB_ENTITY.ERROR_MESSAGE, null);
+            importJobMapper.updateByQuery(
+                    update.toEntity(),
+                    false,
+                    QueryWrapper.create().where(IMPORT_JOB_ENTITY.ID.eq(job.id))
+            );
+        }
+    }
+
     private void deleteContent(String versionId) {
         contentBlockMapper.selectListByQuery(QueryWrapper.create().select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS).from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))).forEach(block -> contentBlockMapper.deleteById(block.id));
@@ -666,7 +677,7 @@ public class VersionRevisionService {
         if (version == null || !"DRAFT".equals(version.status)) {
             throw new ApiException(HttpStatus.CONFLICT, "Only draft versions can be edited");
         }
-        requireDocument(uuid(version.documentId));
+        DocumentLifecycleService.rejectLocked(requireDocument(uuid(version.documentId)));
         return version;
     }
 
@@ -681,10 +692,11 @@ public class VersionRevisionService {
         documentMapper.update(document);
     }
 
-    private ManagementDtos.AdminDocumentSummary documentSummary(DocumentEntity document, List<DocumentVersionEntity> versions) {
+    private ManagementDtos.AdminDocumentSummary documentSummary(DocumentEntity document, List<DocumentVersionEntity> versions, DocumentDeletionJobEntity deletionJob) {
         return new ManagementDtos.AdminDocumentSummary(
                 uuid(document.id), document.code, document.title, document.status, uuid(document.currentVersionId),
-                versions.size(), versions.stream().filter(version -> "DRAFT".equals(version.status)).count(), document.updatedAt);
+                versions.size(), versions.stream().filter(version -> "DRAFT".equals(version.status)).count(), document.updatedAt,
+                deletionJob == null ? null : DocumentLifecycleService.summary(deletionJob));
     }
 
     private ManagementDtos.VersionSummary summary(DocumentVersionEntity version) {

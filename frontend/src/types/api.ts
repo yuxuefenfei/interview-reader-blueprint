@@ -11,6 +11,12 @@ export const SEMANTIC_ROLES = ["QUESTION", "ANSWER", "EXPLANATION", "CONCLUSION"
 export type SemanticRole = typeof SEMANTIC_ROLES[number];
 
 export const VERSION_STATUSES = ["DRAFT", "PUBLISHED", "RETIRED"] as const;
+export const DOCUMENT_STATUSES = ["DRAFT", "PUBLISHED", "OFFLINE", "DELETING", "DELETE_FAILED"] as const;
+export type DocumentStatus = typeof DOCUMENT_STATUSES[number];
+export const DELETION_JOB_STATUSES = ["QUEUED", "RUNNING", "FAILED", "COMPLETED"] as const;
+export type DeletionJobStatus = typeof DELETION_JOB_STATUSES[number];
+export const DELETION_STAGES = ["QUEUED", "CLIENT_SYNC_MARKED", "DELETING_FILES", "DELETING_DATA", "COMPLETED", "FAILED"] as const;
+export type DeletionStage = typeof DELETION_STAGES[number];
 export type VersionStatus = typeof VERSION_STATUSES[number];
 
 export const IMPORT_STATUSES = ["UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING", "READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED"] as const;
@@ -40,7 +46,9 @@ export interface AssetInfo { assetKey: string; path: string; mimeType: string; s
 export interface DocumentPackage { schemaVersion: string; document: DocumentInfo; version: VersionInfo; sections: StagedSection[]; blocks: StagedBlock[]; assets: AssetInfo[]; }
 export interface VersionSummary { id: string; versionNo: number; parentVersionId: string | null; parentVersionNo: number | null; originImportJobId: string | null; sourceType: SourceType; sourceFileName: string | null; status: VersionStatus; draftRevision: number; publishedAt: string | null; createdAt: string; }
 export interface EditableVersion { version: VersionSummary; documentPackage: DocumentPackage; }
-export interface AdminDocumentSummary { id: string; code: string; title: string; status: VersionStatus; currentVersionId: string | null; versionCount: number; draftCount: number; updatedAt: string; }
+export interface DeletionJob { id: string; documentId: string; status: DeletionJobStatus; currentStage: DeletionStage; attemptCount: number; errorCode: string | null; errorMessage: string | null; requestedAt: string; startedAt: string | null; completedAt: string | null; updatedAt: string; }
+export interface DeletedDocumentTombstone { documentId: string; deletedAt: string; }
+export interface AdminDocumentSummary { id: string; code: string; title: string; status: DocumentStatus; currentVersionId: string | null; versionCount: number; draftCount: number; updatedAt: string; deletionJob: DeletionJob | null; }
 export interface AdminDocumentPage { items: AdminDocumentSummary[]; page: number; size: number; hasNext: boolean; }
 export interface EditorDocument { id: string; code: string; title: string; description: string | null; language: string; }
 export interface EditorNode { id: string; parentId: string | null; nodeKey: string; nodeType: NodeType; semanticRole: SemanticRole | null; title: string; level: number; sortOrder: number; anchor: string; sourcePageStart: number | null; sourcePageEnd: number | null; }

@@ -20,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin")
 public class AdminDocumentController {
     private final VersionRevisionService service;
+    private final DocumentLifecycleService lifecycleService;
 
-    public AdminDocumentController(VersionRevisionService service) {
+    public AdminDocumentController(VersionRevisionService service, DocumentLifecycleService lifecycleService) {
         this.service = service;
+        this.lifecycleService = lifecycleService;
     }
 
     @GetMapping("/documents")
@@ -130,6 +132,37 @@ public class AdminDocumentController {
         service.deleteDraft(versionId);
     }
 
+
+    @PostMapping("/documents/{documentId}/take-down")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void takeDown(@PathVariable UUID documentId) {
+        lifecycleService.takeDown(documentId);
+    }
+
+    @PostMapping("/documents/{documentId}/restore")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID documentId) {
+        lifecycleService.restore(documentId);
+    }
+
+    @PostMapping("/documents/{documentId}/deletion")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ManagementDtos.DeletionJobSummary deleteDocument(
+            @PathVariable UUID documentId,
+            @RequestBody ManagementDtos.DeleteDocumentRequest request) {
+        return lifecycleService.requestDeletion(documentId, request);
+    }
+
+    @GetMapping("/document-deletions/{jobId}")
+    public ManagementDtos.DeletionJobSummary deletionJob(@PathVariable UUID jobId) {
+        return lifecycleService.job(jobId);
+    }
+
+    @PostMapping("/document-deletions/{jobId}/retry")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ManagementDtos.DeletionJobSummary retryDeletion(@PathVariable UUID jobId) {
+        return lifecycleService.retry(jobId);
+    }
     @PostMapping("/documents/{documentId}/versions/{versionId}/publish")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void publish(@PathVariable UUID documentId, @PathVariable UUID versionId) {

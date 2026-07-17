@@ -28,7 +28,7 @@ onMounted(() => { void searchDocuments(""); });
 onBeforeUnmount(stopPolling);
 async function searchDocuments(query: string): Promise<void> {
   documentLoading.value = true;
-  try { documents.value = (await adminApi.documents(query, 1, 30)).items; }
+  try { documents.value = (await adminApi.documents(query, 1, 30)).items.filter((document) => document.status !== "DELETING" && document.status !== "DELETE_FAILED"); }
   catch (caught) { ElMessage.error(message(caught)); }
   finally { documentLoading.value = false; }
 }

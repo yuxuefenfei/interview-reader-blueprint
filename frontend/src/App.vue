@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { readerApi } from "./api/reader";
+import { syncDeletedDocuments } from "./offline/deletionSync";
 
 const router = useRouter();
 const ready = ref(false);
@@ -12,10 +13,12 @@ const error = ref("");
 const submitting = ref(false);
 
 onMounted(async () => {
+  window.addEventListener("online", syncDeletions);
   try {
     const session = await readerApi.session();
     authenticated.value = session.authenticated;
     username.value = session.username;
+    if (session.authenticated) void syncDeletedDocuments().catch(() => undefined);
   } finally {
     ready.value = true;
   }
@@ -28,6 +31,7 @@ async function login(): Promise<void> {
     const session = await readerApi.login(form.value.username, form.value.password);
     authenticated.value = session.authenticated;
     username.value = session.username;
+    void syncDeletedDocuments().catch(() => undefined);
     form.value.password = "";
     await router.replace("/reader");
   } catch (caught) {
@@ -42,6 +46,10 @@ async function logout(): Promise<void> {
   authenticated.value = false;
   username.value = null;
   await router.replace("/reader");
+}
+
+function syncDeletions(): void {
+  if (authenticated.value) void syncDeletedDocuments().catch(() => undefined);
 }
 </script>
 

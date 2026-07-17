@@ -52,6 +52,21 @@ export async function flushReadingProgressQueue(send: SendProgress): Promise<num
   }
 }
 
+export async function purgeReadingProgressForDocument(documentId: string): Promise<void> {
+  if (!hasIndexedDb()) {
+    writeFallbackQueue(readFallbackQueue().filter((item) => item.documentId !== documentId));
+    return;
+  }
+  const db = await openOfflineDatabase();
+  try {
+    const items = await listQueuedProgress(db);
+    for (const item of items.filter((queued) => queued.documentId === documentId)) {
+      await transaction(db, "readwrite", (store) => store.delete(item.id));
+    }
+  } finally {
+    db.close();
+  }
+}
 function hasIndexedDb(): boolean {
   return typeof indexedDB !== "undefined";
 }

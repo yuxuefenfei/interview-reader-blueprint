@@ -165,6 +165,120 @@ class InterviewReaderApiTests {
     }
 
     @Test
+    void takeDownPreservesPublishedVersionAndReadingDataAndRestoreIsIdempotent() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "take-down-" + UUID.randomUUID());
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        publish(imported);
+        var position = firstChildFirstBlock(imported.versionId());
+        var progress = """
+                {
+                  "versionId": "%s",
+                  "sectionId": "%s",
+                  "blockId": "%s",
+                  "charOffset": 8,
+                  "blockViewportOffset": 16,
+                  "progressRatio": 0.25,
+                  "deviceId": "take-down-test"
+                }
+                """.formatted(imported.versionId(), position.sectionId(), position.blockId());
+        mockMvc.perform(put("/api/reader/reading-progress/{documentId}", imported.documentId())
+                        .contentType(MediaType.APPLICATION_JSON).content(progress))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/admin/documents/{documentId}/take-down", imported.documentId()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/admin/documents/{documentId}/take-down", imported.documentId()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/reader/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/admin/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OFFLINE"))
+                .andExpect(jsonPath("$.currentVersionId").value(imported.versionId().toString()))
+                .andExpect(jsonPath("$.versionCount").value(1));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reading_progress WHERE document_id = ?", Integer.class,
+                imported.documentId().toString())).isOne();
+
+        mockMvc.perform(post("/api/admin/documents/{documentId}/restore", imported.documentId()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/admin/documents/{documentId}/restore", imported.documentId()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/reader/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void permanentDeletionRequiresOfflineAndExactTitleThenRemovesImportFilesAndData() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "permanent-delete-" + UUID.randomUUID());
+        var title = source.get("document").get("title").asText();
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        publish(imported);
+        var sourceKey = jdbc.queryForObject("SELECT source_object_key FROM import_job WHERE id = ?", String.class,
+                imported.jobId().toString());
+        var sourcePath = Path.of("target/test-import-sources").toAbsolutePath().normalize().resolve(sourceKey).normalize();
+        assertThat(Files.isRegularFile(sourcePath)).isTrue();
+
+        mockMvc.perform(post("/api/admin/documents/{documentId}/deletion", imported.documentId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(Map.of("confirmationTitle", title))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_MUST_BE_OFFLINE"));
+
+        mockMvc.perform(post("/api/admin/documents/{documentId}/take-down", imported.documentId()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/admin/documents/{documentId}/deletion", imported.documentId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmationTitle\":\"wrong title\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_TITLE_MISMATCH"));
+
+        mockMvc.perform(post("/api/admin/documents/{documentId}/deletion", imported.documentId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(Map.of("confirmationTitle", title))))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(get("/api/admin/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}", imported.jobId()))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM document_version WHERE document_id = ?", Integer.class,
+                imported.documentId().toString())).isZero();
+        assertThat(Files.exists(sourcePath)).isFalse();
+        mockMvc.perform(get("/api/reader/document-deletions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.documentId == '%s')]", imported.documentId()).exists());
+    }
+
+    @Test
+    void failedDeletionAutoRetriesThreeTimesAndManualRetryNeedsNoTitle() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "retry-delete-" + UUID.randomUUID());
+        var title = source.get("document").get("title").asText();
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        var originalSourceKey = jdbc.queryForObject("SELECT source_object_key FROM import_job WHERE id = ?", String.class, imported.jobId().toString());
+        jdbc.update("UPDATE import_job SET source_object_key = '../outside-storage' WHERE id = ?", imported.jobId().toString());
+
+        mockMvc.perform(post("/api/admin/documents/{documentId}/deletion", imported.documentId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(Map.of("confirmationTitle", title))))
+                .andExpect(status().isAccepted());
+        var failedDocument = objectMapper.readTree(mockMvc.perform(get("/api/admin/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DELETE_FAILED"))
+                .andExpect(jsonPath("$.deletionJob.status").value("FAILED"))
+                .andExpect(jsonPath("$.deletionJob.attemptCount").value(3))
+                .andReturn().getResponse().getContentAsString());
+        var deletionJobId = failedDocument.get("deletionJob").get("id").asText();
+
+        jdbc.update("UPDATE import_job SET source_object_key = ? WHERE id = ?", originalSourceKey, imported.jobId().toString());
+        mockMvc.perform(post("/api/admin/document-deletions/{jobId}/retry", deletionJobId))
+                .andExpect(status().isAccepted());
+        mockMvc.perform(get("/api/admin/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isNotFound());
+    }
+    @Test
     void searchFiltersUnpublishedMatchesBeforeApplyingLimit() throws Exception {
         var marker = "published-search-" + UUID.randomUUID();
         var imports = new java.util.ArrayList<ImportResult>();

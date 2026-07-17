@@ -57,6 +57,8 @@ java -jar target/interview-reader-0.1.0-SNAPSHOT.jar --spring.profiles.active=de
 
 导入任务在 jar/dev 模式默认使用 Java 21 虚拟线程后台 worker，最大并发数由 `interview-reader.import-worker.max-concurrency` 控制；测试 profile 关闭异步 worker，使用 H2 MySQL 兼容模式做确定性集成测试。
 
+文档“下架”只切换为 `OFFLINE` 并保留版本与阅读数据；永久删除仅允许用于草稿或已下架文档，采用持久化后台任务删除版本、阅读数据、导入记录和托管文件。删除任务默认自动重试 3 次，保留 30 天最小墓碑供离线客户端清理缓存；并发数、重试间隔和墓碑期限统一由 `interview-reader.deletion.*` 配置。
+
 PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度、文本页估算、页面尺寸和每页 normalized block 覆盖统计，便于复核页定位未覆盖内容并支持后续转换规则回归。疑似 PDF 表格会先保存为低置信度 `table_snapshot` 并产生复核 issue，避免误转成高置信正文。
 
 应用会在未显式设置 `pdfbox.fontcache` 时把 PDFBox 字体缓存放到 `./target/pdfbox-font-cache`，避免 Windows 用户目录权限导致 PDF 样本测试或 jar 运行时产生字体缓存写入告警。

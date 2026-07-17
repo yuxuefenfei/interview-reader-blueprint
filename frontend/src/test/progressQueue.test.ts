@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { enqueueReadingProgress, flushReadingProgressQueue } from "../offline/progressQueue";
+import { enqueueReadingProgress, flushReadingProgressQueue, purgeReadingProgressForDocument } from "../offline/progressQueue";
 import type { ReadingProgress } from "../types/api";
 
 const progress: ReadingProgress = {
@@ -46,5 +46,20 @@ describe("offline reading progress queue", () => {
 
     const count = await flushReadingProgressQueue(async (_documentId, queuedProgress) => queuedProgress);
     expect(count).toBe(1);
+  });
+  it("purges queued progress for a permanently deleted document", async () => {
+    vi.stubGlobal("indexedDB", undefined);
+    await enqueueReadingProgress("document-1", progress);
+    await enqueueReadingProgress("document-2", progress);
+
+    await purgeReadingProgressForDocument("document-1");
+    const sent: string[] = [];
+    const count = await flushReadingProgressQueue(async (documentId, queued) => {
+      sent.push(documentId);
+      return queued;
+    });
+
+    expect(count).toBe(1);
+    expect(sent).toEqual(["document-2"]);
   });
 });

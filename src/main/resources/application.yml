@@ -26,3 +26,9 @@ interview-reader:
   import-worker:
     enabled: true
     max-concurrency: 2
+  deletion:
+    worker-enabled: true
+    max-concurrency: 1
+    max-attempts: 3
+    retry-delay: PT1S
+    tombstone-retention: P30D

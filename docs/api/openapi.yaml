@@ -58,6 +58,18 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentPage" }
+  /reader/document-deletions:
+    get:
+      summary: List recent deletion tombstones so clients can purge offline data
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "200":
+          description: Recent deletion tombstones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DeletedDocumentTombstone" }
   /reader/documents/{documentId}:
     get:
       summary: Get published document metadata
@@ -257,6 +269,66 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/VersionSummary" }
+  /admin/documents/{documentId}/take-down:
+    post:
+      summary: Hide a published document from the reader while preserving all data
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "204": { description: Taken down }
+        "409": { $ref: "#/components/responses/Problem" }
+  /admin/documents/{documentId}/restore:
+    post:
+      summary: Restore an offline document using its retained published version
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "204": { description: Restored }
+        "409": { $ref: "#/components/responses/Problem" }
+  /admin/documents/{documentId}/deletion:
+    post:
+      summary: Start an irreversible permanent document deletion
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeleteDocumentRequest" }
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "202":
+          description: Deletion accepted or existing idempotent job returned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeletionJob" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /admin/document-deletions/{jobId}:
+    get:
+      summary: Get durable permanent deletion progress
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "200":
+          description: Deletion progress
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeletionJob" }
+  /admin/document-deletions/{jobId}/retry:
+    post:
+      summary: Retry a failed permanent deletion without repeating title confirmation
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "202":
+          description: Retry accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeletionJob" }
   /admin/documents/{documentId}/versions/{sourceVersionId}/revisions:
     post:
       summary: Create an editable draft from a selected version
@@ -653,6 +725,15 @@ components:
     VersionStatus:
       type: string
       enum: [DRAFT, PUBLISHED, RETIRED]
+    DocumentStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, OFFLINE, DELETING, DELETE_FAILED]
+    DeletionJobStatus:
+      type: string
+      enum: [QUEUED, RUNNING, FAILED, COMPLETED]
+    DeletionStage:
+      type: string
+      enum: [QUEUED, CLIENT_SYNC_MARKED, DELETING_FILES, DELETING_DATA, COMPLETED, FAILED]
     ImportStatus:
       type: string
       enum: [UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, READY, REVIEW_REQUIRED, IMPORTED, FAILED, CANCELED]
@@ -857,18 +938,46 @@ components:
         dueAt: { type: [string, "null"], format: date-time }
         intervalDays: { type: [integer, "null"] }
         repetitions: { type: integer, minimum: 0 }
+    DeleteDocumentRequest:
+      type: object
+      required: [confirmationTitle]
+      properties:
+        confirmationTitle: { type: string }
+    DeletionJob:
+      type: object
+      required: [id, documentId, status, currentStage, attemptCount, errorCode, errorMessage, requestedAt, startedAt, completedAt, updatedAt]
+      properties:
+        id: { $ref: "#/components/schemas/Uuid" }
+        documentId: { $ref: "#/components/schemas/Uuid" }
+        status: { $ref: "#/components/schemas/DeletionJobStatus" }
+        currentStage: { $ref: "#/components/schemas/DeletionStage" }
+        attemptCount: { type: integer, minimum: 0 }
+        errorCode: { type: [string, "null"] }
+        errorMessage: { type: [string, "null"] }
+        requestedAt: { type: string, format: date-time }
+        startedAt: { type: [string, "null"], format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DeletedDocumentTombstone:
+      type: object
+      required: [documentId, deletedAt]
+      properties:
+        documentId: { $ref: "#/components/schemas/Uuid" }
+        deletedAt: { type: string, format: date-time }
     AdminDocumentSummary:
       type: object
-      required: [id, code, title, status, currentVersionId, versionCount, draftCount, updatedAt]
+      required: [id, code, title, status, currentVersionId, versionCount, draftCount, updatedAt, deletionJob]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         code: { type: string }
         title: { type: string }
-        status: { $ref: "#/components/schemas/VersionStatus" }
+        status: { $ref: "#/components/schemas/DocumentStatus" }
         currentVersionId: { $ref: "#/components/schemas/NullableUuid" }
         versionCount: { type: integer, minimum: 0 }
         draftCount: { type: integer, minimum: 0 }
         updatedAt: { type: string, format: date-time }
+        deletionJob:
+          anyOf: [{ $ref: "#/components/schemas/DeletionJob" }, { type: "null" }]
     AdminDocumentPage:
       type: object
       required: [items, page, size, hasNext]

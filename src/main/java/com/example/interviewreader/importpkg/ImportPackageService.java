@@ -127,12 +127,16 @@ public class ImportPackageService {
         var normalizedSourceType = detectSourceType(file.getOriginalFilename(), fileBytes);
         var sourceSha256 = Hashes.sha256(fileBytes);
         var targetId = targetDocumentId == null ? null : id(targetDocumentId);
-        if (targetId != null && documentMapper.selectOneByQuery(QueryWrapper.create()
-                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
-                .from(DOCUMENT_ENTITY)
-                .where(DOCUMENT_ENTITY.ID.eq(targetId))
-                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))) == null) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Target document not found");
+        if (targetId != null) {
+            var target = documentMapper.selectOneByQuery(QueryWrapper.create()
+                    .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                    .from(DOCUMENT_ENTITY)
+                    .where(DOCUMENT_ENTITY.ID.eq(targetId))
+                    .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID)));
+            if (target == null) {
+                throw new ApiException(HttpStatus.NOT_FOUND, "Target document not found");
+            }
+            rejectDeletionLocked(target);
         }
         var importFingerprint = Hashes.sha256(sourceSha256 + ":" + normalizedSourceType + ":" + converterVersion + ":" + Objects.toString(targetId, "NEW"));
         var existingJob = findImportJobByFingerprint(importFingerprint);
@@ -331,6 +335,7 @@ public class ImportPackageService {
             documentMapper.insertSelective(document);
         } else {
             var document = documentMapper.selectOneById(documentId);
+            rejectDeletionLocked(document);
             document.title = documentPackage.document().title();
             document.description = documentPackage.document().description();
             document.updatedAt = now;
@@ -498,6 +503,11 @@ public class ImportPackageService {
         return result;
     }
 
+    private static void rejectDeletionLocked(DocumentEntity document) {
+        if (document != null && ("DELETING".equals(document.status) || "DELETE_FAILED".equals(document.status))) {
+            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
+        }
+    }
     private String findDocumentId(String documentKey) {
         var document = documentMapper.selectOneByQuery(QueryWrapper.create()
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)

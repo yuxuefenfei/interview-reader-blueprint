@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AdminDocumentSummary, VersionSummary } from "../types/api";
+import type { AdminDocumentSummary, DeletionJob, VersionSummary } from "../types/api";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -9,8 +9,14 @@ const mocks = vi.hoisted(() => ({
   versions: vi.fn(),
   createRevision: vi.fn(),
   publish: vi.fn(),
+  takeDown: vi.fn(),
+  restore: vi.fn(),
+  deleteDocument: vi.fn(),
+  deletionJob: vi.fn(),
+  retryDeletion: vi.fn(),
   deleteDraft: vi.fn(),
   confirm: vi.fn(),
+  prompt: vi.fn(),
   messageError: vi.fn(),
   messageSuccess: vi.fn()
 }));
@@ -26,6 +32,11 @@ vi.mock("../api/admin", () => ({
     versions: mocks.versions,
     createRevision: mocks.createRevision,
     publish: mocks.publish,
+    takeDown: mocks.takeDown,
+    restore: mocks.restore,
+    deleteDocument: mocks.deleteDocument,
+    deletionJob: mocks.deletionJob,
+    retryDeletion: mocks.retryDeletion,
     deleteDraft: mocks.deleteDraft
   }
 }));
@@ -35,7 +46,7 @@ vi.mock("element-plus/es/components/message/index", () => ({
 }));
 
 vi.mock("element-plus/es/components/message-box/index", () => ({
-  ElMessageBox: { confirm: mocks.confirm }
+  ElMessageBox: { confirm: mocks.confirm, prompt: mocks.prompt }
 }));
 
 import AdminDocumentDetailView from "../views/AdminDocumentDetailView.vue";
@@ -48,6 +59,7 @@ const ButtonStub = defineComponent({
 });
 const CardStub = defineComponent({ template: '<section><header><slot name="header" /></header><slot /></section>' });
 const TagStub = defineComponent({ template: '<span><slot /></span>' });
+const AlertStub = defineComponent({ props: { title: String, description: String }, template: '<section><strong>{{ title }}</strong><span>{{ description }}</span><slot /></section>' });
 const EmptyStub = defineComponent({ props: { description: String }, template: '<div>{{ description }}</div>' });
 const DropdownStub = defineComponent({ emits: ["command"], template: '<div><slot /><slot name="dropdown" /></div>' });
 const DropdownMenuStub = defineComponent({ template: '<div><slot /></div>' });
@@ -75,9 +87,16 @@ const documentSummary: AdminDocumentSummary = {
   currentVersionId: "v2",
   versionCount: 4,
   draftCount: 2,
-  updatedAt: "2026-07-17T09:04:00+08:00"
+  updatedAt: "2026-07-17T09:04:00+08:00",
+  deletionJob: null
 };
 
+const failedDeletionJob: DeletionJob = {
+  id: "delete-failed-1", documentId: "document-1", status: "FAILED", currentStage: "FAILED", attemptCount: 3,
+  errorCode: "IOException", errorMessage: "Cannot delete managed source file",
+  requestedAt: "2026-07-17T09:05:00+08:00", startedAt: "2026-07-17T09:05:01+08:00",
+  completedAt: null, updatedAt: "2026-07-17T09:05:03+08:00"
+};
 const versionFixtures: VersionSummary[] = [
   version({ id: "v4", versionNo: 4, status: "DRAFT", parentVersionId: "v2", parentVersionNo: 2 }),
   version({ id: "v3", versionNo: 3, status: "DRAFT", parentVersionId: "v1", parentVersionNo: 1 }),
@@ -93,6 +112,7 @@ function mountView() {
         ElButton: ButtonStub,
         ElCard: CardStub,
         ElTag: TagStub,
+        ElAlert: AlertStub,
         ElEmpty: EmptyStub,
         ElDropdown: DropdownStub,
         ElDropdownMenu: DropdownMenuStub,
@@ -110,8 +130,14 @@ describe("AdminDocumentDetailView", () => {
     mocks.versions.mockResolvedValue(versionFixtures);
     mocks.createRevision.mockResolvedValue(versionFixtures[0]);
     mocks.publish.mockResolvedValue(undefined);
+    mocks.takeDown.mockResolvedValue(undefined);
+    mocks.restore.mockResolvedValue(undefined);
+    mocks.deleteDocument.mockResolvedValue({ id: "delete-1", documentId: "document-1", status: "QUEUED", currentStage: "QUEUED", attemptCount: 0, errorCode: null, errorMessage: null, requestedAt: "2026-07-17T09:05:00+08:00", startedAt: null, completedAt: null, updatedAt: "2026-07-17T09:05:00+08:00" });
+    mocks.deletionJob.mockResolvedValue(undefined);
+    mocks.retryDeletion.mockResolvedValue({ ...failedDeletionJob, status: "QUEUED", currentStage: "QUEUED", attemptCount: 0 });
     mocks.deleteDraft.mockResolvedValue(undefined);
     mocks.confirm.mockResolvedValue("confirm");
+    mocks.prompt.mockResolvedValue({ value: documentSummary.title });
   });
 
   it("pins the current published version and exposes branch lineage", async () => {
@@ -126,6 +152,50 @@ describe("AdminDocumentDetailView", () => {
     expect(wrapper.get('[data-version-id="v3"]').text()).toContain("不包含当前线上版本的后续变更");
   });
 
+  it("takes the current document down while explicitly preserving all data", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="take-down-v2"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.stringContaining("阅读进度、书签和笔记都会保留"),
+      "下架文档",
+      expect.objectContaining({ confirmButtonText: "确认下架" })
+    );
+    expect(mocks.takeDown).toHaveBeenCalledWith("document-1");
+    expect(mocks.messageSuccess).toHaveBeenCalledWith("文档已下架，数据已保留");
+  });
+
+  it("requires the exact full title before starting permanent deletion", async () => {
+    mocks.document.mockResolvedValueOnce({ ...documentSummary, status: "OFFLINE" });
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="delete-document"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.prompt).toHaveBeenCalledWith(
+      expect.stringContaining("原始文件及转换中间产物"),
+      "永久删除文档",
+      expect.objectContaining({ confirmButtonText: "永久删除" })
+    );
+    expect(mocks.deleteDocument).toHaveBeenCalledWith("document-1", documentSummary.title);
+    expect(wrapper.text()).toContain("永久删除进行中");
+  });
+
+  it("allows a failed irreversible deletion to be retried without another title prompt", async () => {
+    mocks.document.mockResolvedValueOnce({ ...documentSummary, status: "DELETE_FAILED", deletionJob: failedDeletionJob });
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="retry-deletion"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.retryDeletion).toHaveBeenCalledWith(failedDeletionJob.id);
+    expect(mocks.prompt).not.toHaveBeenCalled();
+  });
   it("includes branch risk in the publish confirmation", async () => {
     mocks.confirm.mockRejectedValueOnce("cancel");
     const wrapper = mountView();
