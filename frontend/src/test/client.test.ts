@@ -24,6 +24,14 @@ describe("Axios API domains", () => {
     expect(body.get("targetDocumentId")).toBe("document-1");
   });
 
+  it("requests the next content page with the server cursor", async () => {
+    const get = vi.spyOn(http, "get").mockResolvedValue({ data: { node: {}, blocks: [], nextAfterSeq: null } } as never);
+    await readerApi.content("version-1", "node-1", 100);
+    expect(get).toHaveBeenCalledWith("/reader/versions/version-1/nodes/node-1/content", {
+      params: { afterSeq: 100, limit: 100 }
+    });
+  });
+
   it("loads the lightweight editor snapshot through the management endpoint", async () => {
     const get = vi.spyOn(http, "get").mockResolvedValue({ data: { version: {}, document: {}, nodes: [] } } as never);
     await adminApi.editor("version-1");

@@ -1,9 +1,9 @@
 package com.example.interviewreader.security;
 
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,7 +78,7 @@ public class AuthSessionService {
         }
         var expectedBytes = expected.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         var actualBytes = actual.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        return expectedBytes.length == actualBytes.length && Arrays.equals(expectedBytes, actualBytes);
+        return MessageDigest.isEqual(expectedBytes, actualBytes);
     }
 
     private record Session(String username, Instant expiresAt) {

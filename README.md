@@ -87,40 +87,73 @@ $env:INTERVIEW_READER_PASSWORD='replace-with-a-strong-password'
 
 ## 已实现 API
 
-- `POST /api/import-jobs`
-- `GET /api/import-jobs/{jobId}`
-- `GET /api/import-jobs/{jobId}/issues`
-- `GET /api/import-jobs/{jobId}/raw-extraction`
-- `GET /api/import-jobs/{jobId}/source-file`
-- `GET /api/import-jobs/{jobId}/normalized-package`
-- `PATCH /api/import-jobs/{jobId}/normalized-package/sections/{sectionKey}`
-- `PATCH /api/import-jobs/{jobId}/normalized-package/blocks/{blockKey}`
-- `POST /api/import-jobs/{jobId}/cancel`
-- `POST /api/import-jobs/{jobId}/commit`
-- `GET /api/documents`
-- `GET /api/documents/{documentId}`
-- `POST /api/documents/{documentId}/versions/{versionId}/publish`
-- `GET /api/versions/{versionId}/toc`
-- `GET /api/versions/{versionId}/nodes/{nodeId}/content`
-- `GET /api/search?q=...`
-- `GET /api/reading-progress/{documentId}`
-- `PUT /api/reading-progress/{documentId}`
-- `POST /api/bookmarks`
-- `DELETE /api/bookmarks/{bookmarkId}`
-- `POST /api/notes`
-- `PUT /api/review-states/{nodeId}`
-- `POST /api/exports`
+完整契约位于 `docs/api/openapi.yaml`。除登录和会话查询外，业务 API 均要求 `IR_SESSION` Cookie。
+
+认证：
+
+- `POST /api/auth/login`
+- `GET /api/auth/session`
+- `POST /api/auth/logout`
+
+阅读端：
+
+- `GET /api/reader/documents?query=...&cursor=...&limit=16`
+- `GET /api/reader/documents/{documentId}`
+- `GET /api/reader/versions/{versionId}/toc`
+- `GET /api/reader/versions/{versionId}/nodes/{nodeId}/content?afterSeq=...&limit=50`
+- `GET /api/reader/search?q=...&documentId=...&limit=20`
+- `GET /api/reader/reading-progress/{documentId}`
+- `PUT /api/reader/reading-progress/{documentId}`
+- `POST /api/reader/bookmarks`
+- `DELETE /api/reader/bookmarks/{bookmarkId}`
+- `POST /api/reader/notes`
+- `PUT /api/reader/review-states/{nodeId}`
+- `GET /api/reader/review-queue?documentId=...&limit=5&dueOnly=false`
+
+后台文档与版本：
+
+- `GET /api/admin/documents?query=...&page=1&size=20`
+- `GET /api/admin/documents/{documentId}`
+- `GET /api/admin/documents/{documentId}/versions`
+- `POST /api/admin/documents/{documentId}/versions/{sourceVersionId}/revisions`
+- `POST /api/admin/documents/{documentId}/versions/{versionId}/publish`
+- `GET /api/admin/versions/{versionId}/editor`
+- `PUT /api/admin/versions/{versionId}/editor`（兼容整包保存）
+- `DELETE /api/admin/versions/{versionId}/editor`
+- `GET /api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks?cursor=...&limit=40`
+- `POST /api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks`
+- `PATCH /api/admin/versions/{versionId}/editor/nodes/{nodeId}`
+- `PATCH /api/admin/versions/{versionId}/editor/structure`
+- `PATCH /api/admin/versions/{versionId}/editor/blocks/{blockId}`
+- `DELETE /api/admin/versions/{versionId}/editor/blocks/{blockId}?draftRevision=...`
+- `POST /api/admin/versions/{versionId}/editor/blocks/cleanup-empty`
+
+导入与导出：
+
+- `POST /api/admin/import-jobs`
+- `GET /api/admin/import-jobs/{jobId}`
+- `GET /api/admin/import-jobs/{jobId}/issues`
+- `GET /api/admin/import-jobs/{jobId}/raw-extraction`
+- `GET /api/admin/import-jobs/{jobId}/source-file`
+- `GET /api/admin/import-jobs/{jobId}/normalized-package`
+- `PATCH /api/admin/import-jobs/{jobId}/normalized-package/sections/{sectionKey}`
+- `PATCH /api/admin/import-jobs/{jobId}/normalized-package/blocks/{blockKey}`
+- `POST /api/admin/import-jobs/{jobId}/cancel`
+- `POST /api/admin/import-jobs/{jobId}/commit`
+- `POST /api/admin/exports`
 
 示例包位于 `docs/examples/document-package.example.json`。Excel 导入模板位于 `docs/templates/interview-reader-import-template.xlsx`。
 
-`POST /api/import-jobs` 使用 `multipart/form-data`：
+`POST /api/admin/import-jobs` 使用 `multipart/form-data`，必填字段为 `file`，可选字段为 `targetDocumentId`。服务端根据文件内容与扩展名识别类型，支持：
 
-- `sourceType=JSON_PACKAGE`，上传 JSON 文件。
-- `sourceType=EXCEL`，上传 `.xlsx` 文件。
-- `sourceType=MARKDOWN`，上传 `.md` / `.markdown` 文件。
-- `sourceType=PDF`，上传 `.pdf` 文件。PDF 导入会保存原始源文件、raw extraction 和 normalized package，复核页可按 issue/block 定位源页。
+- JSON 文档包（`.json`）
+- Excel OOXML 工作簿（`.xlsx`，不支持旧版二进制 `.xls`）
+- Markdown（`.md` / `.markdown`）
+- PDF（`.pdf`）
 
-当前 `POST /api/exports` 支持同步导出 JSON Package、Excel Package、Markdown 与静态 HTML：
+PDF 导入会保存原始源文件、raw extraction 和 normalized package，复核页可按 issue/block 定位源页。
+
+`POST /api/admin/exports` 同步导出 JSON Package、Excel Package、Markdown 或静态 HTML：
 
 ```json
 {
@@ -130,4 +163,4 @@ $env:INTERVIEW_READER_PASSWORD='replace-with-a-strong-password'
 }
 ```
 
-将 `format` 改为 `EXCEL` 会返回 `.xlsx` 文件；改为 `MARKDOWN` 会返回 `.md` 文本；改为 `STATIC_HTML` 会返回由受信任 renderer 生成的 `.html` 文件。
+将 `format` 改为 `EXCEL` 会返回 `.xlsx` 文件；改为 `MARKDOWN` 会返回 `.md` 文本；改为 `STATIC_HTML` 会返回由受信任 renderer 生成的 `.html` 文件。API 中的时间字段使用带时区偏移的 ISO 8601 字符串。

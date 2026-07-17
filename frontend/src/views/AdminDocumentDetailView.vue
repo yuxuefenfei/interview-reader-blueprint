@@ -2,7 +2,8 @@
 import { ArrowLeft, EditPen, Plus, UploadFilled, Delete, Promotion } from "@element-plus/icons-vue";
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus/es/components/message/index";
+import { ElMessageBox } from "element-plus/es/components/message-box/index";
 import { adminApi } from "../api/admin";
 import { formatTime, zh } from "../shared/presentation";
 import type { AdminDocumentSummary, VersionSummary } from "../types/api";

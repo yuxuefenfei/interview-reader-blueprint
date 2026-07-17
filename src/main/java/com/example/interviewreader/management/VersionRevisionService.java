@@ -166,9 +166,7 @@ public class VersionRevisionService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Draft contains blocking structure errors");
         }
         replaceContent(version.id, request.documentPackage());
-        version.draftRevision++;
-        documentVersionMapper.update(version);
-        touchDocument(version.documentId);
+        advanceDraft(version);
         return new ManagementDtos.EditableVersion(summary(version), packageFor(version));
     }
 
@@ -463,8 +461,21 @@ public class VersionRevisionService {
     }
 
     private void advanceDraft(DocumentVersionEntity version) {
-        version.draftRevision++;
-        documentVersionMapper.update(version);
+        var expectedRevision = version.draftRevision;
+        var nextRevision = expectedRevision + 1;
+        var update = UpdateWrapper.of(DocumentVersionEntity.class)
+                .set(DOCUMENT_VERSION_ENTITY.DRAFT_REVISION, nextRevision);
+        var updated = documentVersionMapper.updateByQuery(
+                update.toEntity(),
+                false,
+                QueryWrapper.create()
+                        .where(DOCUMENT_VERSION_ENTITY.ID.eq(version.id))
+                        .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("DRAFT"))
+                        .and(DOCUMENT_VERSION_ENTITY.DRAFT_REVISION.eq(expectedRevision)));
+        if (updated != 1) {
+            throw new ApiException(HttpStatus.CONFLICT, "DRAFT_REVISION_CONFLICT", "草稿已被其他操作更新，请刷新后再试。");
+        }
+        version.draftRevision = nextRevision;
         touchDocument(version.documentId);
     }
 

@@ -96,7 +96,10 @@ public class DocumentQueryService {
         var hasNext = documents.size() > safeLimit;
         var pageItems = hasNext ? documents.subList(0, safeLimit) : documents;
         var nextCursor = hasNext ? encodeDocumentCursor(pageItems.getLast()) : null;
-        return new DocumentPage(pageItems.stream().map(this::mapDocumentSummary).toList(), nextCursor);
+        var progressByDocument = progressByDocument(pageItems.stream().map(document -> document.id).toList());
+        return new DocumentPage(pageItems.stream()
+                .map(document -> mapDocumentSummary(document, progressByDocument.get(document.id)))
+                .toList(), nextCursor);
     }
 
     public DocumentSummary getDocument(UUID documentId) {
@@ -109,7 +112,7 @@ public class DocumentQueryService {
         if (document == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
         }
-        return mapDocumentSummary(document);
+        return mapDocumentSummary(document, progress(documentId));
     }
 
     @Transactional
@@ -203,18 +206,35 @@ public class DocumentQueryService {
         var safeLimit = Math.clamp(limit == null ? 20 : limit, 1, 100);
         var needle = q.trim();
         var searchLimit = documentId == null ? safeLimit * 4 : safeLimit * 8;
-        var matchedBlocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+        var blockQuery = QueryWrapper.create()
                 .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
                 .from(CONTENT_BLOCK_ENTITY)
+                .innerJoin(CONTENT_NODE_ENTITY).on(CONTENT_BLOCK_ENTITY.NODE_ID.eq(CONTENT_NODE_ENTITY.ID))
+                .innerJoin(DOCUMENT_VERSION_ENTITY).on(CONTENT_NODE_ENTITY.VERSION_ID.eq(DOCUMENT_VERSION_ENTITY.ID))
+                .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
                 .where(CONTENT_BLOCK_ENTITY.PLAIN_TEXT.like(needle))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .orderBy(CONTENT_BLOCK_ENTITY.VERSION_ID.asc(), CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc())
-                .limit(searchLimit));
-        var titleMatchedNodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .limit(searchLimit);
+        var nodeQuery = QueryWrapper.create()
                 .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
                 .from(CONTENT_NODE_ENTITY)
+                .innerJoin(DOCUMENT_VERSION_ENTITY).on(CONTENT_NODE_ENTITY.VERSION_ID.eq(DOCUMENT_VERSION_ENTITY.ID))
+                .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
                 .where(CONTENT_NODE_ENTITY.TITLE.like(needle))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .orderBy(CONTENT_NODE_ENTITY.PATH.asc())
-                .limit(searchLimit));
+                .limit(searchLimit);
+        if (documentId != null) {
+            blockQuery.and(DOCUMENT_ENTITY.ID.eq(id(documentId)));
+            nodeQuery.and(DOCUMENT_ENTITY.ID.eq(id(documentId)));
+        }
+        var matchedBlocks = contentBlockMapper.selectListByQuery(blockQuery);
+        var titleMatchedNodes = contentNodeMapper.selectListByQuery(nodeQuery);
 
         var nodeIds = new ArrayList<String>();
         matchedBlocks.stream().map(block -> block.nodeId).distinct().forEach(nodeIds::add);
@@ -336,6 +356,7 @@ public class DocumentQueryService {
 
     @Transactional
     public ReadingProgress upsertProgress(UUID documentId, ReadingProgress progress) {
+        validateReadingPosition(documentId, progress);
         var existing = progress(documentId);
         if (existing == null) {
             var entity = new ReadingProgressEntity();
@@ -366,6 +387,44 @@ public class DocumentQueryService {
             readingProgressMapper.update(existing);
         }
         return getProgress(documentId);
+    }
+
+    private void validateReadingPosition(UUID documentId, ReadingProgress progress) {
+        var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.ID)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
+                .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(progress.versionId())))
+                .and(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED")));
+        if (version == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "READING_VERSION_INVALID", "阅读版本不属于目标文档或尚未发布。");
+        }
+        if (progress.sectionId() != null) {
+            var section = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
+                    .select(CONTENT_NODE_ENTITY.ID)
+                    .from(CONTENT_NODE_ENTITY)
+                    .where(CONTENT_NODE_ENTITY.ID.eq(id(progress.sectionId())))
+                    .and(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(progress.versionId()))));
+            if (section == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "READING_SECTION_INVALID", "阅读章节不属于目标版本。");
+            }
+        }
+        if (progress.blockId() != null) {
+            var blockQuery = QueryWrapper.create()
+                    .select(CONTENT_BLOCK_ENTITY.ID)
+                    .from(CONTENT_BLOCK_ENTITY)
+                    .where(CONTENT_BLOCK_ENTITY.ID.eq(id(progress.blockId())))
+                    .and(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(progress.versionId())));
+            if (progress.sectionId() != null) {
+                blockQuery.and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(id(progress.sectionId())));
+            }
+            if (contentBlockMapper.selectOneByQuery(blockQuery) == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "READING_BLOCK_INVALID", "阅读内容块不属于目标版本或章节。");
+            }
+        }
     }
 
     private TocNode node(UUID versionId, UUID nodeId) {
@@ -454,8 +513,21 @@ public class DocumentQueryService {
                 .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.eq(id(documentId))));
     }
 
-    private DocumentSummary mapDocumentSummary(DocumentEntity document) {
-        var progress = progress(uuid(document.id));
+    private Map<String, ReadingProgressEntity> progressByDocument(List<String> documentIds) {
+        if (documentIds.isEmpty()) {
+            return Map.of();
+        }
+        var result = new LinkedHashMap<String, ReadingProgressEntity>();
+        readingProgressMapper.selectListByQuery(QueryWrapper.create()
+                        .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
+                        .from(READING_PROGRESS_ENTITY)
+                        .where(READING_PROGRESS_ENTITY.USER_ID.eq(LOCAL_USER_ID))
+                        .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.in(documentIds)))
+                .forEach(progress -> result.put(progress.documentId, progress));
+        return result;
+    }
+
+    private DocumentSummary mapDocumentSummary(DocumentEntity document, ReadingProgressEntity progress) {
         var ratio = progress == null ? BigDecimal.ZERO : progress.progressRatio;
         return new DocumentSummary(
                 uuid(document.id),

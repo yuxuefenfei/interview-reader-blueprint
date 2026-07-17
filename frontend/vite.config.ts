@@ -30,7 +30,14 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "../target/frontend-static",
-      emptyOutDir: true
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vue-vendor": ["vue", "vue-router"]
+          }
+        }
+      }
     },
     test: {
       environment: "jsdom",

@@ -2,7 +2,8 @@
 import { ArrowLeft, Delete, EditPen, FolderOpened, FullScreen, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus/es/components/message/index";
+import { ElMessageBox } from "element-plus/es/components/message-box/index";
 import { adminApi } from "../api/admin";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import { zh } from "../shared/presentation";

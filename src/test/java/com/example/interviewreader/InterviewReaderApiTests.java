@@ -159,6 +159,83 @@ class InterviewReaderApiTests {
     }
 
     @Test
+    void searchFiltersUnpublishedMatchesBeforeApplyingLimit() throws Exception {
+        var marker = "published-search-" + UUID.randomUUID();
+        var imports = new java.util.ArrayList<ImportResult>();
+        for (var index = 0; index < 6; index++) {
+            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+            ((ObjectNode) source.get("document")).put("documentKey", marker + "-key-" + index);
+            ((ObjectNode) source.get("document")).put("title", marker + " title " + index);
+            ((ObjectNode) source.get("version")).put("versionKey", marker + "-version-" + index);
+            var block = (ObjectNode) source.get("blocks").get(0);
+            block.put("plainText", marker);
+            ((ObjectNode) block.get("payload")).put("text", marker);
+            imports.add(importAndCommit(objectMapper.writeValueAsBytes(source)));
+        }
+        var published = imports.stream()
+                .max(java.util.Comparator.comparing(result -> result.versionId().toString()))
+                .orElseThrow();
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish",
+                        published.documentId(), published.versionId()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/reader/search")
+                        .param("q", marker)
+                        .param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].documentId").value(published.documentId().toString()));
+    }
+
+    @Test
+    void readingProgressRejectsMissingRatioAndCrossDocumentPositions() throws Exception {
+        var firstSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) firstSource.get("document")).put("documentKey", "progress-first-" + UUID.randomUUID());
+        ((ObjectNode) firstSource.get("version")).put("versionKey", "progress-first-version");
+        var first = importAndCommit(objectMapper.writeValueAsBytes(firstSource));
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish",
+                        first.documentId(), first.versionId()))
+                .andExpect(status().isNoContent());
+
+        var secondSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) secondSource.get("document")).put("documentKey", "progress-other-" + UUID.randomUUID());
+        ((ObjectNode) secondSource.get("version")).put("versionKey", "progress-other-version");
+        var second = importAndCommit(objectMapper.writeValueAsBytes(secondSource));
+        mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish",
+                        second.documentId(), second.versionId()))
+                .andExpect(status().isNoContent());
+
+        var missingRatio = """
+                {
+                  "versionId": "%s",
+                  "charOffset": 0,
+                  "blockViewportOffset": 0,
+                  "revision": 0
+                }
+                """.formatted(first.versionId());
+        mockMvc.perform(put("/api/reader/reading-progress/{documentId}", first.documentId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(missingRatio))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        var crossDocument = """
+                {
+                  "versionId": "%s",
+                  "charOffset": 0,
+                  "blockViewportOffset": 0,
+                  "progressRatio": 0.1,
+                  "revision": 0
+                }
+                """.formatted(second.versionId());
+        mockMvc.perform(put("/api/reader/reading-progress/{documentId}", first.documentId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(crossDocument))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("READING_VERSION_INVALID"));
+    }
+
+    @Test
     void documentLibraryUsesDatabaseCursorPagination() throws Exception {
         var marker = "cursor-page-" + UUID.randomUUID();
         for (var index = 0; index < 3; index++) {
@@ -896,6 +973,19 @@ class InterviewReaderApiTests {
     }
 
     @Test
+    void legacyXlsUploadIsRejectedInsteadOfCreatingAnUnprocessableJob() throws Exception {
+        var file = new MockMultipartFile(
+                "file",
+                "legacy.xls",
+                "application/vnd.ms-excel",
+                "legacy-binary-workbook".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/api/admin/import-jobs").file(file))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_SOURCE_FILE"));
+    }
+
+    @Test
     void excelUploadRejectsNonZipContentBeforeParsing() throws Exception {
         var job = uploadPackage("not an xlsx".getBytes(StandardCharsets.UTF_8), "EXCEL", "fake.xlsx");
         assertThat(job.get("status").asText()).isEqualTo("REVIEW_REQUIRED");
@@ -1098,6 +1188,14 @@ class InterviewReaderApiTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version.draftRevision").value(1))
                 .andExpect(jsonPath("$.nodes[1].title").value("已修订的结论"));
+
+        var staleBlockUpdate = """
+                { "draftRevision": 0, "blockType": "paragraph", "payload": { "text": "过期写入" }, "plainText": "过期写入", "language": null }
+                """;
+        mockMvc.perform(patch("/api/admin/versions/{versionId}/editor/blocks/{blockId}", versionId, blockId)
+                        .contentType(MediaType.APPLICATION_JSON).content(staleBlockUpdate))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DRAFT_REVISION_CONFLICT"));
 
         var blockUpdate = """
                 { "draftRevision": 1, "blockType": "paragraph", "payload": { "text": "可检索的新内容" }, "plainText": "可检索的新内容", "language": null }

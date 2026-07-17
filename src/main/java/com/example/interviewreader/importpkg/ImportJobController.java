@@ -31,11 +31,10 @@ public class ImportJobController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ImportJobDto create(
-            @RequestParam(required = false) String sourceType,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) UUID targetDocumentId
     ) {
-        return service.createImportJob(sourceType, file, targetDocumentId);
+        return service.createImportJob(file, targetDocumentId);
     }
 
     @GetMapping("/{jobId}")

@@ -123,7 +123,7 @@ public class ImportPackageService {
     }
 
     @Transactional
-    public ImportJobDto createImportJob(String sourceType, MultipartFile file, UUID targetDocumentId) {
+    public ImportJobDto createImportJob(MultipartFile file, UUID targetDocumentId) {
         var fileBytes = readBytes(file);
         var normalizedSourceType = detectSourceType(file.getOriginalFilename(), fileBytes);
         var sourceSha256 = Hashes.sha256(fileBytes);
@@ -728,7 +728,7 @@ public class ImportPackageService {
     private String detectSourceType(String fileName, byte[] bytes) {
         var normalizedName = Objects.toString(fileName, "").toLowerCase(Locale.ROOT);
         if (startsWith(bytes, "%PDF-")) return "PDF";
-        if (normalizedName.endsWith(".xlsx") || normalizedName.endsWith(".xls") || looksLikeZip(bytes)) return "EXCEL";
+        if (normalizedName.endsWith(".xlsx") || looksLikeZip(bytes)) return "EXCEL";
         if (normalizedName.endsWith(".md") || normalizedName.endsWith(".markdown")) return "MARKDOWN";
         if (normalizedName.endsWith(".json") || firstNonWhitespace(bytes) == '{' || firstNonWhitespace(bytes) == '[') return "JSON_PACKAGE";
         throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_SOURCE_FILE", "无法识别文件格式，请上传 PDF、Excel、Markdown 或 JSON 文档包。");

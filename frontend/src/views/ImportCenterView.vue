@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { CircleCheck, DocumentAdd, Search, UploadFilled } from "@element-plus/icons-vue";
-import type { UploadRawFile } from "element-plus";
+import type { UploadRawFile } from "element-plus/es/components/upload/index";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "element-plus/es/components/message/index";
 import { adminApi } from "../api/admin";
 import { importIssueMessage, zh } from "../shared/presentation";
 import { importStageState, importStageSummary, processingStages } from "../utils/importProgress";
@@ -71,7 +71,7 @@ async function commit(): Promise<void> {
 function issueMessage(issue: ImportIssue): string { return importIssueMessage(issue.issueCode, issue.sourcePage, issue.message); }
 function inferSourceType(name: string): string {
   const suffix = name.split(".").pop()?.toLowerCase();
-  return suffix === "pdf" ? "PDF" : suffix === "xlsx" || suffix === "xls" ? "EXCEL" : suffix === "md" || suffix === "markdown" ? "MARKDOWN" : suffix === "json" ? "JSON_PACKAGE" : "UNKNOWN";
+  return suffix === "pdf" ? "PDF" : suffix === "xlsx" ? "EXCEL" : suffix === "md" || suffix === "markdown" ? "MARKDOWN" : suffix === "json" ? "JSON_PACKAGE" : "UNKNOWN";
 }
 function message(value: unknown): string { return value instanceof Error ? value.message : "导入失败"; }
 </script>

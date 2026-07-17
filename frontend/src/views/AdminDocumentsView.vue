@@ -2,7 +2,7 @@
 import { Search, UploadFilled, View } from "@element-plus/icons-vue";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage } from "element-plus/es/components/message/index";
 import { adminApi } from "../api/admin";
 import { formatTime, zh } from "../shared/presentation";
 import type { AdminDocumentSummary } from "../types/api";

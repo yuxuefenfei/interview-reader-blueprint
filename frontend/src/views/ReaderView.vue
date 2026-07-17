@@ -5,7 +5,10 @@ import { useRoute, useRouter } from "vue-router";
 import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import TocTree from "../components/TocTree.vue";
-import type { DocumentSummary, NodeContent, TocNode } from "../types/api";
+import { cacheNodeContent, getCachedNodeContent } from "../offline/contentCache";
+import { enqueueReadingProgress, flushReadingProgressQueue } from "../offline/progressQueue";
+import type { DocumentSummary, NodeContent, ReadingProgress, TocNode } from "../types/api";
+import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
 import { firstReadableNode, flattenToc, isQuestionNode } from "../utils/toc";
 
 defineProps<{ username?: string | null }>();
@@ -27,7 +30,10 @@ const searchHits = ref<Awaited<ReturnType<typeof readerApi.search>>>([]);
 const readingArea = ref<HTMLElement | null>(null);
 const chapterProgress = ref(0);
 const theme = ref(localStorage.getItem("reader.theme") || "light");
+const loadingMore = ref(false);
+const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
+let contentRequestId = 0;
 
 const readable = computed(() => flattenToc(toc.value).filter((node) => isQuestionNode(node) || node.children.length === 0));
 const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));
@@ -37,8 +43,16 @@ const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgre
 
 watch(theme, (value) => localStorage.setItem("reader.theme", value));
 watch(() => route.params.documentId, () => { void openFromRoute(); });
-onMounted(async () => { await loadDocuments(); await openFromRoute(); });
-onBeforeUnmount(() => { if (saveTimer !== null) window.clearTimeout(saveTimer); });
+onMounted(async () => {
+  window.addEventListener("online", flushOfflineProgress);
+  void flushOfflineProgress();
+  await loadDocuments();
+  await openFromRoute();
+});
+onBeforeUnmount(() => {
+  if (saveTimer !== null) window.clearTimeout(saveTimer);
+  window.removeEventListener("online", flushOfflineProgress);
+});
 
 async function loadDocuments(): Promise<void> {
   try {
@@ -69,13 +83,55 @@ async function selectDocument(document: DocumentSummary): Promise<void> {
 }
 
 async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
-  if (!selected.value?.currentVersionId) return;
+  const versionId = selected.value?.currentVersionId;
+  if (!versionId) return;
+  const requestId = ++contentRequestId;
   activeNode.value = node;
-  content.value = await readerApi.content(selected.value.currentVersionId, node.id);
-  drawer.value = false;
-  if (shouldScroll) await nextTick(() => readingArea.value?.scrollTo({ top: 0, behavior: "smooth" }));
-  chapterProgress.value = 0;
-  scheduleProgress();
+  error.value = "";
+  try {
+    let nextContent: NodeContent;
+    try {
+      nextContent = await readerApi.content(versionId, node.id);
+      void cacheNodeContent(versionId, node.id, 100, nextContent).catch(() => undefined);
+    } catch (caught) {
+      const cached = await getCachedNodeContent(versionId, node.id, 100);
+      if (!cached) throw caught;
+      nextContent = cached;
+    }
+    if (requestId !== contentRequestId) return;
+    content.value = nextContent;
+    drawer.value = false;
+    if (shouldScroll) await nextTick(() => readingArea.value?.scrollTo({ top: 0, behavior: "smooth" }));
+    chapterProgress.value = 0;
+    scheduleProgress();
+  } catch (caught) {
+    if (requestId === contentRequestId) {
+      content.value = null;
+      error.value = message(caught);
+    }
+  }
+}
+
+async function loadMoreContent(): Promise<void> {
+  const versionId = selected.value?.currentVersionId;
+  const node = activeNode.value;
+  const current = content.value;
+  if (!versionId || !node || !current?.nextAfterSeq || loadingMore.value) return;
+  loadingMore.value = true;
+  try {
+    const page = await readerApi.content(versionId, node.id, current.nextAfterSeq);
+    if (activeNode.value?.id !== node.id || content.value !== current) return;
+    content.value = {
+      node: current.node,
+      blocks: [...current.blocks, ...page.blocks],
+      nextAfterSeq: page.nextAfterSeq
+    };
+    void cacheNodeContent(versionId, node.id, 100, content.value).catch(() => undefined);
+  } catch (caught) {
+    error.value = message(caught);
+  } finally {
+    loadingMore.value = false;
+  }
 }
 
 function onReadingScroll(): void {
@@ -92,7 +148,7 @@ function scheduleProgress(): void {
   saveTimer = window.setTimeout(() => {
     if (!selected.value || !activeNode.value || !selected.value.currentVersionId) return;
     const firstBlock = content.value?.blocks[0] ?? null;
-    void readerApi.saveProgress(selected.value.id, {
+    const progress: ReadingProgress = {
       versionId: selected.value.currentVersionId,
       sectionId: activeNode.value.id,
       blockId: firstBlock?.id ?? null,
@@ -100,10 +156,23 @@ function scheduleProgress(): void {
       blockViewportOffset: 0,
       progressRatio: chapterProgress.value,
       clientUpdatedAt: new Date().toISOString(),
-      deviceId: localStorage.getItem("reader.deviceId") || crypto.randomUUID(),
+      deviceId,
       revision: 0
-    }).catch(() => undefined);
+    };
+    void saveProgressOfflineAware(selected.value.id, progress);
   }, 700);
+}
+
+async function saveProgressOfflineAware(documentId: string, progress: ReadingProgress): Promise<void> {
+  try {
+    await readerApi.saveProgress(documentId, progress);
+  } catch {
+    await enqueueReadingProgress(documentId, progress).catch(() => undefined);
+  }
+}
+
+function flushOfflineProgress(): void {
+  void flushReadingProgressQueue(readerApi.saveProgress).catch(() => undefined);
 }
 
 async function search(): Promise<void> {
@@ -141,7 +210,7 @@ function message(value: unknown): string { return value instanceof Error ? value
       <div v-if="loading" class="reader-state">正在加载章节</div>
       <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
       <template v-else-if="content">
-        <article class="reader-article"><h1>{{ content.node.title }}</h1><ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" /></article>
+        <article class="reader-article"><h1>{{ content.node.title }}</h1><ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" /><div v-if="content.nextAfterSeq" class="reader-load-more"><el-button :loading="loadingMore" @click="loadMoreContent">加载更多内容</el-button></div></article>
         <nav class="chapter-pagination" aria-label="章节翻页"><el-button :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button><el-button type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button></nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
