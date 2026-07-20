@@ -4,7 +4,7 @@ import { CircleCheck, DocumentAdd, Search, UploadFilled } from "@element-plus/ic
 import type { UploadRawFile } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus/es/components/message";
+import { ElMessage } from "element-plus/es/components/message/index";
 import { adminApi } from "../api/admin";
 import { importIssueMessage, zh } from "../shared/presentation";
 import { IMPORT_POLL_BACKOFF_FACTOR, IMPORT_POLL_INITIAL_DELAY_MS, IMPORT_POLL_MAX_DELAY_MS } from "../shared/runtimePolicy";

@@ -3,7 +3,7 @@ import { toUserMessage } from "../utils/errorMessage";
 import { ArrowLeft, Delete, EditPen, FolderOpened, FullScreen, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus/es/components/message";
+import { ElMessage } from "element-plus/es/components/message/index";
 import { ElMessageBox } from "element-plus";
 import { adminApi } from "../api/admin";
 import ContentBlockView from "../components/ContentBlockView.vue";
