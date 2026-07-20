@@ -55,7 +55,7 @@ server {
     }
 
     # 健康检查仅限本机或内网监控网段访问。按实际监控网络调整。
-    location = /actuator/health {
+    location ~ ^/actuator/health(?:/(?:liveness|readiness))?$ {
         allow 127.0.0.1;
         allow 10.0.0.0/8;
         deny all;

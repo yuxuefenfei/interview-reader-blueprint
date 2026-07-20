@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toUserMessage } from "../utils/errorMessage";
 import { ArrowLeft, ArrowRight, Close, Menu, Moon, Search, Sunny } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -6,7 +7,7 @@ import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import TocTree from "../components/TocTree.vue";
 import { cacheNodeContent, getCachedNodeContent } from "../offline/contentCache";
-import { enqueueReadingProgress, flushReadingProgressQueue } from "../offline/progressQueue";
+import { enqueueReadingProgress, flushReadingProgressQueue, shouldQueueReadingProgress } from "../offline/progressQueue";
 import type { DocumentSummary, NodeContent, ReadingProgress, TocNode } from "../types/api";
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
 import { firstReadableNode, flattenToc, isQuestionNode } from "../utils/toc";
@@ -166,8 +167,14 @@ function scheduleProgress(): void {
 async function saveProgressOfflineAware(documentId: string, progress: ReadingProgress): Promise<void> {
   try {
     await readerApi.saveProgress(documentId, progress);
-  } catch {
-    await enqueueReadingProgress(documentId, progress).catch(() => undefined);
+  } catch (caught) {
+    if (shouldQueueReadingProgress(caught)) {
+      await enqueueReadingProgress(documentId, progress).catch(() => {
+        error.value = "阅读进度暂时无法保存";
+      });
+      return;
+    }
+    error.value = message(caught);
   }
 }
 
@@ -189,15 +196,15 @@ async function jump(hit: { documentId: string; nodeId: string }): Promise<void> 
 }
 
 function toggleTheme(): void { theme.value = theme.value === "dark" ? "light" : "dark"; }
-function message(value: unknown): string { return value instanceof Error ? value.message : "加载失败"; }
+function message(value: unknown): string { return toUserMessage(value, "加载失败"); }
 </script>
 
 <template>
   <div class="reader-page" :class="`theme-${theme}`">
     <header class="reader-header">
-      <button class="reader-menu-button" type="button" aria-label="打开目录" @click="drawer = true"><el-icon><Menu /></el-icon></button>
+      <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true"><el-icon><Menu /></el-icon></button>
       <div class="reader-heading"><strong>{{ activeNode?.title || selected?.title || "阅读器" }}</strong><span>{{ selected?.title }}</span></div>
-      <div class="reader-header-actions"><el-button circle :icon="theme === 'dark' ? Sunny : Moon" :aria-label="theme === 'dark' ? '浅色模式' : '深色模式'" @click="toggleTheme" /><el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button><el-button text @click="emit('logout')">退出</el-button></div>
+      <div class="reader-header-actions"><el-button circle :icon="theme === 'dark' ? Sunny : Moon" :aria-label="theme === 'dark' ? '浅色模式' : '深色模式'" :aria-pressed="theme === 'dark'" @click="toggleTheme" /><el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button><el-button text @click="emit('logout')">退出</el-button></div>
       <div class="mobile-chapter-progress" aria-label="当前章节阅读进度"><span :style="mobileProgressStyle"></span></div>
     </header>
 
@@ -216,9 +223,9 @@ function message(value: unknown): string { return value instanceof Error ? value
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
     </main>
 
-    <div class="reader-fab" :class="{ open: toolsOpen }"><button v-if="toolsOpen" class="reader-fab-action reader-fab-search" type="button" aria-label="搜索" @click="searchOpen = true; toolsOpen = false"><el-icon><Search /></el-icon></button><button v-if="toolsOpen" class="reader-fab-action reader-fab-toc" type="button" aria-label="目录" @click="drawer = true; toolsOpen = false"><el-icon><Menu /></el-icon></button><button class="reader-fab-main" type="button" :aria-label="toolsOpen ? '关闭工具箱' : '打开工具箱'" @click="toolsOpen = !toolsOpen"><el-icon><Close v-if="toolsOpen" /><Menu v-else /></el-icon></button></div>
+    <div class="reader-fab" :class="{ open: toolsOpen }"><button v-if="toolsOpen" class="reader-fab-action reader-fab-search" type="button" aria-label="搜索" @click="searchOpen = true; toolsOpen = false"><el-icon><Search /></el-icon></button><button v-if="toolsOpen" class="reader-fab-action reader-fab-toc" type="button" aria-label="目录" @click="drawer = true; toolsOpen = false"><el-icon><Menu /></el-icon></button><button class="reader-fab-main" type="button" :aria-label="toolsOpen ? '关闭工具箱' : '打开工具箱'" :aria-expanded="toolsOpen" @click="toolsOpen = !toolsOpen"><el-icon><Close v-if="toolsOpen" /><Menu v-else /></el-icon></button></div>
 
     <el-drawer v-model="drawer" direction="ltr" size="min(88vw, 360px)" :with-header="false"><section class="reader-drawer"><header><strong>文档目录</strong><el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" /></header><div class="reader-drawer-documents"><button v-for="document in documents" :key="document.id" :class="{ active: document.id === selected?.id }" type="button" @click="selectDocument(document)">{{ document.title }}</button></div><TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" /></section></el-drawer>
-    <el-drawer v-model="searchOpen" direction="btt" size="min(68vh, 520px)" :with-header="false"><section class="reader-search-sheet"><header><strong>搜索当前文档</strong><el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" /></header><el-input v-model="query" placeholder="搜索标题或正文" clearable @keyup.enter="search"><template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template></el-input><button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)"><strong>{{ hit.title }}</strong><span>{{ hit.snippet }}</span></button></section></el-drawer>
+    <el-drawer v-model="searchOpen" direction="btt" size="min(68vh, 520px)" :with-header="false"><section class="reader-search-sheet"><header><strong>搜索当前文档</strong><el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" /></header><el-input v-model="query" aria-label="搜索标题或正文" placeholder="搜索标题或正文" clearable @keyup.enter="search"><template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template></el-input><button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)"><strong>{{ hit.title }}</strong><span>{{ hit.snippet }}</span></button></section></el-drawer>
   </div>
 </template>

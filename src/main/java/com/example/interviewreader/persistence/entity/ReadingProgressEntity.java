@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import lombok.Getter;
+import lombok.Setter;
 
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
@@ -6,20 +8,23 @@ import com.mybatisflex.annotation.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/** 阅读进度持久化实体。 */
+@Getter
+@Setter
 @Table("reading_progress")
 public class ReadingProgressEntity {
     @Id(keyType = KeyType.None)
-    public String id;
-    public String userId;
-    public String documentId;
-    public String versionId;
-    public String sectionId;
-    public String blockId;
-    public int charOffset;
-    public int blockViewportOffset;
-    public BigDecimal progressRatio;
-    public OffsetDateTime clientUpdatedAt;
-    public String deviceId;
-    public long revision;
-    public OffsetDateTime updatedAt;
+    private String id;
+    private String userId;
+    private String documentId;
+    private String versionId;
+    private String sectionId;
+    private String blockId;
+    private int charOffset;
+    private int blockViewportOffset;
+    private BigDecimal progressRatio;
+    private OffsetDateTime clientUpdatedAt;
+    private String deviceId;
+    private long revision;
+    private OffsetDateTime updatedAt;
 }

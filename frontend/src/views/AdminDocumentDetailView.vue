@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toUserMessage } from "../utils/errorMessage";
 import { ArrowLeft, CircleCheckFilled, Delete, EditPen, MoreFilled, Plus, RefreshRight, UploadFilled } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -213,7 +214,7 @@ function handleMoreCommand(version: VersionSummary, command: string | number | o
   if (command === ("create" satisfies MoreCommand)) void createRevision(version);
   if (command === ("discard" satisfies MoreCommand)) void discard(version);
 }
-function message(value: unknown): string { return value instanceof Error ? value.message : "操作失败，请稍后重试"; }
+function message(value: unknown): string { return toUserMessage(value, "操作失败，请稍后重试"); }
 </script>
 
 <template>

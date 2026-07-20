@@ -3,9 +3,7 @@ package com.example.interviewreader.exportpkg;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.importpkg.DocumentPackage;
-import com.example.interviewreader.persistence.entity.AssetEntity;
-import com.example.interviewreader.persistence.entity.ContentBlockEntity;
-import com.example.interviewreader.persistence.entity.ContentNodeEntity;
+import com.example.interviewreader.persistence.entity.*;
 import com.example.interviewreader.persistence.mapper.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -48,22 +46,28 @@ public class DocumentPackageExportService {
                 .from(CONTENT_NODE_ENTITY)
                 .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(versionId)))
                 .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
-        var nodesById = nodes.stream().collect(Collectors.toMap(node -> node.id, Function.identity()));
-        var tags = documentTagMapper.selectListByQuery(QueryWrapper.create()
+        var nodesById = nodes.stream().collect(Collectors.toMap(node -> node.getId(), Function.identity()));
+        var tagIds = documentTagMapper.selectListByQuery(QueryWrapper.create()
                         .select(DOCUMENT_TAG_ENTITY.ALL_COLUMNS)
                         .from(DOCUMENT_TAG_ENTITY)
                         .where(DOCUMENT_TAG_ENTITY.DOCUMENT_ID.eq(id(documentId))))
                 .stream()
-                .map(link -> tagMapper.selectOneByQuery(QueryWrapper.create()
-                        .select(TAG_ENTITY.ALL_COLUMNS)
-                        .from(TAG_ENTITY)
-                        .where(TAG_ENTITY.ID.eq(link.tagId))))
-                .filter(Objects::nonNull)
-                .map(tag -> tag.name)
-                .sorted()
+                .map(DocumentTagEntity::getTagId)
+                .distinct()
                 .toList();
+        // 标签数量不应放大 SQL 次数；关联与标签各读取一次，并保持原有的名称排序契约。
+        var tags = tagIds.isEmpty()
+                ? List.<String>of()
+                : tagMapper.selectListByQuery(QueryWrapper.create()
+                                .select(TAG_ENTITY.ALL_COLUMNS)
+                                .from(TAG_ENTITY)
+                                .where(TAG_ENTITY.ID.in(tagIds)))
+                        .stream()
+                        .map(TagEntity::getName)
+                        .sorted()
+                        .toList();
         var sections = nodes.stream()
-                .map(node -> mapSection(node, nodesById.get(node.parentId)))
+                .map(node -> mapSection(node, nodesById.get(node.getParentId())))
                 .toList();
         var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
                         .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
@@ -71,9 +75,9 @@ public class DocumentPackageExportService {
                         .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(versionId))))
                 .stream()
                 .sorted(Comparator
-                        .comparing((ContentBlockEntity block) -> nodesById.get(block.nodeId).path)
-                        .thenComparingInt(block -> block.seq))
-                .map(block -> mapBlock(block, nodesById.get(block.nodeId)))
+                        .comparing((ContentBlockEntity block) -> nodesById.get(block.getNodeId()).getPath())
+                        .thenComparingInt(ContentBlockEntity::getSeq))
+                .map(block -> mapBlock(block, nodesById.get(block.getNodeId())))
                 .toList();
         var assets = assetMapper.selectListByQuery(QueryWrapper.create()
                         .select(ASSET_ENTITY.ALL_COLUMNS)
@@ -119,58 +123,58 @@ public class DocumentPackageExportService {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document version not found");
         }
         return new Header(
-                document.code,
-                document.title,
-                document.description,
-                version.versionNo,
-                version.sourceType,
-                version.sourceFileName,
-                version.sourceFileSha256,
-                version.converterVersion,
-                version.schemaVersion,
-                version.language,
-                readMap(version.metadata));
+                document.getCode(),
+                document.getTitle(),
+                document.getDescription(),
+                version.getVersionNo(),
+                version.getSourceType(),
+                version.getSourceFileName(),
+                version.getSourceFileSha256(),
+                version.getConverterVersion(),
+                version.getSchemaVersion(),
+                version.getLanguage(),
+                readMap(version.getMetadata()));
     }
 
     private DocumentPackage.SectionInfo mapSection(ContentNodeEntity node, ContentNodeEntity parent) {
         return new DocumentPackage.SectionInfo(
-                node.nodeKey,
-                parent == null ? null : parent.nodeKey,
-                node.level,
-                node.nodeType,
-                node.semanticRole,
-                node.title,
-                node.sortOrder,
-                node.anchor,
-                node.sourcePageStart,
-                node.sourcePageEnd,
-                readTreeOrNull(node.sourceBbox),
-                node.contentHash);
+                node.getNodeKey(),
+                parent == null ? null : parent.getNodeKey(),
+                node.getLevel(),
+                node.getNodeType(),
+                node.getSemanticRole(),
+                node.getTitle(),
+                node.getSortOrder(),
+                node.getAnchor(),
+                node.getSourcePageStart(),
+                node.getSourcePageEnd(),
+                readTreeOrNull(node.getSourceBbox()),
+                node.getContentHash());
     }
 
     private DocumentPackage.BlockInfo mapBlock(ContentBlockEntity block, ContentNodeEntity node) {
         return new DocumentPackage.BlockInfo(
-                block.blockKey,
-                node.nodeKey,
-                block.seq,
-                block.blockType,
-                readTreeOrNull(block.payload),
-                block.plainText,
-                block.language,
-                block.sourcePage,
-                readTreeOrNull(block.sourceBbox),
-                block.confidence,
-                block.contentHash);
+                block.getBlockKey(),
+                node.getNodeKey(),
+                block.getSeq(),
+                block.getBlockType(),
+                readTreeOrNull(block.getPayload()),
+                block.getPlainText(),
+                block.getLanguage(),
+                block.getSourcePage(),
+                readTreeOrNull(block.getSourceBbox()),
+                block.getConfidence(),
+                block.getContentHash());
     }
 
     private DocumentPackage.AssetInfo mapAsset(AssetEntity asset) {
-        var metadata = readTreeOrNull(asset.metadata);
+        var metadata = readTreeOrNull(asset.getMetadata());
         var alt = metadata == null || metadata.get("alt") == null ? null : metadata.get("alt").asText();
         return new DocumentPackage.AssetInfo(
-                asset.assetKey,
-                asset.objectKey,
-                asset.mimeType,
-                asset.sha256.toLowerCase(Locale.ROOT),
+                asset.getAssetKey(),
+                asset.getObjectKey(),
+                asset.getMimeType(),
+                asset.getSha256().toLowerCase(Locale.ROOT),
                 alt);
     }
 

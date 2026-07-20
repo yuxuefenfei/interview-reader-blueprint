@@ -20,7 +20,7 @@ public class DeletedDocumentTombstoneService {
         var cutoff = OffsetDateTime.now().minus(properties.tombstoneRetention());
         return jobMapper.selectCompletedSince(AppConstants.LOCAL_USER_ID.toString(), cutoff, MAX_TOMBSTONES_PER_SYNC).stream()
                 .map(job -> new ManagementDtos.DeletedDocumentTombstone(
-                        java.util.UUID.fromString(job.documentId), job.completedAt))
+                        java.util.UUID.fromString(job.getDocumentId()), job.getCompletedAt()))
                 .toList();
     }
 

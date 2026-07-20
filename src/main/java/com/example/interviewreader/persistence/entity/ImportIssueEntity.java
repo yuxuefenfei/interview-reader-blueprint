@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import lombok.Getter;
+import lombok.Setter;
 
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
@@ -6,21 +8,24 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.time.OffsetDateTime;
 
+/** 文档导入问题持久化实体。 */
+@Getter
+@Setter
 @Table("import_issue")
 public class ImportIssueEntity {
     @Id(keyType = KeyType.None)
-    public String id;
-    public String jobId;
-    public String severity;
-    public String issueCode;
+    private String id;
+    private String jobId;
+    private String severity;
+    private String issueCode;
     @Column(isLarge = true)
-    public String message;
-    public Integer sourcePage;
-    public String sectionKey;
-    public String blockKey;
-    public String cellRef;
+    private String message;
+    private Integer sourcePage;
+    private String sectionKey;
+    private String blockKey;
+    private String cellRef;
     @Column(isLarge = true)
-    public String details;
-    public boolean resolved;
-    public OffsetDateTime createdAt;
+    private String details;
+    private boolean resolved;
+    private OffsetDateTime createdAt;
 }

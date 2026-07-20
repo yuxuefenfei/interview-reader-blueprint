@@ -1,20 +1,25 @@
 package com.example.interviewreader.persistence.entity;
+import lombok.Getter;
+import lombok.Setter;
 
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.time.OffsetDateTime;
 
+/** 复习状态持久化实体。 */
+@Getter
+@Setter
 @Table("review_state")
 public class ReviewStateEntity {
     @Id(keyType = KeyType.None)
-    public String id;
-    public String userId;
-    public String documentId;
-    public String nodeId;
-    public String mastery;
-    public OffsetDateTime dueAt;
-    public Integer intervalDays;
-    public int repetitions;
-    public OffsetDateTime updatedAt;
+    private String id;
+    private String userId;
+    private String documentId;
+    private String nodeId;
+    private String mastery;
+    private OffsetDateTime dueAt;
+    private Integer intervalDays;
+    private int repetitions;
+    private OffsetDateTime updatedAt;
 }

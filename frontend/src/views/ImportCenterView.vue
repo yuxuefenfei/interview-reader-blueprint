@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { toUserMessage } from "../utils/errorMessage";
 import { CircleCheck, DocumentAdd, Search, UploadFilled } from "@element-plus/icons-vue";
-import type { UploadRawFile } from "element-plus/es/components/upload/index";
+import type { UploadRawFile } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus/es/components/message/index";
+import { ElMessage } from "element-plus/es/components/message";
 import { adminApi } from "../api/admin";
 import { importIssueMessage, zh } from "../shared/presentation";
+import { IMPORT_POLL_BACKOFF_FACTOR, IMPORT_POLL_INITIAL_DELAY_MS, IMPORT_POLL_MAX_DELAY_MS } from "../shared/runtimePolicy";
 import { importStageState, importStageSummary, processingStages } from "../utils/importProgress";
 import { TERMINAL_IMPORT_STATUSES } from "../types/api";
 import type { AdminDocumentSummary, ImportIssue, ImportJob } from "../types/api";
@@ -20,12 +22,20 @@ const job = ref<ImportJob | null>(null);
 const issues = ref<ImportIssue[]>([]);
 const uploading = ref(false);
 let pollTimer: number | null = null;
+let pollDelayMs = IMPORT_POLL_INITIAL_DELAY_MS;
+let polling = false;
 
 const recognizedType = computed(() => selectedFile.value ? inferSourceType(selectedFile.value.name) : null);
 const jobStageSummary = computed(() => job.value ? importStageSummary(job.value.status, job.value.currentStage) : "");
 
-onMounted(() => { void searchDocuments(""); });
-onBeforeUnmount(stopPolling);
+onMounted(() => {
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  void searchDocuments("");
+});
+onBeforeUnmount(() => {
+  stopPolling();
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+});
 async function searchDocuments(query: string): Promise<void> {
   documentLoading.value = true;
   try { documents.value = (await adminApi.documents(query, 1, 30)).items.filter((document) => document.status !== "DELETING" && document.status !== "DELETE_FAILED"); }
@@ -48,17 +58,53 @@ async function upload(): Promise<void> {
   } catch (caught) { ElMessage.error(message(caught)); }
   finally { uploading.value = false; }
 }
-function startPolling(): void { stopPolling(); void refreshJob(); pollTimer = window.setInterval(() => void refreshJob(), 800); }
-function stopPolling(): void { if (pollTimer !== null) { window.clearInterval(pollTimer); pollTimer = null; } }
+function startPolling(): void {
+  stopPolling();
+  pollDelayMs = IMPORT_POLL_INITIAL_DELAY_MS;
+  schedulePoll(0);
+}
+function stopPolling(): void {
+  if (pollTimer !== null) {
+    window.clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+}
+function schedulePoll(delayMs: number): void {
+  if (document.hidden || !job.value || TERMINAL_IMPORT_STATUSES.has(job.value.status)) return;
+  pollTimer = window.setTimeout(() => {
+    pollTimer = null;
+    void refreshJob();
+  }, delayMs);
+}
 async function refreshJob(): Promise<void> {
-  if (!job.value) return;
+  if (!job.value || polling || document.hidden) return;
+  polling = true;
   try {
     job.value = await adminApi.importJob(job.value.id);
     if (TERMINAL_IMPORT_STATUSES.has(job.value.status)) {
       stopPolling();
       issues.value = await adminApi.importIssues(job.value.id);
+      return;
     }
-  } catch (caught) { stopPolling(); ElMessage.error(message(caught)); }
+    // 上一请求完成后再安排下一次，并逐步退避，慢网络下不会产生重叠请求。
+    schedulePoll(pollDelayMs);
+    pollDelayMs = Math.min(IMPORT_POLL_MAX_DELAY_MS, Math.ceil(pollDelayMs * IMPORT_POLL_BACKOFF_FACTOR));
+  } catch (caught) {
+    stopPolling();
+    ElMessage.error(message(caught));
+  } finally {
+    polling = false;
+  }
+}
+function onVisibilityChange(): void {
+  if (document.hidden) {
+    stopPolling();
+    return;
+  }
+  if (job.value && !TERMINAL_IMPORT_STATUSES.has(job.value.status)) {
+    pollDelayMs = IMPORT_POLL_INITIAL_DELAY_MS;
+    schedulePoll(0);
+  }
 }
 async function commit(): Promise<void> {
   if (!job.value) return;
@@ -74,7 +120,7 @@ function inferSourceType(name: string): string {
   const suffix = name.split(".").pop()?.toLowerCase();
   return suffix === "pdf" ? "PDF" : suffix === "xlsx" ? "EXCEL" : suffix === "md" || suffix === "markdown" ? "MARKDOWN" : suffix === "json" ? "JSON_PACKAGE" : "UNKNOWN";
 }
-function message(value: unknown): string { return value instanceof Error ? value.message : "导入失败"; }
+function message(value: unknown): string { return toUserMessage(value, "导入失败"); }
 </script>
 
 <template>

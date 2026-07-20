@@ -1,5 +1,7 @@
 package com.example.interviewreader.importpkg;
 
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
@@ -16,11 +18,17 @@ public class ImportJobWorker {
     private final ExecutorService executor;
     private final Map<UUID, Future<?>> futures = new ConcurrentHashMap<>();
 
-    public ImportJobWorker(ImportProperties properties) {
+    public ImportJobWorker(ImportProperties properties, MeterRegistry meterRegistry) {
         var worker = properties.importWorker();
         this.enabled = worker.enabled();
         this.permits = new Semaphore(worker.maxConcurrency());
         this.executor = Executors.newVirtualThreadPerTaskExecutor();
+        Gauge.builder("interview.reader.import.jobs.submitted", futures, Map::size)
+                .description("已提交且尚未结束的导入任务数")
+                .register(meterRegistry);
+        Gauge.builder("interview.reader.import.workers.available", permits, Semaphore::availablePermits)
+                .description("当前可用的导入并发许可数")
+                .register(meterRegistry);
     }
 
     public void submit(UUID jobId, Runnable task) {

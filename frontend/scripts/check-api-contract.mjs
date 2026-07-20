@@ -84,9 +84,29 @@ if (!styles.includes(`@media (max-width: ${mobileWidth}px)`)) failures.push("CSS
 if (!styles.includes(`(min-width: ${mobileWidth + 1}px)`)) failures.push("CSS desktop breakpoint differs from responsive.ts");
 
 const applicationYaml = fs.readFileSync(path.join(projectRoot, "src", "main", "resources", "application.yml"), "utf8");
+const applicationConfig = parse(applicationYaml);
 const nginx = fs.readFileSync(path.join(projectRoot, "deploy", "nginx", "interview-reader.conf.example"), "utf8");
-if (!applicationYaml.includes("max-size: 10MB") || !nginx.includes("client_max_body_size 10m;")) {
-  failures.push("Spring and Nginx upload limits must both remain 10 MiB");
+const runtimeConfig = fs.readFileSync(path.join(frontendRoot, "src", "shared", "runtimeConfig.ts"), "utf8");
+const readme = fs.readFileSync(path.join(projectRoot, "README.md"), "utf8");
+
+const backendPort = Number(readEnvironmentDefault(applicationConfig.server?.port, "SERVER_PORT"));
+const frontendPort = Number(runtimeConfig.match(/DEFAULT_API_PROXY_TARGET = "http:\/\/[^:"]+:(\d+)"/)?.[1]);
+const nginxPort = Number(nginx.match(/server 127\.0\.0\.1:(\d+);/)?.[1]);
+const documentedPorts = [...readme.matchAll(/http:\/\/localhost:(\d+)/g)].map((match) => Number(match[1]));
+if (!backendPort || frontendPort !== backendPort || nginxPort !== backendPort
+    || documentedPorts.some((port) => port !== backendPort)) {
+  failures.push("Backend port default differs across Spring, Vite, Nginx, or README");
+}
+
+const uploadDefault = readEnvironmentDefault(applicationConfig["interview-reader"]?.upload?.["max-size"], "UPLOAD_MAX_SIZE");
+const nginxUpload = nginx.match(/client_max_body_size\s+([^;]+);/)?.[1];
+if (!uploadDefault || !nginxUpload || sizeInBytes(uploadDefault) !== sizeInBytes(nginxUpload)) {
+  failures.push("Spring and Nginx upload limits differ");
+}
+const sharedUploadProperty = "$" + "{interview-reader.upload.max-size}";
+if (applicationConfig.spring?.servlet?.multipart?.["max-file-size"] !== sharedUploadProperty
+    || applicationConfig.spring?.servlet?.multipart?.["max-request-size"] !== sharedUploadProperty) {
+  failures.push("Spring multipart limits must reference interview-reader.upload.max-size");
 }
 
 if (failures.length) {
@@ -95,6 +115,18 @@ if (failures.length) {
 }
 console.log(`Contract check passed: ${specEndpoints.size} endpoints, concrete schemas, aligned enums and operational limits.`);
 
+function readEnvironmentDefault(value, variableName) {
+  if (typeof value !== "string") return null;
+  const match = value.match(new RegExp("^\\$\\{" + variableName + ":(.+)\\}$"));
+  return match?.[1] ?? null;
+}
+function sizeInBytes(value) {
+  const match = String(value).trim().match(/^(\d+)\s*(b|kb|kib|m|mb|mib)$/i);
+  if (!match) return NaN;
+  const unit = match[2].toLowerCase();
+  const multiplier = unit === "b" ? 1 : ["kb", "kib"].includes(unit) ? 1024 : 1024 * 1024;
+  return Number(match[1]) * multiplier;
+}
 function walk(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const candidate = path.join(directory, entry.name);

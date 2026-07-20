@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { toUserMessage } from "../utils/errorMessage";
 import { Search, UploadFilled, View } from "@element-plus/icons-vue";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus/es/components/message/index";
+import { ElMessage } from "element-plus/es/components/message";
 import { adminApi } from "../api/admin";
 import { formatTime, zh } from "../shared/presentation";
 import type { AdminDocumentSummary } from "../types/api";
@@ -32,7 +33,7 @@ async function load(reset = false): Promise<void> {
 function previous(): void { if (page.value > 1) { page.value--; void load(); } }
 function next(): void { if (hasNext.value) { page.value++; void load(); } }
 function open(document: AdminDocumentSummary): void { void router.push(`/admin/documents/${document.id}`); }
-function message(value: unknown): string { return value instanceof Error ? value.message : "加载文档失败"; }
+function message(value: unknown): string { return toUserMessage(value, "加载文档失败"); }
 </script>
 
 <template>

@@ -5,6 +5,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -17,12 +18,21 @@ public class AuthController {
 
     private final AuthProperties properties;
     private final AuthSessionService sessionService;
+    private final LoginAttemptService loginAttemptService;
 
 
     @PostMapping("/login")
-    ResponseEntity<AuthSessionResponse> login(@Valid @RequestBody LoginRequest request) {
-        var token = sessionService.createSession(request.username(), request.password())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "用户名或密码错误"));
+    ResponseEntity<AuthSessionResponse> login(
+            HttpServletRequest httpRequest,
+            @Valid @RequestBody LoginRequest request) {
+        var attemptKey = loginAttemptService.attemptKey(httpRequest, request.username());
+        loginAttemptService.requireAllowed(attemptKey);
+        var token = sessionService.createSession(request.username(), request.password()).orElse(null);
+        if (token == null) {
+            loginAttemptService.recordFailure(attemptKey);
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
+        }
+        loginAttemptService.recordSuccess(attemptKey);
         var cookie = sessionCookie(token, properties.sessionTtl());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -74,7 +84,9 @@ public class AuthController {
         return java.util.Optional.empty();
     }
 
-    record LoginRequest(@NotBlank String username, @NotBlank String password) {
+    record LoginRequest(
+            @NotBlank @Size(max = 200) String username,
+            @NotBlank @Size(max = 500) String password) {
     }
 
     public record AuthSessionResponse(boolean authenticated, String username) {

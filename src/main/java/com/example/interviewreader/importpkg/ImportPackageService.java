@@ -15,6 +15,7 @@ import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
 import com.example.interviewreader.persistence.entity.ImportIssueEntity;
 import com.example.interviewreader.persistence.entity.ImportJobEntity;
 import com.example.interviewreader.persistence.entity.TagEntity;
+import com.example.interviewreader.persistence.mapper.AppUserMapper;
 import com.example.interviewreader.persistence.mapper.AssetMapper;
 import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
 import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
@@ -71,6 +72,7 @@ public class ImportPackageService {
     private final SourceFileStorage sourceFileStorage;
     private final ImportJobWorker importJobWorker;
     private final ImportJobMapper importJobMapper;
+    private final AppUserMapper appUserMapper;
     private final ImportIssueMapper importIssueMapper;
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
@@ -91,6 +93,7 @@ public class ImportPackageService {
             SourceFileStorage sourceFileStorage,
             ImportJobWorker importJobWorker,
             ImportJobMapper importJobMapper,
+            AppUserMapper appUserMapper,
             ImportIssueMapper importIssueMapper,
             DocumentMapper documentMapper,
             DocumentVersionMapper documentVersionMapper,
@@ -110,6 +113,7 @@ public class ImportPackageService {
         this.sourceFileStorage = sourceFileStorage;
         this.importJobWorker = importJobWorker;
         this.importJobMapper = importJobMapper;
+        this.appUserMapper = appUserMapper;
         this.importIssueMapper = importIssueMapper;
         this.documentMapper = documentMapper;
         this.documentVersionMapper = documentVersionMapper;
@@ -139,7 +143,11 @@ public class ImportPackageService {
             rejectDeletionLocked(target);
         }
         var importFingerprint = Hashes.sha256(sourceSha256 + ":" + normalizedSourceType + ":" + converterVersion + ":" + Objects.toString(targetId, "NEW"));
-        var existingJob = findImportJobByFingerprint(importFingerprint);
+        // 单用户导入以用户行作为互斥键，保证“检查可复用任务 + 新建任务”在并发上传时原子化。
+        if (appUserMapper.selectIdForUpdate(LOCAL_USER_ID) == null) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Local user is not initialized");
+        }
+        var existingJob = findReusableImportJobByFingerprint(importFingerprint);
         if (existingJob != null) {
             return existingJob;
         }
@@ -153,19 +161,19 @@ public class ImportPackageService {
         statistics.put("workerMode", importJobWorker.isEnabled() ? "ASYNC" : "INLINE");
 
         var job = new ImportJobEntity();
-        job.id = jobId.toString();
-        job.ownerId = LOCAL_USER_ID;
-        job.targetDocumentId = targetId;
-        job.sourceType = normalizedSourceType;
-        job.sourceObjectKey = sourceObjectKey;
-        job.sourceSha256 = sourceSha256;
-        job.converterVersion = converterVersion;
-        job.importFingerprint = importFingerprint;
-        job.status = "UPLOADED";
-        job.progress = 5;
-        job.currentStage = "UPLOADED";
-        job.statistics = toJson(statistics);
-        job.startedAt = OffsetDateTime.now();
+        job.setId(jobId.toString());
+        job.setOwnerId(LOCAL_USER_ID);
+        job.setTargetDocumentId(targetId);
+        job.setSourceType(normalizedSourceType);
+        job.setSourceObjectKey(sourceObjectKey);
+        job.setSourceSha256(sourceSha256);
+        job.setConverterVersion(converterVersion);
+        job.setImportFingerprint(importFingerprint);
+        job.setStatus("UPLOADED");
+        job.setProgress(5);
+        job.setCurrentStage("UPLOADED");
+        job.setStatistics(toJson(statistics));
+        job.setStartedAt(OffsetDateTime.now());
         importJobMapper.insertSelective(job);
 
         scheduleImportProcessing(jobId, normalizedSourceType, fileBytes, sourceFileName, sourceSha256, statistics);
@@ -210,25 +218,25 @@ public class ImportPackageService {
             ensureNotCanceled(jobId);
             var job = requireJob(jobId);
             var status = issues.stream().anyMatch(issue -> "BLOCKING".equals(issue.severity())) ? "REVIEW_REQUIRED" : "READY";
-            job.status = status;
-            job.progress = 100;
-            job.currentStage = status;
-            job.statistics = toJson(statistics);
-            job.rawExtractionJson = toJsonOrNull(parsed.rawExtraction());
-            job.normalizedObjectKey = documentPackage == null ? "{}" : toJson(documentPackage);
-            job.finishedAt = OffsetDateTime.now();
+            job.setStatus(status);
+            job.setProgress(100);
+            job.setCurrentStage(status);
+            job.setStatistics(toJson(statistics));
+            job.setRawExtractionJson(toJsonOrNull(parsed.rawExtraction()));
+            job.setNormalizedObjectKey(documentPackage == null ? "{}" : toJson(documentPackage));
+            job.setFinishedAt(OffsetDateTime.now());
             importJobMapper.update(job);
         } catch (ImportCanceledException exception) {
             return;
         } catch (RuntimeException exception) {
             var job = job(jobId);
-            if (job != null && !"CANCELED".equals(job.status)) {
-                job.status = "FAILED";
-                job.progress = 100;
-                job.currentStage = "FAILED";
-                job.errorCode = "IMPORT_FAILED";
-                job.errorMessage = exception.getMessage();
-                job.finishedAt = OffsetDateTime.now();
+            if (job != null && !"CANCELED".equals(job.getStatus())) {
+                job.setStatus("FAILED");
+                job.setProgress(100);
+                job.setCurrentStage("FAILED");
+                job.setErrorCode("IMPORT_FAILED");
+                job.setErrorMessage(exception.getMessage());
+                job.setFinishedAt(OffsetDateTime.now());
                 importJobMapper.update(job);
             }
         }
@@ -242,13 +250,13 @@ public class ImportPackageService {
         }
         importJobWorker.cancel(jobId);
         var job = requireJob(jobId);
-        if (CANCELABLE_STATUSES.contains(job.status)) {
-            job.status = "CANCELED";
-            job.progress = 100;
-            job.currentStage = "CANCELED";
-            job.errorCode = null;
-            job.errorMessage = null;
-            job.finishedAt = OffsetDateTime.now();
+        if (CANCELABLE_STATUSES.contains(job.getStatus())) {
+            job.setStatus("CANCELED");
+            job.setProgress(100);
+            job.setCurrentStage("CANCELED");
+            job.setErrorCode(null);
+            job.setErrorMessage(null);
+            job.setFinishedAt(OffsetDateTime.now());
             importJobMapper.update(job);
         }
         var canceled = getImportJob(jobId);
@@ -279,16 +287,16 @@ public class ImportPackageService {
 
     public JsonNode rawExtraction(UUID jobId) {
         var job = requireJob(jobId);
-        return snapshot(job.rawExtractionJson, "raw extraction");
+        return snapshot(job.getRawExtractionJson(), "raw extraction");
     }
 
     public JsonNode normalizedPackage(UUID jobId) {
         var job = requireJob(jobId);
-        return snapshot(job.normalizedObjectKey, "normalized package");
+        return snapshot(job.getNormalizedObjectKey(), "normalized package");
     }
 
     public SourceFileStorage.SourceFile sourceFile(UUID jobId) {
-        return sourceFileStorage.load(requireJob(jobId).sourceObjectKey);
+        return sourceFileStorage.load(requireJob(jobId).getSourceObjectKey());
     }
 
     @Transactional
@@ -304,60 +312,63 @@ public class ImportPackageService {
     @Transactional
     public DocumentVersionDto commit(UUID jobId) {
         var job = loadJobForCommit(jobId);
-        if ("IMPORTED".equals(job.status) && job.resultVersionId != null) {
-            return getVersion(UUID.fromString(job.resultVersionId));
+        if ("IMPORTED".equals(job.getStatus()) && job.getResultVersionId() != null) {
+            return getVersion(UUID.fromString(job.getResultVersionId()));
         }
-        if (!"READY".equals(job.status)) {
+        if (!"READY".equals(job.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "Only READY import jobs can be committed");
         }
 
-        var documentPackage = readPackage(job.normalizedObjectKey);
+        var documentPackage = readPackage(job.getNormalizedObjectKey());
         var issues = validator.validate(documentPackage);
         if (!issues.isEmpty()) {
             issues.forEach(issue -> insertIssue(jobId, issue));
-            job.status = "REVIEW_REQUIRED";
-            job.currentStage = "VALIDATING";
+            job.setStatus("REVIEW_REQUIRED");
+            job.setCurrentStage("VALIDATING");
             importJobMapper.update(job);
             throw new ApiException(HttpStatus.CONFLICT, "Import package has blocking validation issues");
         }
 
-        var documentId = job.targetDocumentId == null ? findDocumentId(documentPackage.document().documentKey()) : job.targetDocumentId;
+        var documentId = job.getTargetDocumentId() == null ? findDocumentId(documentPackage.document().documentKey()) : job.getTargetDocumentId();
         var now = OffsetDateTime.now();
         if (documentId == null) {
             documentId = UUID.randomUUID().toString();
             var document = new DocumentEntity();
-            document.id = documentId;
-            document.ownerId = LOCAL_USER_ID;
-            document.code = documentPackage.document().documentKey();
-            document.title = documentPackage.document().title();
-            document.description = documentPackage.document().description();
-            document.status = "DRAFT";
+            document.setId(documentId);
+            document.setOwnerId(LOCAL_USER_ID);
+            document.setCode(documentPackage.document().documentKey());
+            document.setTitle(documentPackage.document().title());
+            document.setDescription(documentPackage.document().description());
+            document.setStatus("DRAFT");
             documentMapper.insertSelective(document);
         } else {
-            var document = documentMapper.selectOneById(documentId);
+            var document = documentMapper.selectOwnedForUpdate(documentId, LOCAL_USER_ID);
+            if (document == null) {
+                throw new ApiException(HttpStatus.NOT_FOUND, "Target document not found");
+            }
             rejectDeletionLocked(document);
-            document.title = documentPackage.document().title();
-            document.description = documentPackage.document().description();
-            document.updatedAt = now;
+            document.setTitle(documentPackage.document().title());
+            document.setDescription(documentPackage.document().description());
+            document.setUpdatedAt(now);
             documentMapper.update(document);
         }
 
         var versionId = UUID.randomUUID().toString();
         var version = new DocumentVersionEntity();
-        version.id = versionId;
-        version.documentId = documentId;
-        version.versionNo = nextVersionNo(documentId);
-        version.parentVersionId = currentVersionId(documentId);
-        version.originImportJobId = job.id;
-        version.draftRevision = 0;
-        version.sourceType = documentPackage.version().sourceType().toUpperCase(Locale.ROOT);
-        version.sourceFileName = documentPackage.version().sourceFileName();
-        version.sourceFileSha256 = documentPackage.version().sourceSha256();
-        version.converterVersion = Objects.requireNonNullElse(documentPackage.version().converterVersion(), converterVersion);
-        version.schemaVersion = documentPackage.schemaVersion();
-        version.status = "DRAFT";
-        version.language = Objects.requireNonNullElse(documentPackage.document().language(), "zh-CN");
-        version.metadata = toJson(Objects.requireNonNullElse(documentPackage.version().metadata(), Map.of()));
+        version.setId(versionId);
+        version.setDocumentId(documentId);
+        version.setVersionNo(nextVersionNo(documentId));
+        version.setParentVersionId(currentVersionId(documentId));
+        version.setOriginImportJobId(job.getId());
+        version.setDraftRevision(0);
+        version.setSourceType(documentPackage.version().sourceType().toUpperCase(Locale.ROOT));
+        version.setSourceFileName(documentPackage.version().sourceFileName());
+        version.setSourceFileSha256(documentPackage.version().sourceSha256());
+        version.setConverterVersion(Objects.requireNonNullElse(documentPackage.version().converterVersion(), converterVersion));
+        version.setSchemaVersion(documentPackage.schemaVersion());
+        version.setStatus("DRAFT");
+        version.setLanguage(Objects.requireNonNullElse(documentPackage.document().language(), "zh-CN"));
+        version.setMetadata(toJson(Objects.requireNonNullElse(documentPackage.version().metadata(), Map.of())));
         documentVersionMapper.insertSelective(version);
 
         insertSections(versionId, documentPackage);
@@ -366,14 +377,14 @@ public class ImportPackageService {
         upsertTags(documentId, documentPackage.document().tags());
 
         var document = documentMapper.selectOneById(documentId);
-        document.updatedAt = now;
+        document.setUpdatedAt(now);
         documentMapper.update(document);
 
-        job.status = "IMPORTED";
-        job.resultVersionId = versionId;
-        job.currentStage = "COMMITTED";
+        job.setStatus("IMPORTED");
+        job.setResultVersionId(versionId);
+        job.setCurrentStage("COMMITTED");
         importJobMapper.update(job);
-        return new DocumentVersionDto(UUID.fromString(versionId), UUID.fromString(documentId), version.versionNo, "DRAFT", documentPackage.schemaVersion());
+        return new DocumentVersionDto(UUID.fromString(versionId), UUID.fromString(documentId), version.getVersionNo(), "DRAFT", documentPackage.schemaVersion());
     }
 
     private void insertSections(String versionId, DocumentPackage documentPackage) {
@@ -399,22 +410,22 @@ public class ImportPackageService {
             var searchText = section.title() + "\n" + String.join("\n", blockTextBySection.getOrDefault(section.sectionKey(), List.of()));
 
             var node = new ContentNodeEntity();
-            node.id = id;
-            node.versionId = versionId;
-            node.parentId = parentId;
-            node.nodeKey = section.sectionKey();
-            node.nodeType = section.nodeType().toUpperCase(Locale.ROOT);
-            node.semanticRole = emptyToNull(section.semanticRole());
-            node.title = section.title();
-            node.level = section.level();
-            node.path = path;
-            node.sortOrder = section.sortOrder();
-            node.anchor = anchor;
-            node.sourcePageStart = section.sourcePageStart();
-            node.sourcePageEnd = section.sourcePageEnd();
-            node.sourceBbox = toJsonOrNull(section.sourceBbox());
-            node.contentHash = emptyToNull(section.contentHash());
-            node.searchText = searchText;
+            node.setId(id);
+            node.setVersionId(versionId);
+            node.setParentId(parentId);
+            node.setNodeKey(section.sectionKey());
+            node.setNodeType(section.nodeType().toUpperCase(Locale.ROOT));
+            node.setSemanticRole(emptyToNull(section.semanticRole()));
+            node.setTitle(section.title());
+            node.setLevel(section.level());
+            node.setPath(path);
+            node.setSortOrder(section.sortOrder());
+            node.setAnchor(anchor);
+            node.setSourcePageStart(section.sourcePageStart());
+            node.setSourcePageEnd(section.sourcePageEnd());
+            node.setSourceBbox(toJsonOrNull(section.sourceBbox()));
+            node.setContentHash(emptyToNull(section.contentHash()));
+            node.setSearchText(searchText);
             contentNodeMapper.insertSelective(node);
             nodeIds.put(section.sectionKey(), id);
             paths.put(section.sectionKey(), path);
@@ -427,23 +438,23 @@ public class ImportPackageService {
                         .from(CONTENT_NODE_ENTITY)
                         .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId)))
                 .stream()
-                .collect(HashMap<String, String>::new, (map, node) -> map.put(node.nodeKey, node.id), HashMap::putAll);
+                .collect(HashMap<String, String>::new, (map, node) -> map.put(node.getNodeKey(), node.getId()), HashMap::putAll);
 
         for (var block : documentPackage.blocks()) {
             var entity = new ContentBlockEntity();
-            entity.id = UUID.randomUUID().toString();
-            entity.versionId = versionId;
-            entity.nodeId = nodeIds.get(block.sectionKey());
-            entity.blockKey = block.blockKey();
-            entity.seq = block.seq();
-            entity.blockType = block.blockType();
-            entity.payload = toJson(block.payload());
-            entity.plainText = Objects.requireNonNullElse(block.plainText(), "");
-            entity.language = emptyToNull(block.language());
-            entity.sourcePage = block.sourcePage();
-            entity.sourceBbox = toJsonOrNull(block.sourceBbox());
-            entity.confidence = block.confidence();
-            entity.contentHash = emptyToNull(block.contentHash());
+            entity.setId(UUID.randomUUID().toString());
+            entity.setVersionId(versionId);
+            entity.setNodeId(nodeIds.get(block.sectionKey()));
+            entity.setBlockKey(block.blockKey());
+            entity.setSeq(block.seq());
+            entity.setBlockType(block.blockType());
+            entity.setPayload(toJson(block.payload()));
+            entity.setPlainText(Objects.requireNonNullElse(block.plainText(), ""));
+            entity.setLanguage(emptyToNull(block.language()));
+            entity.setSourcePage(block.sourcePage());
+            entity.setSourceBbox(toJsonOrNull(block.sourceBbox()));
+            entity.setConfidence(block.confidence());
+            entity.setContentHash(emptyToNull(block.contentHash()));
             contentBlockMapper.insertSelective(entity);
         }
     }
@@ -451,15 +462,15 @@ public class ImportPackageService {
     private void insertAssets(String versionId, DocumentPackage documentPackage) {
         for (var asset : documentPackage.assets()) {
             var entity = new AssetEntity();
-            entity.id = UUID.randomUUID().toString();
-            entity.versionId = versionId;
-            entity.assetKey = asset.assetKey();
-            entity.objectKey = asset.path();
-            entity.originalName = asset.path();
-            entity.mimeType = asset.mimeType();
-            entity.sha256 = asset.sha256().toLowerCase(Locale.ROOT);
-            entity.sizeBytes = 0;
-            entity.metadata = toJson(Map.of("alt", Objects.requireNonNullElse(asset.alt(), "")));
+            entity.setId(UUID.randomUUID().toString());
+            entity.setVersionId(versionId);
+            entity.setAssetKey(asset.assetKey());
+            entity.setObjectKey(asset.path());
+            entity.setOriginalName(asset.path());
+            entity.setMimeType(asset.mimeType());
+            entity.setSha256(asset.sha256().toLowerCase(Locale.ROOT));
+            entity.setSizeBytes(0);
+            entity.setMetadata(toJson(Map.of("alt", Objects.requireNonNullElse(asset.alt(), ""))));
             assetMapper.insertSelective(entity);
         }
     }
@@ -474,10 +485,10 @@ public class ImportPackageService {
             if (tagId == null) {
                 tagId = UUID.randomUUID().toString();
                 var entity = new TagEntity();
-                entity.id = tagId;
-                entity.ownerId = LOCAL_USER_ID;
-                entity.name = tag.trim();
-                entity.normalizedName = normalized;
+                entity.setId(tagId);
+                entity.setOwnerId(LOCAL_USER_ID);
+                entity.setName(tag.trim());
+                entity.setNormalizedName(normalized);
                 tagMapper.insertSelective(entity);
             }
             var link = documentTagMapper.selectOneByQuery(QueryWrapper.create()
@@ -487,8 +498,8 @@ public class ImportPackageService {
                     .and(DOCUMENT_TAG_ENTITY.TAG_ID.eq(tagId)));
             if (link == null) {
                 var entity = new DocumentTagEntity();
-                entity.documentId = documentId;
-                entity.tagId = tagId;
+                entity.setDocumentId(documentId);
+                entity.setTagId(tagId);
                 documentTagMapper.insertSelective(entity);
             }
         }
@@ -504,7 +515,7 @@ public class ImportPackageService {
     }
 
     private static void rejectDeletionLocked(DocumentEntity document) {
-        if (document != null && ("DELETING".equals(document.status) || "DELETE_FAILED".equals(document.status))) {
+        if (document != null && ("DELETING".equals(document.getStatus()) || "DELETE_FAILED".equals(document.getStatus()))) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
         }
     }
@@ -514,7 +525,7 @@ public class ImportPackageService {
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .and(DOCUMENT_ENTITY.CODE.eq(documentKey)));
-        return document == null ? null : document.id;
+        return document == null ? null : document.getId();
     }
 
     private String findTagId(String normalized) {
@@ -523,34 +534,30 @@ public class ImportPackageService {
                 .from(TAG_ENTITY)
                 .where(TAG_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .and(TAG_ENTITY.NORMALIZED_NAME.eq(normalized)));
-        return tag == null ? null : tag.id;
+        return tag == null ? null : tag.getId();
     }
 
-    private ImportJobDto findImportJobByFingerprint(String fingerprint) {
+    private ImportJobDto findReusableImportJobByFingerprint(String fingerprint) {
         var job = importJobMapper.selectOneByQuery(QueryWrapper.create()
                 .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
                 .from(IMPORT_JOB_ENTITY)
                 .where(IMPORT_JOB_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .and(IMPORT_JOB_ENTITY.IMPORT_FINGERPRINT.eq(fingerprint))
+                .and(IMPORT_JOB_ENTITY.STATUS.ne("FAILED"))
+                .and(IMPORT_JOB_ENTITY.STATUS.ne("CANCELED"))
                 .orderBy(IMPORT_JOB_ENTITY.CREATED_AT.desc())
                 .limit(1));
         return job == null ? null : mapJob(job);
     }
 
     private int nextVersionNo(String documentId) {
-        return documentVersionMapper.selectListByQuery(QueryWrapper.create()
-                        .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
-                        .from(DOCUMENT_VERSION_ENTITY)
-                        .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(documentId)))
-                .stream()
-                .mapToInt(version -> version.versionNo)
-                .max()
-                .orElse(0) + 1;
+        // 已存在文档在提交导入时持有文档行锁；新建文档行尚未提交，不会被其他事务并发分配版本号。
+        return documentVersionMapper.selectMaxVersionNo(documentId) + 1;
     }
 
     private String currentVersionId(String documentId) {
         var document = documentMapper.selectOneById(documentId);
-        return document == null ? null : document.currentVersionId;
+        return document == null ? null : document.getCurrentVersionId();
     }
 
     private ImportJobEntity loadJobForCommit(UUID jobId) {
@@ -559,10 +566,10 @@ public class ImportPackageService {
 
     private ImportJobEntity loadJobForRevision(UUID jobId) {
         var job = loadJobForCommit(jobId);
-        if ("IMPORTED".equals(job.status)) {
+        if ("IMPORTED".equals(job.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "Imported jobs cannot be revised");
         }
-        if (!Set.of("READY", "REVIEW_REQUIRED").contains(job.status)) {
+        if (!Set.of("READY", "REVIEW_REQUIRED").contains(job.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "Only READY or REVIEW_REQUIRED import jobs can be revised");
         }
         return job;
@@ -573,7 +580,7 @@ public class ImportPackageService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Patch body must be a JSON object");
         }
         var job = loadJobForRevision(jobId);
-        var root = readTree(job.normalizedObjectKey);
+        var root = readTree(job.getNormalizedObjectKey());
         var items = root.path(arrayName);
         if (!items.isArray()) {
             throw new ApiException(HttpStatus.CONFLICT, "Staged package has no " + arrayName + " array");
@@ -595,11 +602,11 @@ public class ImportPackageService {
         var documentPackage = readPackage(root.toString());
         var issues = validator.validate(documentPackage);
         replaceIssues(jobId, issues);
-        job.normalizedObjectKey = toJson(root);
-        job.status = issues.stream().anyMatch(issue -> "BLOCKING".equals(issue.severity())) ? "REVIEW_REQUIRED" : "READY";
-        job.currentStage = "REVIEWING";
-        job.errorCode = null;
-        job.errorMessage = null;
+        job.setNormalizedObjectKey(toJson(root));
+        job.setStatus(issues.stream().anyMatch(issue -> "BLOCKING".equals(issue.severity())) ? "REVIEW_REQUIRED" : "READY");
+        job.setCurrentStage("REVIEWING");
+        job.setErrorCode(null);
+        job.setErrorMessage(null);
         importJobMapper.update(job);
         return root;
     }
@@ -609,7 +616,7 @@ public class ImportPackageService {
                 .select(IMPORT_ISSUE_ENTITY.ALL_COLUMNS)
                 .from(IMPORT_ISSUE_ENTITY)
                 .where(IMPORT_ISSUE_ENTITY.JOB_ID.eq(id(jobId))))) {
-            importIssueMapper.deleteById(issue.id);
+            importIssueMapper.deleteById(issue.getId());
         }
         for (var issue : issues) {
             insertIssue(jobId, issue);
@@ -621,7 +628,7 @@ public class ImportPackageService {
         if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document version not found");
         }
-        return new DocumentVersionDto(UUID.fromString(version.id), UUID.fromString(version.documentId), version.versionNo, version.status, version.schemaVersion);
+        return new DocumentVersionDto(UUID.fromString(version.getId()), UUID.fromString(version.getDocumentId()), version.getVersionNo(), version.getStatus(), version.getSchemaVersion());
     }
 
     private DocumentPackage readPackage(String json) {
@@ -641,40 +648,40 @@ public class ImportPackageService {
 
     private ImportJobDto mapJob(ImportJobEntity job) {
         return new ImportJobDto(
-                UUID.fromString(job.id),
-                uuid(job.targetDocumentId),
-                job.sourceType,
-                job.status,
-                job.currentStage,
-                job.progress,
-                readMap(job.statistics),
-                job.errorCode,
-                job.errorMessage);
+                UUID.fromString(job.getId()),
+                uuid(job.getTargetDocumentId()),
+                job.getSourceType(),
+                job.getStatus(),
+                job.getCurrentStage(),
+                job.getProgress(),
+                readMap(job.getStatistics()),
+                job.getErrorCode(),
+                job.getErrorMessage());
     }
 
     private ImportIssueDto mapIssue(ImportIssueEntity issue) {
         return new ImportIssueDto(
-                issue.severity,
-                issue.issueCode,
-                issue.message,
-                issue.sourcePage,
-                issue.sectionKey,
-                issue.blockKey,
-                issue.cellRef);
+                issue.getSeverity(),
+                issue.getIssueCode(),
+                issue.getMessage(),
+                issue.getSourcePage(),
+                issue.getSectionKey(),
+                issue.getBlockKey(),
+                issue.getCellRef());
     }
 
     private void insertIssue(UUID jobId, ImportIssueDto issue) {
         var entity = new ImportIssueEntity();
-        entity.id = UUID.randomUUID().toString();
-        entity.jobId = id(jobId);
-        entity.severity = issue.severity();
-        entity.issueCode = issue.issueCode();
-        entity.message = issue.message();
-        entity.sourcePage = issue.sourcePage();
-        entity.sectionKey = issue.sectionKey();
-        entity.blockKey = issue.blockKey();
-        entity.cellRef = issue.cellRef();
-        entity.details = "{}";
+        entity.setId(UUID.randomUUID().toString());
+        entity.setJobId(id(jobId));
+        entity.setSeverity(issue.severity());
+        entity.setIssueCode(issue.issueCode());
+        entity.setMessage(issue.message());
+        entity.setSourcePage(issue.sourcePage());
+        entity.setSectionKey(issue.sectionKey());
+        entity.setBlockKey(issue.blockKey());
+        entity.setCellRef(issue.cellRef());
+        entity.setDetails("{}");
         importIssueMapper.insertSelective(entity);
     }
 
@@ -702,19 +709,19 @@ public class ImportPackageService {
     private void updateImportStage(UUID jobId, String stage, int progress, Map<String, Object> statistics) {
         ensureNotCanceled(jobId);
         var job = requireJob(jobId);
-        if ("CANCELED".equals(job.status)) {
+        if ("CANCELED".equals(job.getStatus())) {
             throw new ImportCanceledException();
         }
-        job.status = stage;
-        job.currentStage = stage;
-        job.progress = progress;
-        job.statistics = toJson(statistics);
+        job.setStatus(stage);
+        job.setCurrentStage(stage);
+        job.setProgress(progress);
+        job.setStatistics(toJson(statistics));
         importJobMapper.update(job);
     }
 
     private void ensureNotCanceled(UUID jobId) {
         var job = job(jobId);
-        if (job != null && "CANCELED".equals(job.status)) {
+        if (job != null && "CANCELED".equals(job.getStatus())) {
             throw new ImportCanceledException();
         }
     }

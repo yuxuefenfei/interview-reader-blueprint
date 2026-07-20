@@ -56,24 +56,24 @@ public class DocumentDeletionProcessor {
     private DeletionContext startAttempt(UUID jobId) {
         return transactions.execute(status -> {
             var job = jobMapper.selectOneById(jobId.toString());
-            if (job == null || "COMPLETED".equals(job.status)) return null;
+            if (job == null || "COMPLETED".equals(job.getStatus())) return null;
             var now = OffsetDateTime.now();
-            job.status = "RUNNING";
-            job.currentStage = "CLIENT_SYNC_MARKED";
-            job.attemptCount++;
-            if (job.startedAt == null) job.startedAt = now;
-            job.errorCode = null;
-            job.errorMessage = null;
-            job.updatedAt = now;
+            job.setStatus("RUNNING");
+            job.setCurrentStage("CLIENT_SYNC_MARKED");
+            job.setAttemptCount(job.getAttemptCount() + 1);
+            if (job.getStartedAt() == null) job.setStartedAt(now);
+            job.setErrorCode(null);
+            job.setErrorMessage(null);
+            job.setUpdatedAt(now);
             jobMapper.update(job);
             jdbc.update("UPDATE document SET status = 'DELETING', updated_at = :now WHERE id = :id",
-                    Map.of("id", job.documentId, "now", now));
+                    Map.of("id", job.getDocumentId(), "now", now));
             return collectContext(job);
         });
     }
 
     private DeletionContext collectContext(DocumentDeletionJobEntity job) {
-        var parameters = Map.<String, Object>of("documentId", job.documentId);
+        var parameters = Map.<String, Object>of("documentId", job.getDocumentId());
         var versions = new LinkedHashSet<>(jdbc.queryForList(
                 "SELECT id FROM document_version WHERE document_id = :documentId", parameters, String.class));
         var importJobs = new LinkedHashSet<>(jdbc.queryForList(
@@ -88,7 +88,7 @@ public class DocumentDeletionProcessor {
         }
         var tagIds = new LinkedHashSet<>(jdbc.queryForList(
                 "SELECT tag_id FROM document_tag WHERE document_id = :documentId", parameters, String.class));
-        return new DeletionContext(job.id, job.documentId, job.ownerId, versions, importJobs, tagIds);
+        return new DeletionContext(job.getId(), job.getDocumentId(), job.getOwnerId(), versions, importJobs, tagIds);
     }
 
     private void deleteManagedFiles(DeletionContext context) {
@@ -162,12 +162,12 @@ public class DocumentDeletionProcessor {
             }
             var job = jobMapper.selectOneById(context.jobId());
             var now = OffsetDateTime.now();
-            job.status = "COMPLETED";
-            job.currentStage = "COMPLETED";
-            job.errorCode = null;
-            job.errorMessage = null;
-            job.completedAt = now;
-            job.updatedAt = now;
+            job.setStatus("COMPLETED");
+            job.setCurrentStage("COMPLETED");
+            job.setErrorCode(null);
+            job.setErrorMessage(null);
+            job.setCompletedAt(now);
+            job.setUpdatedAt(now);
             jobMapper.update(job);
         });
     }
@@ -175,9 +175,9 @@ public class DocumentDeletionProcessor {
     private void updateStage(UUID jobId, String stage) {
         transactions.executeWithoutResult(status -> {
             var job = jobMapper.selectOneById(jobId.toString());
-            if (job == null || "COMPLETED".equals(job.status)) return;
-            job.currentStage = stage;
-            job.updatedAt = OffsetDateTime.now();
+            if (job == null || "COMPLETED".equals(job.getStatus())) return;
+            job.setCurrentStage(stage);
+            job.setUpdatedAt(OffsetDateTime.now());
             jobMapper.update(job);
         });
     }
@@ -186,18 +186,18 @@ public class DocumentDeletionProcessor {
         var attempts = transactions.execute(status -> {
             var job = jobMapper.selectOneById(jobId.toString());
             if (job == null) return properties.maxAttempts();
-            var finalFailure = job.attemptCount >= properties.maxAttempts();
-            job.status = finalFailure ? "FAILED" : "QUEUED";
-            job.currentStage = finalFailure ? "FAILED" : "QUEUED";
-            job.errorCode = exception.getClass().getSimpleName();
-            job.errorMessage = safeMessage(exception);
-            job.updatedAt = OffsetDateTime.now();
+            var finalFailure = job.getAttemptCount() >= properties.maxAttempts();
+            job.setStatus(finalFailure ? "FAILED" : "QUEUED");
+            job.setCurrentStage(finalFailure ? "FAILED" : "QUEUED");
+            job.setErrorCode(exception.getClass().getSimpleName());
+            job.setErrorMessage(safeMessage(exception));
+            job.setUpdatedAt(OffsetDateTime.now());
             jobMapper.update(job);
             if (finalFailure) {
                 jdbc.update("UPDATE document SET status = 'DELETE_FAILED', updated_at = :now WHERE id = :id",
-                        Map.of("id", job.documentId, "now", job.updatedAt));
+                        Map.of("id", job.getDocumentId(), "now", job.getUpdatedAt()));
             }
-            return job.attemptCount;
+            return job.getAttemptCount();
         });
         return attempts == null ? properties.maxAttempts() : attempts;
     }

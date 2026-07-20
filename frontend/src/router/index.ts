@@ -35,8 +35,17 @@ router.beforeEach((to) => {
   return true;
 });
 
-adminViewport.addEventListener("change", (event) => {
+const handleAdminViewportChange = (event: MediaQueryListEvent): void => {
   if (event.matches && isAdminPath(router.currentRoute.value.path)) void router.replace("/reader");
+};
+
+adminViewport.addEventListener("change", handleAdminViewportChange);
+router.afterEach(() => {
+  window.requestAnimationFrame(() => document.getElementById("main-content")?.focus({ preventScroll: true }));
 });
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => adminViewport.removeEventListener("change", handleAdminViewportChange));
+}
 
 export default router;

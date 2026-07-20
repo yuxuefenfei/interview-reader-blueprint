@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import lombok.Getter;
+import lombok.Setter;
 
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
@@ -7,24 +9,27 @@ import com.mybatisflex.annotation.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/** 文档内容块持久化实体。 */
+@Getter
+@Setter
 @Table("content_block")
 public class ContentBlockEntity {
     @Id(keyType = KeyType.None)
-    public String id;
-    public String versionId;
-    public String nodeId;
-    public String blockKey;
-    public int seq;
-    public String blockType;
+    private String id;
+    private String versionId;
+    private String nodeId;
+    private String blockKey;
+    private int seq;
+    private String blockType;
     @Column(isLarge = true)
-    public String payload;
+    private String payload;
     @Column(isLarge = true)
-    public String plainText;
-    public String language;
-    public Integer sourcePage;
+    private String plainText;
+    private String language;
+    private Integer sourcePage;
     @Column(isLarge = true)
-    public String sourceBbox;
-    public BigDecimal confidence;
-    public String contentHash;
-    public OffsetDateTime createdAt;
+    private String sourceBbox;
+    private BigDecimal confidence;
+    private String contentHash;
+    private OffsetDateTime createdAt;
 }

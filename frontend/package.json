@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "npm run contract:check && vue-tsc --noEmit && vite build",
+    "build": "npm run contract:check && vue-tsc --noEmit && vite build && node scripts/check-bundle-budget.mjs",
     "test": "vitest run",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "contract:check": "node scripts/check-api-contract.mjs"

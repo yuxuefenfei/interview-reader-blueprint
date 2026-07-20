@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toUserMessage } from "../utils/errorMessage";
 import { RefreshRight } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
@@ -76,7 +77,7 @@ async function loadSavedPreview(): Promise<void> {
     activeBlockId.value = page.items[0]?.id ?? null;
     connected.value = false;
   } catch (caught) {
-    if (!receivedLiveState) error.value = caught instanceof Error ? caught.message : "预览加载失败";
+    if (!receivedLiveState) error.value = toUserMessage(caught, "预览加载失败");
   } finally {
     loading.value = false;
   }

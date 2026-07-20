@@ -1,6 +1,8 @@
 package com.example.interviewreader.management;
 
 import com.example.interviewreader.persistence.mapper.DocumentDeletionJobMapper;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import java.util.Map;
 import java.util.UUID;
@@ -23,16 +25,22 @@ public class DocumentDeletionWorker {
     private final DocumentDeletionJobMapper jobMapper;
 
     public DocumentDeletionWorker(DocumentDeletionProperties properties, DocumentDeletionProcessor processor,
-                                  DocumentDeletionJobMapper jobMapper) {
+                                  DocumentDeletionJobMapper jobMapper, MeterRegistry meterRegistry) {
         this.enabled = properties.workerEnabled();
         this.permits = new Semaphore(properties.maxConcurrency());
         this.processor = processor;
         this.jobMapper = jobMapper;
+        Gauge.builder("interview.reader.deletion.jobs.submitted", futures, Map::size)
+                .description("已提交且尚未结束的永久删除任务数")
+                .register(meterRegistry);
+        Gauge.builder("interview.reader.deletion.workers.available", permits, Semaphore::availablePermits)
+                .description("当前可用的永久删除并发许可数")
+                .register(meterRegistry);
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void resumeDurableJobs() {
-        jobMapper.selectRecoverable().forEach(job -> submit(UUID.fromString(job.id)));
+        jobMapper.selectRecoverable().forEach(job -> submit(UUID.fromString(job.getId())));
     }
 
     public void submit(UUID jobId) {

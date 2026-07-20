@@ -8,21 +8,41 @@ spring:
       max-request-size: ${interview-reader.upload.max-size}
 
 server:
-  port: 28080
+  port: ${SERVER_PORT:28080}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db,diskSpace
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 interview-reader:
   upload:
-    max-size: 10MB
-  converter-version: json-package-0.2.0
-  storage-dir: ./data/import-sources
+    max-size: ${UPLOAD_MAX_SIZE:10MB}
+  converter-version: ${INTERVIEW_READER_CONVERTER_VERSION:json-package-0.2.0}
+  storage-dir: ${INTERVIEW_READER_STORAGE_DIR:./data/import-sources}
   security:
     session-ttl: PT12H
+    session-cleanup-interval: PT10M
+    allowed-origins: []
+    trust-forwarded-client-ip: false
+    login-rate-limit:
+      max-attempts: 5
+      window: PT1M
+      block-duration: PT5M
+      max-entries: 10000
   import-worker:
     enabled: true
     max-concurrency: 2

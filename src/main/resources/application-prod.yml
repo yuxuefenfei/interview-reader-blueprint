@@ -1,9 +1,18 @@
+server:
+  address: 127.0.0.1
+
 spring:
   datasource:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_MAX_SIZE:10}
+      minimum-idle: ${DATABASE_POOL_MIN_IDLE:2}
+      connection-timeout: ${DATABASE_CONNECTION_TIMEOUT_MS:30000}
+      validation-timeout: ${DATABASE_VALIDATION_TIMEOUT_MS:5000}
+      leak-detection-threshold: ${DATABASE_LEAK_DETECTION_MS:0}
   flyway:
     locations: classpath:db/migration/mysql
 
@@ -13,3 +22,5 @@ interview-reader:
     username: ${INTERVIEW_READER_USERNAME}
     password: ${INTERVIEW_READER_PASSWORD}
     secure-cookie: true
+    allowed-origins: ${INTERVIEW_READER_ALLOWED_ORIGINS}
+    trust-forwarded-client-ip: true

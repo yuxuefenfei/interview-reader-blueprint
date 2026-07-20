@@ -1,19 +1,27 @@
 package com.example.interviewreader;
 
+import com.example.interviewreader.document.DocumentQueryService;
+import com.example.interviewreader.document.DocumentDtos.ReadingProgress;
+import com.example.interviewreader.importpkg.ImportPackageService;
+import com.example.interviewreader.management.VersionRevisionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -56,6 +64,15 @@ class InterviewReaderApiTests {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private VersionRevisionService versionRevisionService;
+
+    @Autowired
+    private DocumentQueryService documentQueryService;
+
+    @Autowired
+    private ImportPackageService importPackageService;
 
     @Test
     void missingReadingProgressReturnsNoContent() throws Exception {
@@ -307,6 +324,83 @@ class InterviewReaderApiTests {
                 .andExpect(jsonPath("$[0].documentId").value(published.documentId().toString()));
     }
 
+    @Test
+    void concurrentRevisionCreationAllocatesUniqueSequentialNumbers() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "concurrent-revision-" + UUID.randomUUID());
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return versionRevisionService.createRevision(imported.documentId(), imported.versionId()).versionNo();
+            });
+            var second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return versionRevisionService.createRevision(imported.documentId(), imported.versionId()).versionNo();
+            });
+            ready.await();
+            start.countDown();
+
+            assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(2, 3);
+        }
+
+        assertThat(jdbc.queryForList(
+                "SELECT version_no FROM document_version WHERE document_id = ? ORDER BY version_no",
+                Integer.class,
+                imported.documentId().toString())).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void concurrentReadingProgressKeepsNewestClientPosition() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "concurrent-progress-" + UUID.randomUUID());
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        publish(imported);
+        var position = firstChildFirstBlock(imported.versionId());
+        var older = new ReadingProgress(
+                imported.versionId(), position.sectionId(), position.blockId(), 10, 20,
+                new BigDecimal("0.25"), OffsetDateTime.parse("2026-07-20T10:00:00+08:00"), "older-device", 0);
+        var newer = new ReadingProgress(
+                imported.versionId(), position.sectionId(), position.blockId(), 30, 40,
+                new BigDecimal("0.75"), OffsetDateTime.parse("2026-07-20T11:00:00+08:00"), "newer-device", 0);
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return documentQueryService.upsertProgress(imported.documentId(), older);
+            });
+            var second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return documentQueryService.upsertProgress(imported.documentId(), newer);
+            });
+            ready.await();
+            start.countDown();
+            first.get();
+            second.get();
+        }
+
+        var stored = documentQueryService.getProgress(imported.documentId());
+        assertThat(stored.progressRatio()).isEqualByComparingTo("0.75");
+        assertThat(stored.charOffset()).isEqualTo(30);
+        assertThat(stored.deviceId()).isEqualTo("newer-device");
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM reading_progress WHERE document_id = ?",
+                Integer.class,
+                imported.documentId().toString())).isOne();
+
+        var replayed = documentQueryService.upsertProgress(imported.documentId(), older);
+        assertThat(replayed.progressRatio()).isEqualByComparingTo("0.75");
+        assertThat(replayed.revision()).isEqualTo(stored.revision());
+    }
     @Test
     void readingProgressRejectsMissingRatioAndCrossDocumentPositions() throws Exception {
         var firstSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
@@ -564,6 +658,53 @@ class InterviewReaderApiTests {
         assertThat(repeatedCommit.get("id").asText()).isEqualTo(first.versionId().toString());
     }
 
+    @Test
+    void failedAndCanceledImportsCanCreateFreshRetryJobs() throws Exception {
+        for (var terminalStatus : List.of("FAILED", "CANCELED")) {
+            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+            ((ObjectNode) source.get("document")).put("documentKey", "retry-" + terminalStatus.toLowerCase() + "-" + UUID.randomUUID());
+            var bytes = objectMapper.writeValueAsBytes(source);
+            var first = uploadJsonPackage(bytes);
+            jdbc.update("UPDATE import_job SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    terminalStatus, first.get("id").asText());
+
+            var retried = uploadJsonPackage(bytes);
+
+            assertThat(retried.get("id").asText()).isNotEqualTo(first.get("id").asText());
+            assertThat(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM import_job WHERE import_fingerprint = (SELECT import_fingerprint FROM import_job WHERE id = ?)",
+                    Integer.class,
+                    first.get("id").asText())).isEqualTo(2);
+        }
+    }
+
+    @Test
+    void concurrentIdenticalUploadsReuseOneActiveImportJob() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "concurrent-import-" + UUID.randomUUID());
+        var bytes = objectMapper.writeValueAsBytes(source);
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return importPackageService.createImportJob(
+                        new MockMultipartFile("file", "document-package.json", MediaType.APPLICATION_JSON_VALUE, bytes), null).id();
+            });
+            var second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return importPackageService.createImportJob(
+                        new MockMultipartFile("file", "document-package.json", MediaType.APPLICATION_JSON_VALUE, bytes), null).id();
+            });
+            ready.await();
+            start.countDown();
+
+            assertThat(first.get()).isEqualTo(second.get());
+        }
+    }
     @Test
     void excelTemplateCanBeImportedAndPreservesCodeWhitespace() throws Exception {
         var imported = importAndCommitExcel(Files.readAllBytes(Path.of("docs/templates/interview-reader-import-template.xlsx")));

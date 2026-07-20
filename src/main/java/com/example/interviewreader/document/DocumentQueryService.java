@@ -62,9 +62,9 @@ public class DocumentQueryService {
         var hasNext = documents.size() > safeLimit;
         var pageItems = hasNext ? documents.subList(0, safeLimit) : documents;
         var nextCursor = hasNext ? encodeDocumentCursor(pageItems.getLast()) : null;
-        var progressByDocument = progressByDocument(pageItems.stream().map(document -> document.id).toList());
+        var progressByDocument = progressByDocument(pageItems.stream().map(document -> document.getId()).toList());
         return new DocumentPage(pageItems.stream()
-                .map(document -> mapDocumentSummary(document, progressByDocument.get(document.id)))
+                .map(document -> mapDocumentSummary(document, progressByDocument.get(document.getId())))
                 .toList(), nextCursor);
     }
 
@@ -85,7 +85,7 @@ public class DocumentQueryService {
     public void publish(UUID documentId, UUID versionId) {
         var targetDocument = documentMapper.selectOneById(id(documentId));
         if (targetDocument == null) throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
-        if ("DELETING".equals(targetDocument.status) || "DELETE_FAILED".equals(targetDocument.status)) {
+        if ("DELETING".equals(targetDocument.getStatus()) || "DELETE_FAILED".equals(targetDocument.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
         }
         var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
@@ -96,25 +96,25 @@ public class DocumentQueryService {
         if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Version not found");
         }
-        if (!"DRAFT".equals(version.status)) {
+        if (!"DRAFT".equals(version.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "Only a draft version can be published");
         }
         var previousVersionId = previousPublishedVersionId(documentId, versionId);
         var now = OffsetDateTime.now();
         for (var published : publishedVersions(documentId)) {
-            if (!published.id.equals(id(versionId))) {
-                published.status = "RETIRED";
+            if (!published.getId().equals(id(versionId))) {
+                published.setStatus("RETIRED");
                 documentVersionMapper.update(published);
             }
         }
-        version.status = "PUBLISHED";
-        version.publishedAt = now;
+        version.setStatus("PUBLISHED");
+        version.setPublishedAt(now);
         documentVersionMapper.update(version);
 
         {
-            targetDocument.status = "PUBLISHED";
-            targetDocument.currentVersionId = id(versionId);
-            targetDocument.updatedAt = now;
+            targetDocument.setStatus("PUBLISHED");
+            targetDocument.setCurrentVersionId(id(versionId));
+            targetDocument.setUpdatedAt(now);
             documentMapper.update(targetDocument);
         }
         migrateReadingProgress(documentId, previousVersionId, versionId);
@@ -163,7 +163,7 @@ public class DocumentQueryService {
                 .limit(safeLimit + 1));
         Integer nextAfterSeq = null;
         if (rows.size() > safeLimit) {
-            nextAfterSeq = rows.get(safeLimit - 1).seq;
+            nextAfterSeq = rows.get(safeLimit - 1).getSeq();
             rows = rows.subList(0, safeLimit);
         }
         return new NodeContent(node, rows.stream().map(this::mapContentBlock).toList(), nextAfterSeq);
@@ -207,18 +207,18 @@ public class DocumentQueryService {
         var titleMatchedNodes = contentNodeMapper.selectListByQuery(nodeQuery);
 
         var nodeIds = new ArrayList<String>();
-        matchedBlocks.stream().map(block -> block.nodeId).distinct().forEach(nodeIds::add);
-        titleMatchedNodes.stream().map(node -> node.id).filter(id -> !nodeIds.contains(id)).forEach(nodeIds::add);
+        matchedBlocks.stream().map(block -> block.getNodeId()).distinct().forEach(nodeIds::add);
+        titleMatchedNodes.stream().map(node -> node.getId()).filter(id -> !nodeIds.contains(id)).forEach(nodeIds::add);
         if (nodeIds.isEmpty()) {
             return List.of();
         }
 
         var nodesById = nodesById(nodeIds);
         var bodyMatchedNodeIds = matchedBlocks.stream()
-                .map(block -> block.nodeId)
+                .map(block -> block.getNodeId())
                 .collect(java.util.stream.Collectors.toSet());
         var missingTitleBlockNodeIds = titleMatchedNodes.stream()
-                .map(node -> node.id)
+                .map(node -> node.getId())
                 .filter(nodeId -> !bodyMatchedNodeIds.contains(nodeId))
                 .toList();
         if (!missingTitleBlockNodeIds.isEmpty()) {
@@ -226,33 +226,33 @@ public class DocumentQueryService {
             matchedBlocks.addAll(firstBlocksInNodes(missingTitleBlockNodeIds));
         }
 
-        var versionIds = nodesById.values().stream().map(node -> node.versionId).distinct().toList();
+        var versionIds = nodesById.values().stream().map(node -> node.getVersionId()).distinct().toList();
         var versionsById = versionsById(versionIds);
-        var documentIds = versionsById.values().stream().map(version -> version.documentId).distinct().toList();
+        var documentIds = versionsById.values().stream().map(version -> version.getDocumentId()).distinct().toList();
         var documentsById = documentsById(documentIds);
 
         var hits = new ArrayList<SearchHit>();
         for (var block : matchedBlocks) {
-            var node = nodesById.get(block.nodeId);
-            var version = node == null ? null : versionsById.get(node.versionId);
-            var document = version == null ? null : documentsById.get(version.documentId);
-            if (node == null || version == null || document == null || !LOCAL_USER_ID.equals(document.ownerId)) {
+            var node = nodesById.get(block.getNodeId());
+            var version = node == null ? null : versionsById.get(node.getVersionId());
+            var document = version == null ? null : documentsById.get(version.getDocumentId());
+            if (node == null || version == null || document == null || !LOCAL_USER_ID.equals(document.getOwnerId())) {
                 continue;
             }
-            if (documentId != null && !id(documentId).equals(document.id)) {
+            if (documentId != null && !id(documentId).equals(document.getId())) {
                 continue;
             }
-            if (!containsIgnoreCase(block.plainText, needle) && !containsIgnoreCase(node.title, needle)) {
+            if (!containsIgnoreCase(block.getPlainText(), needle) && !containsIgnoreCase(node.getTitle(), needle)) {
                 continue;
             }
             hits.add(new SearchHit(
-                    uuid(document.id),
-                    uuid(version.id),
-                    uuid(node.id),
-                    uuid(block.id),
-                    node.title,
-                    List.of(node.title),
-                    snippet(block.plainText),
+                    uuid(document.getId()),
+                    uuid(version.getId()),
+                    uuid(node.getId()),
+                    uuid(block.getId()),
+                    node.getTitle(),
+                    List.of(node.getTitle()),
+                    snippet(block.getPlainText()),
                     BigDecimal.ONE));
             if (hits.size() >= safeLimit) {
                 break;
@@ -270,7 +270,7 @@ public class DocumentQueryService {
                 .from(CONTENT_NODE_ENTITY)
                 .where(CONTENT_NODE_ENTITY.ID.in(nodeIds)));
         var result = new LinkedHashMap<String, ContentNodeEntity>();
-        rows.forEach(row -> result.put(row.id, row));
+        rows.forEach(row -> result.put(row.getId(), row));
         return result;
     }
 
@@ -285,7 +285,7 @@ public class DocumentQueryService {
                 .orderBy(CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc()));
         var firstBlocks = new LinkedHashMap<String, ContentBlockEntity>();
         for (var row : rows) {
-            firstBlocks.putIfAbsent(row.nodeId, row);
+            firstBlocks.putIfAbsent(row.getNodeId(), row);
         }
         return List.copyOf(firstBlocks.values());
     }
@@ -300,7 +300,7 @@ public class DocumentQueryService {
                 .where(DOCUMENT_VERSION_ENTITY.ID.in(versionIds))
                 .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
         var result = new LinkedHashMap<String, DocumentVersionEntity>();
-        rows.forEach(row -> result.put(row.id, row));
+        rows.forEach(row -> result.put(row.getId(), row));
         return result;
     }
 
@@ -315,7 +315,7 @@ public class DocumentQueryService {
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED")));
         var result = new LinkedHashMap<String, DocumentEntity>();
-        rows.forEach(row -> result.put(row.id, row));
+        rows.forEach(row -> result.put(row.getId(), row));
         return result;
     }
 
@@ -326,34 +326,43 @@ public class DocumentQueryService {
 
     @Transactional
     public ReadingProgress upsertProgress(UUID documentId, ReadingProgress progress) {
+        var document = documentMapper.selectOwnedForUpdate(id(documentId), LOCAL_USER_ID);
+        if (document == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
+        }
         validateReadingPosition(documentId, progress);
         var existing = progress(documentId);
+        var clientUpdatedAt = progress.clientUpdatedAt() == null ? OffsetDateTime.now() : progress.clientUpdatedAt();
         if (existing == null) {
             var entity = new ReadingProgressEntity();
-            entity.id = UUID.randomUUID().toString();
-            entity.userId = LOCAL_USER_ID;
-            entity.documentId = id(documentId);
-            entity.versionId = id(progress.versionId());
-            entity.sectionId = id(progress.sectionId());
-            entity.blockId = id(progress.blockId());
-            entity.charOffset = progress.charOffset();
-            entity.blockViewportOffset = progress.blockViewportOffset();
-            entity.progressRatio = progress.progressRatio();
-            entity.clientUpdatedAt = progress.clientUpdatedAt();
-            entity.deviceId = progress.deviceId();
-            entity.revision = 1;
+            entity.setId(UUID.randomUUID().toString());
+            entity.setUserId(LOCAL_USER_ID);
+            entity.setDocumentId(id(documentId));
+            entity.setVersionId(id(progress.versionId()));
+            entity.setSectionId(id(progress.sectionId()));
+            entity.setBlockId(id(progress.blockId()));
+            entity.setCharOffset(progress.charOffset());
+            entity.setBlockViewportOffset(progress.blockViewportOffset());
+            entity.setProgressRatio(progress.progressRatio());
+            entity.setClientUpdatedAt(clientUpdatedAt);
+            entity.setDeviceId(progress.deviceId());
+            entity.setRevision(1);
             readingProgressMapper.insertSelective(entity);
         } else {
-            existing.versionId = id(progress.versionId());
-            existing.sectionId = id(progress.sectionId());
-            existing.blockId = id(progress.blockId());
-            existing.charOffset = progress.charOffset();
-            existing.blockViewportOffset = progress.blockViewportOffset();
-            existing.progressRatio = progress.progressRatio();
-            existing.clientUpdatedAt = progress.clientUpdatedAt();
-            existing.deviceId = progress.deviceId();
-            existing.revision++;
-            existing.updatedAt = OffsetDateTime.now();
+            // 离线队列可能乱序重放；旧的客户端时间不得覆盖服务器已经接受的新阅读位置。
+            if (existing.getClientUpdatedAt() != null && !clientUpdatedAt.isAfter(existing.getClientUpdatedAt())) {
+                return mapReadingProgress(existing);
+            }
+            existing.setVersionId(id(progress.versionId()));
+            existing.setSectionId(id(progress.sectionId()));
+            existing.setBlockId(id(progress.blockId()));
+            existing.setCharOffset(progress.charOffset());
+            existing.setBlockViewportOffset(progress.blockViewportOffset());
+            existing.setProgressRatio(progress.progressRatio());
+            existing.setClientUpdatedAt(clientUpdatedAt);
+            existing.setDeviceId(progress.deviceId());
+            existing.setRevision(existing.getRevision() + 1);
+            existing.setUpdatedAt(OffsetDateTime.now());
             readingProgressMapper.update(existing);
         }
         return getProgress(documentId);
@@ -433,11 +442,11 @@ public class DocumentQueryService {
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
                 .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
         return versions.stream()
-                .filter(version -> !version.id.equals(id(nextVersionId)))
+                .filter(version -> !version.getId().equals(id(nextVersionId)))
                 .max(Comparator
-                        .comparing((DocumentVersionEntity version) -> version.publishedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparingInt(version -> version.versionNo))
-                .map(version -> uuid(version.id))
+                        .comparing((DocumentVersionEntity version) -> version.getPublishedAt(), Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparingInt(version -> version.getVersionNo()))
+                .map(version -> uuid(version.getId()))
                 .orElse(null);
     }
 
@@ -466,12 +475,12 @@ public class DocumentQueryService {
                     .set(READING_PROGRESS_ENTITY.CHAR_OFFSET, 0)
                     .set(READING_PROGRESS_ENTITY.BLOCK_VIEWPORT_OFFSET, 0)
                     .set(READING_PROGRESS_ENTITY.PROGRESS_RATIO, BigDecimal.ZERO)
-                    .set(READING_PROGRESS_ENTITY.REVISION, row.revision + 1)
+                    .set(READING_PROGRESS_ENTITY.REVISION, row.getRevision() + 1)
                     .set(READING_PROGRESS_ENTITY.UPDATED_AT, OffsetDateTime.now());
             readingProgressMapper.updateByQuery(
                     update.toEntity(),
                     false,
-                    QueryWrapper.create().where(READING_PROGRESS_ENTITY.ID.eq(row.id))
+                    QueryWrapper.create().where(READING_PROGRESS_ENTITY.ID.eq(row.getId()))
             );
         }
     }
@@ -493,58 +502,58 @@ public class DocumentQueryService {
                         .from(READING_PROGRESS_ENTITY)
                         .where(READING_PROGRESS_ENTITY.USER_ID.eq(LOCAL_USER_ID))
                         .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.in(documentIds)))
-                .forEach(progress -> result.put(progress.documentId, progress));
+                .forEach(progress -> result.put(progress.getDocumentId(), progress));
         return result;
     }
 
     private DocumentSummary mapDocumentSummary(DocumentEntity document, ReadingProgressEntity progress) {
-        var ratio = progress == null ? BigDecimal.ZERO : progress.progressRatio;
+        var ratio = progress == null ? BigDecimal.ZERO : progress.getProgressRatio();
         return new DocumentSummary(
-                uuid(document.id),
-                document.code,
-                document.title,
-                document.description,
-                uuid(document.currentVersionId),
+                uuid(document.getId()),
+                document.getCode(),
+                document.getTitle(),
+                document.getDescription(),
+                uuid(document.getCurrentVersionId()),
                 ratio);
     }
 
     private MutableTocNode mapMutableTocNode(ContentNodeEntity entity) {
         return new MutableTocNode(
-                entity.id,
-                entity.parentId,
-                entity.title,
-                entity.level,
-                entity.nodeType,
-                entity.semanticRole,
-                entity.anchor,
-                entity.sourcePageStart,
-                entity.sortOrder);
+                entity.getId(),
+                entity.getParentId(),
+                entity.getTitle(),
+                entity.getLevel(),
+                entity.getNodeType(),
+                entity.getSemanticRole(),
+                entity.getAnchor(),
+                entity.getSourcePageStart(),
+                entity.getSortOrder());
     }
 
     private ContentBlock mapContentBlock(ContentBlockEntity entity) {
         return new ContentBlock(
-                uuid(entity.id),
-                entity.blockKey,
-                entity.seq,
-                entity.blockType,
-                readTree(entity.payload),
-                entity.plainText,
-                entity.sourcePage,
-                readNullableTree(entity.sourceBbox),
-                entity.confidence);
+                uuid(entity.getId()),
+                entity.getBlockKey(),
+                entity.getSeq(),
+                entity.getBlockType(),
+                readTree(entity.getPayload()),
+                entity.getPlainText(),
+                entity.getSourcePage(),
+                readNullableTree(entity.getSourceBbox()),
+                entity.getConfidence());
     }
 
     private ReadingProgress mapReadingProgress(ReadingProgressEntity entity) {
         return new ReadingProgress(
-                uuid(entity.versionId),
-                uuid(entity.sectionId),
-                uuid(entity.blockId),
-                entity.charOffset,
-                entity.blockViewportOffset,
-                entity.progressRatio,
-                entity.clientUpdatedAt,
-                entity.deviceId,
-                entity.revision);
+                uuid(entity.getVersionId()),
+                uuid(entity.getSectionId()),
+                uuid(entity.getBlockId()),
+                entity.getCharOffset(),
+                entity.getBlockViewportOffset(),
+                entity.getProgressRatio(),
+                entity.getClientUpdatedAt(),
+                entity.getDeviceId(),
+                entity.getRevision());
     }
 
     private JsonNode readTree(String json) {
@@ -574,7 +583,7 @@ public class DocumentQueryService {
     }
 
     private String encodeDocumentCursor(DocumentEntity document) {
-        var raw = document.updatedAt.toInstant() + "|" + document.id;
+        var raw = document.getUpdatedAt().toInstant() + "|" + document.getId();
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 

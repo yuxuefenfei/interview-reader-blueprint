@@ -1,10 +1,15 @@
 package com.example.interviewreader.common;
 
+import com.example.interviewreader.config.UploadProperties;
+import com.example.interviewreader.security.LoginRateLimitException;
+
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,6 +23,7 @@ import java.util.LinkedHashMap;
 public class ApiExceptionHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
     private final ApiProblemFactory problemFactory;
+    private final UploadProperties uploadProperties;
 
 
     @ExceptionHandler(ApiException.class)
@@ -40,9 +46,16 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException exception) {
-        return problemFactory.create(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE", "上传文件不能超过 10MB。");
+        return problemFactory.create(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE", "上传文件不能超过 " + uploadProperties.displayMaxSize() + "。");
     }
 
+    @ExceptionHandler(LoginRateLimitException.class)
+    ResponseEntity<ProblemDetail> handleLoginRateLimit(LoginRateLimitException exception) {
+        var retryAfterSeconds = Math.max(1, exception.retryAfter().toSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
+                .body(problemFactory.create(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_RATE_LIMITED", exception.getMessage()));
+    }
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleIntegrityViolation(DataIntegrityViolationException exception) {
         return problemFactory.create(HttpStatus.CONFLICT, "DATA_CONFLICT", "当前操作与已有数据关联冲突，请刷新后重试。");

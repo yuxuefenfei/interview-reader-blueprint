@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import lombok.Getter;
+import lombok.Setter;
 
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
@@ -6,32 +8,35 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.time.OffsetDateTime;
 
+/** 文档导入任务持久化实体。 */
+@Getter
+@Setter
 @Table("import_job")
 public class ImportJobEntity {
     @Id(keyType = KeyType.None)
-    public String id;
-    public String ownerId;
-    public String targetDocumentId;
-    public String sourceType;
-    public String sourceObjectKey;
-    public String sourceSha256;
-    public String converterVersion;
-    public String importFingerprint;
-    public String status;
-    public int progress;
-    public String currentStage;
-    public String resultVersionId;
-    public String errorCode;
+    private String id;
+    private String ownerId;
+    private String targetDocumentId;
+    private String sourceType;
+    private String sourceObjectKey;
+    private String sourceSha256;
+    private String converterVersion;
+    private String importFingerprint;
+    private String status;
+    private int progress;
+    private String currentStage;
+    private String resultVersionId;
+    private String errorCode;
     @Column(isLarge = true)
-    public String errorMessage;
+    private String errorMessage;
     @Column(isLarge = true)
-    public String statistics;
-    public String rawExtractionObjectKey;
+    private String statistics;
+    private String rawExtractionObjectKey;
     @Column(isLarge = true)
-    public String rawExtractionJson;
+    private String rawExtractionJson;
     @Column(isLarge = true)
-    public String normalizedObjectKey;
-    public OffsetDateTime createdAt;
-    public OffsetDateTime startedAt;
-    public OffsetDateTime finishedAt;
+    private String normalizedObjectKey;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime startedAt;
+    private OffsetDateTime finishedAt;
 }

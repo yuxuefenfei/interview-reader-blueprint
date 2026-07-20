@@ -10,9 +10,15 @@ public class RuntimeProfileGuard {
 
     public RuntimeProfileGuard(Environment environment) {
         var activeProfiles = Set.of(environment.getActiveProfiles());
-        if (activeProfiles.stream().noneMatch(SUPPORTED_PROFILES::contains)) {
+        if (activeProfiles.size() != 1 || !SUPPORTED_PROFILES.containsAll(activeProfiles)) {
             throw new IllegalStateException(
-                    "An explicit Spring profile is required. Select one of: dev, test, prod.");
+                    "Exactly one supported Spring profile is required. Select one of: dev, test, prod.");
+        }
+
+        // 非测试环境禁止把耗时转换退回 HTTP 线程同步执行，避免上传请求长期占用容器线程。
+        var importWorkerEnabled = environment.getProperty("interview-reader.import-worker.enabled", Boolean.class, true);
+        if (!activeProfiles.contains("test") && !importWorkerEnabled) {
+            throw new IllegalStateException("Import worker must be enabled outside the test profile.");
         }
     }
 }

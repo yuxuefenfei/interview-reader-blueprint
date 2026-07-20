@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { toUserMessage } from "../utils/errorMessage";
 import { ArrowLeft, Delete, EditPen, FolderOpened, FullScreen, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus/es/components/message/index";
-import { ElMessageBox } from "element-plus/es/components/message-box/index";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import { ElMessage } from "element-plus/es/components/message";
+import { ElMessageBox } from "element-plus";
 import { adminApi } from "../api/admin";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import { zh } from "../shared/presentation";
@@ -11,12 +12,23 @@ import { ADMIN_DESKTOP_MEDIA_QUERY } from "../shared/responsive";
 import { BLOCK_TYPES, NODE_TYPES, SEMANTIC_ROLES } from "../types/api";
 import type { EditorBlock, EditorNode, EditorSnapshot, StructureNode } from "../types/api";
 import { editorTextPlaceholder, parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
+import { createSerializedSaveQueue } from "../utils/serializedSaveQueue";
 import { detachedPreviewChannelName, isDetachedPreviewMessage, type DetachedPreviewState } from "../utils/detachedPreviewChannel";
 
 type TreeNode = EditorNode & { children: TreeNode[] };
 type NodeForm = Pick<EditorNode, "title" | "nodeType" | "semanticRole" | "anchor">;
 type PreviewMode = "block" | "node";
 type SaveState = "saved" | "dirty" | "saving" | "error";
+interface BlockSaveSnapshot {
+  blockId: string;
+  blockType: EditorBlock["blockType"];
+  plainText: string;
+  language: string | null;
+  payloadText: string;
+  fallbackPayload: Record<string, unknown>;
+  state: string;
+}
+interface BlockSaveTask { snapshot: BlockSaveSnapshot; quiet: boolean }
 
 const route = useRoute();
 const router = useRouter();
@@ -50,11 +62,13 @@ const treePanelRef = ref<HTMLElement>();
 const blockListRef = ref<HTMLElement>();
 const previewScrollRef = ref<HTMLElement>();
 const previewPanelRef = ref<HTMLElement>();
-let autoSaveTimer: number | null = null;
+let blockRequestId = 0;
+let discardingDraft = false;
 let clearPreviewDrag: (() => void) | null = null;
 let detachedPreviewChannel: BroadcastChannel | null = null;
 let detachedPreviewPublishTimer: number | null = null;
 let detachedPreviewWindow: Window | null = null;
+const blockSaveQueue = createSerializedSaveQueue<BlockSaveTask>(700, ({ snapshot, quiet }) => persistBlockSnapshot(snapshot, quiet));
 
 const selectedNode = computed(() => editor.value?.nodes.find((node) => node.id === selectedId.value) ?? null);
 const previewNode = computed<EditorNode | null>(() => {
@@ -100,10 +114,13 @@ onMounted(() => {
   detachedPreviewChannel.onmessage = (event: MessageEvent<unknown>) => {
     if (isDetachedPreviewMessage(event.data) && event.data.type === "preview-state-request") publishDetachedPreview();
   };
+  window.addEventListener("beforeunload", warnBeforeUnload);
   void load();
 });
+onBeforeRouteLeave(async () => discardingDraft || await flushPendingBlockSave());
 onBeforeUnmount(() => {
-  if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer);
+  blockSaveQueue.cancelPending();
+  window.removeEventListener("beforeunload", warnBeforeUnload);
   if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
   detachedPreviewPublishTimer = null;
   clearPreviewDrag?.();
@@ -163,6 +180,7 @@ function showEmbeddedPreview(): void {
 }
 
 async function load(): Promise<void> {
+  if (editor.value && !await flushPendingBlockSave()) return;
   loading.value = true;
   try {
     const snapshot = await adminApi.editor(versionId);
@@ -207,12 +225,13 @@ function toTree(nodes: EditorNode[]): TreeNode[] {
 }
 
 async function selectNode(node: EditorNode): Promise<void> {
+  if (selectedId.value !== node.id && !await flushPendingBlockSave()) return;
   selectedId.value = node.id;
   fillNodeForm(node);
   activeBlockId.value = null;
   await loadBlocks();
   await nextTick();
-  scrollTreeTo(node.id);
+  if (selectedId.value === node.id) scrollTreeTo(node.id);
 }
 
 function fillNodeForm(node: EditorNode): void {
@@ -227,10 +246,13 @@ function resetNodeForm(): void {
 }
 
 async function loadBlocks(append = false): Promise<void> {
-  if (!selectedId.value) return;
+  const nodeId = selectedId.value;
+  if (!nodeId) return;
+  const requestId = ++blockRequestId;
   nodeLoading.value = true;
   try {
-    const result = await adminApi.nodeBlocks(versionId, selectedId.value, append ? nextCursor.value ?? undefined : undefined);
+    const result = await adminApi.nodeBlocks(versionId, nodeId, append ? nextCursor.value ?? undefined : undefined);
+    if (requestId !== blockRequestId || selectedId.value !== nodeId) return;
     blocks.value = append ? [...blocks.value, ...result.items.filter((item) => !blocks.value.some((block) => block.id === item.id))] : result.items;
     nextCursor.value = result.nextCursor;
     for (const block of result.items) {
@@ -238,17 +260,20 @@ async function loadBlocks(append = false): Promise<void> {
       savedBlockStates[block.id] = blockState(block);
     }
     const firstBlock = blocks.value[0];
-    if (!activeBlockId.value && firstBlock) activateBlock(firstBlock.id, false);
+    if (!activeBlockId.value && firstBlock) void activateBlock(firstBlock.id, false);
     saveState.value = "saved";
-  } catch (caught) { ElMessage.error(message(caught)); }
-  finally {
-    nodeLoading.value = false;
-    publishDetachedPreview();
+  } catch (caught) {
+    if (requestId === blockRequestId) ElMessage.error(message(caught));
+  } finally {
+    if (requestId === blockRequestId) {
+      nodeLoading.value = false;
+      publishDetachedPreview();
+    }
   }
 }
 
 async function saveNode(): Promise<void> {
-  if (!editor.value || !selectedId.value) return;
+  if (!editor.value || !selectedId.value || !await flushPendingBlockSave()) return;
   nodeSaving.value = true;
   try {
     const snapshot = await adminApi.updateNode(versionId, selectedId.value, editor.value.version.draftRevision, nodeForm);
@@ -262,6 +287,10 @@ async function saveNode(): Promise<void> {
 
 async function persistStructure(): Promise<void> {
   if (!editor.value) return;
+  if (!await flushPendingBlockSave()) {
+    treeData.value = toTree(editor.value.nodes);
+    return;
+  }
   const nodes: StructureNode[] = [];
   const visit = (items: TreeNode[], parentId: string | null): void => items.forEach((item, index) => {
     nodes.push({ id: item.id, parentId, sortOrder: (index + 1) * 10 });
@@ -280,7 +309,7 @@ async function persistStructure(): Promise<void> {
 }
 
 async function addBlock(): Promise<void> {
-  if (!editor.value || !selectedId.value) return;
+  if (!editor.value || !selectedId.value || !await flushPendingBlockSave()) return;
   creatingBlock.value = true;
   try {
     const block = await adminApi.createBlock(versionId, selectedId.value, editor.value.version.draftRevision, {
@@ -361,7 +390,8 @@ function resetPreviewPosition(): void {
   previewOffset.y = 0;
 }
 
-function activateBlock(blockId: string, scroll = true): void {
+async function activateBlock(blockId: string, scroll = true): Promise<void> {
+  if (activeBlockId.value !== blockId && !await flushPendingBlockSave()) return;
   activeBlockId.value = blockId;
   void nextTick(() => {
     centerInScrollContainer(blockListRef.value, `[data-block-id="${blockId}"]`, scroll);
@@ -374,41 +404,71 @@ function scrollTreeTo(nodeId: string): void {
   centerInScrollContainer(treePanelRef.value, `[data-node-id="${nodeId}"]`, true);
 }
 
+function captureBlockSave(block: EditorBlock): BlockSaveSnapshot {
+  const payloadText = payloadTexts[block.id] ?? JSON.stringify(block.payload ?? {}, null, 2);
+  return {
+    blockId: block.id,
+    blockType: block.blockType,
+    plainText: block.plainText,
+    language: block.language,
+    payloadText,
+    fallbackPayload: JSON.parse(JSON.stringify(block.payload ?? {})) as Record<string, unknown>,
+    state: blockState(block)
+  };
+}
+
 function scheduleBlockSave(): void {
-  const editedBlockId = activeBlock.value?.id;
-  if (!editedBlockId) return;
+  const block = activeBlock.value;
+  if (!block) return;
   publishDetachedPreview();
-  if (autoSaveTimer !== null) window.clearTimeout(autoSaveTimer);
   saveState.value = "dirty";
-  autoSaveTimer = window.setTimeout(() => {
-    const editedBlock = blocks.value.find((block) => block.id === editedBlockId);
-    if (editedBlock) void saveBlock(editedBlock, true);
-  }, 700);
+  blockSaveQueue.schedule({ snapshot: captureBlockSave(block), quiet: true });
+}
+
+async function flushPendingBlockSave(): Promise<boolean> {
+  return blockSaveQueue.flush();
 }
 
 async function saveBlock(block: EditorBlock, quiet = false): Promise<boolean> {
-  if (!editor.value || savingBlockId.value || !isBlockDirty(block)) return true;
-  const parsed = parseEditorPayload(payloadTexts[block.id], block.payload);
+  if (!editor.value || !isBlockDirty(block)) return true;
+  blockSaveQueue.cancelPending();
+  return blockSaveQueue.submit({ snapshot: captureBlockSave(block), quiet });
+}
+
+async function persistBlockSnapshot(snapshot: BlockSaveSnapshot, quiet: boolean): Promise<boolean> {
+  if (!editor.value || savedBlockStates[snapshot.blockId] === snapshot.state) return true;
+  const parsed = parseEditorPayload(snapshot.payloadText, snapshot.fallbackPayload);
   if (parsed === null) {
     saveState.value = "error";
     if (!quiet) ElMessage.error("扩展数据必须是有效的 JSON");
     return false;
   }
-  savingBlockId.value = block.id;
+  const requestBlock = {
+    id: snapshot.blockId,
+    blockType: snapshot.blockType,
+    plainText: snapshot.plainText,
+    language: snapshot.language
+  } as EditorBlock;
+  savingBlockId.value = snapshot.blockId;
   saveState.value = "saving";
   try {
-    const updated = await adminApi.updateBlock(versionId, block.id, editor.value.version.draftRevision, {
-      blockType: block.blockType,
-      payload: previewPayload(block, parsed),
-      plainText: block.plainText,
-      language: block.language
+    const updated = await adminApi.updateBlock(versionId, snapshot.blockId, editor.value.version.draftRevision, {
+      blockType: snapshot.blockType,
+      payload: previewPayload(requestBlock, parsed),
+      plainText: snapshot.plainText,
+      language: snapshot.language
     });
-    Object.assign(block, updated);
-    payloadTexts[block.id] = JSON.stringify(updated.payload ?? {}, null, 2);
-    publishDetachedPreview();
-    savedBlockStates[block.id] = blockState(block);
     editor.value.version.draftRevision++;
-    saveState.value = "saved";
+    const current = blocks.value.find((block) => block.id === snapshot.blockId);
+    savedBlockStates[snapshot.blockId] = snapshot.state;
+    // 请求期间若用户继续输入，只更新“已保存基线”，不能用旧响应覆盖新的本地文本。
+    if (current && blockState(current) === snapshot.state) {
+      Object.assign(current, updated);
+      payloadTexts[current.id] = JSON.stringify(updated.payload ?? {}, null, 2);
+      savedBlockStates[current.id] = blockState(current);
+    }
+    publishDetachedPreview();
+    saveState.value = blocks.value.some(isBlockDirty) ? "dirty" : "saved";
     if (!quiet) ElMessage.success("内容块已保存");
     return true;
   } catch (caught) {
@@ -418,7 +478,14 @@ async function saveBlock(block: EditorBlock, quiet = false): Promise<boolean> {
   } finally { savingBlockId.value = null; }
 }
 
+function warnBeforeUnload(event: BeforeUnloadEvent): void {
+  if (!blockSaveQueue.hasWork() && !blocks.value.some(isBlockDirty)) return;
+  event.preventDefault();
+  event.returnValue = "";
+}
+
 async function saveAllBlocks(): Promise<void> {
+  if (!await flushPendingBlockSave()) return;
   for (const block of blocks.value.filter(isBlockDirty)) {
     const saved = await saveBlock(block, true);
     if (!saved) return;
@@ -431,6 +498,7 @@ async function deleteActiveBlock(): Promise<void> {
   if (!editor.value || !block) return;
   try {
     await ElMessageBox.confirm(`将删除“${blockSummary(block)}”，无法恢复。`, "删除内容块", { type: "warning", confirmButtonText: "删除", cancelButtonText: "取消" });
+    if (!await flushPendingBlockSave()) return;
     deletingBlockId.value = block.id;
     const result = await adminApi.deleteBlock(versionId, block.id, editor.value.version.draftRevision);
     editor.value.version.draftRevision = result.draftRevision;
@@ -445,6 +513,7 @@ async function cleanupEmptyBlocks(): Promise<void> {
   if (!editor.value) return;
   try {
     await ElMessageBox.confirm("将删除当前草稿中所有没有有效内容的块，并重新排列块序号。", "清理空内容块", { type: "warning", confirmButtonText: "清理", cancelButtonText: "取消" });
+    if (!await flushPendingBlockSave()) return;
     cleaningEmptyBlocks.value = true;
     const result = await adminApi.cleanupEmptyBlocks(versionId, editor.value.version.draftRevision);
     editor.value.version.draftRevision = result.draftRevision;
@@ -457,13 +526,15 @@ async function cleanupEmptyBlocks(): Promise<void> {
 async function discard(): Promise<void> {
   try {
     await ElMessageBox.confirm("将永久删除这份草稿，无法恢复。", "丢弃草稿", { type: "warning", confirmButtonText: "丢弃", cancelButtonText: "取消" });
+    blockSaveQueue.cancelPending();
+    discardingDraft = true;
     await adminApi.deleteDraft(versionId);
     ElMessage.success("草稿已丢弃");
     await router.push("/admin/documents");
   } catch (caught) { if (caught !== "cancel") ElMessage.error(message(caught)); }
 }
 
-function message(value: unknown): string { return value instanceof Error ? value.message : "操作失败"; }
+function message(value: unknown): string { return toUserMessage(value, "操作失败"); }
 </script>
 
 <template>
@@ -508,7 +579,7 @@ function message(value: unknown): string { return value instanceof Error ? value
           </div>
         </section>
         <Teleport to="body">
-          <aside v-show="previewVisible" ref="previewPanelRef" class="editor-preview-panel" :style="{ transform: `translate(${previewOffset.x}px, ${previewOffset.y}px)` }">
+          <aside v-show="previewVisible" ref="previewPanelRef" class="editor-preview-panel" role="region" aria-label="实时预览" :style="{ transform: `translate(${previewOffset.x}px, ${previewOffset.y}px)` }">
             <header><div><p class="eyebrow">实时预览</p><strong>{{ previewNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="RefreshRight" aria-label="还原实时预览位置" title="还原到右侧" @click="resetPreviewPosition" /><el-button circle :icon="Hide" aria-label="隐藏实时预览" title="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
             <div ref="previewScrollRef" class="editor-preview-scroll">
               <article class="editor-preview-article"><div v-if="previewNode" class="preview-node-meta"><el-tag effect="plain">{{ zh(previewNode.nodeType) }}</el-tag><el-tag v-if="previewNode.semanticRole" type="success" effect="plain">{{ zh(previewNode.semanticRole) }}</el-tag></div><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>

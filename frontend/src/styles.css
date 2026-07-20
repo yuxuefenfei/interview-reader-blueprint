@@ -9,6 +9,12 @@ html, body, #app { min-height: 100%; }
 body { margin: 0; background: #f3f6f8; }
 button, input, textarea { font: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+.route-content:focus { outline: none; }
+.skip-link { position: fixed; z-index: 10000; top: 8px; left: 8px; padding: 9px 13px; border-radius: 6px; background: #fff; color: #0b6059; box-shadow: 0 4px 16px rgba(0, 0, 0, .18); transform: translateY(-160%); }
+.skip-link:focus { transform: translateY(0); }
+.app-status-banner, .app-update-banner { position: fixed; z-index: 9999; right: 16px; bottom: 16px; max-width: min(520px, calc(100vw - 32px)); padding: 10px 14px; border-radius: 7px; background: #172033; color: #fff; box-shadow: 0 8px 24px rgba(23, 32, 51, .22); font-size: 13px; line-height: 1.5; }
+.app-update-banner { bottom: 64px; display: flex; align-items: center; gap: 12px; background: #0b6059; }
+.app-update-banner button { padding: 5px 9px; border: 1px solid rgba(255, 255, 255, .7); border-radius: 5px; background: transparent; color: #fff; cursor: pointer; }
 .boot-screen, .login-page { min-height: 100vh; display: grid; place-items: center; }
 .boot-screen { color: #5f6b7a; }
 .login-page { padding: 24px; background: #edf2f4; }

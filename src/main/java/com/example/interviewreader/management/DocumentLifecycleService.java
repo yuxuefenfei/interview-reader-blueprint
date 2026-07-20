@@ -35,10 +35,10 @@ public class DocumentLifecycleService {
     public void takeDown(UUID documentId) {
         var document = requireDocument(documentId);
         rejectLocked(document);
-        if ("OFFLINE".equals(document.status)) {
+        if ("OFFLINE".equals(document.getStatus())) {
             return;
         }
-        if (!"PUBLISHED".equals(document.status)) {
+        if (!"PUBLISHED".equals(document.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_NOT_PUBLISHED", "Document is not published");
         }
         updateStatus(document, "PUBLISHED", "OFFLINE");
@@ -48,14 +48,14 @@ public class DocumentLifecycleService {
     public void restore(UUID documentId) {
         var document = requireDocument(documentId);
         rejectLocked(document);
-        if ("PUBLISHED".equals(document.status)) {
+        if ("PUBLISHED".equals(document.getStatus())) {
             return;
         }
-        if (!"OFFLINE".equals(document.status) || document.currentVersionId == null) {
+        if (!"OFFLINE".equals(document.getStatus()) || document.getCurrentVersionId() == null) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_CANNOT_RESTORE", "Offline document has no published version to restore");
         }
-        var version = versionMapper.selectOneById(document.currentVersionId);
-        if (version == null || !"PUBLISHED".equals(version.status)) {
+        var version = versionMapper.selectOneById(document.getCurrentVersionId());
+        if (version == null || !"PUBLISHED".equals(version.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_CANNOT_RESTORE", "Published version is missing");
         }
         updateStatus(document, "OFFLINE", "PUBLISHED");
@@ -75,29 +75,29 @@ public class DocumentLifecycleService {
         }
         existing = deletionJobMapper.selectByDocument(documentId.toString(), OWNER_ID);
         if (existing != null) return summary(existing);
-        if ("PUBLISHED".equals(document.status)) {
+        if ("PUBLISHED".equals(document.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_MUST_BE_OFFLINE", "Take the document down before permanent deletion");
         }
         rejectLocked(document);
-        if (!("DRAFT".equals(document.status) || "OFFLINE".equals(document.status))) {
+        if (!("DRAFT".equals(document.getStatus()) || "OFFLINE".equals(document.getStatus()))) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_CANNOT_DELETE", "Document cannot be permanently deleted in its current state");
         }
-        if (request == null || request.confirmationTitle() == null || !document.title.equals(request.confirmationTitle())) {
+        if (request == null || request.confirmationTitle() == null || !document.getTitle().equals(request.confirmationTitle())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "DOCUMENT_TITLE_MISMATCH", "Confirmation title must exactly match the full document title");
         }
         var now = OffsetDateTime.now();
         var job = new DocumentDeletionJobEntity();
-        job.id = UUID.randomUUID().toString();
-        job.documentId = document.id;
-        job.ownerId = OWNER_ID;
-        job.status = "QUEUED";
-        job.currentStage = "QUEUED";
-        job.attemptCount = 0;
-        job.requestedAt = now;
-        job.updatedAt = now;
+        job.setId(UUID.randomUUID().toString());
+        job.setDocumentId(document.getId());
+        job.setOwnerId(OWNER_ID);
+        job.setStatus("QUEUED");
+        job.setCurrentStage("QUEUED");
+        job.setAttemptCount(0);
+        job.setRequestedAt(now);
+        job.setUpdatedAt(now);
         deletionJobMapper.insert(job);
-        updateStatus(document, document.status, "DELETING");
-        submitAfterCommit(UUID.fromString(job.id));
+        updateStatus(document, document.getStatus(), "DELETING");
+        submitAfterCommit(UUID.fromString(job.getId()));
         return summary(job);
     }
 
@@ -109,25 +109,25 @@ public class DocumentLifecycleService {
     @Transactional
     public ManagementDtos.DeletionJobSummary retry(UUID jobId) {
         var job = requireJob(jobId);
-        if ("COMPLETED".equals(job.status)) {
+        if ("COMPLETED".equals(job.getStatus())) {
             return summary(job);
         }
-        if (!"FAILED".equals(job.status)) {
+        if (!"FAILED".equals(job.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DELETION_NOT_FAILED", "Only a failed deletion can be retried");
         }
-        var document = documentMapper.selectOneById(job.documentId);
+        var document = documentMapper.selectOneById(job.getDocumentId());
         if (document == null) {
             throw new ApiException(HttpStatus.CONFLICT, "DELETION_DOCUMENT_MISSING", "Deletion target no longer exists");
         }
-        job.status = "QUEUED";
-        job.currentStage = "QUEUED";
-        job.attemptCount = 0;
-        job.errorCode = null;
-        job.errorMessage = null;
-        job.updatedAt = OffsetDateTime.now();
+        job.setStatus("QUEUED");
+        job.setCurrentStage("QUEUED");
+        job.setAttemptCount(0);
+        job.setErrorCode(null);
+        job.setErrorMessage(null);
+        job.setUpdatedAt(OffsetDateTime.now());
         deletionJobMapper.update(job);
-        document.status = "DELETING";
-        document.updatedAt = job.updatedAt;
+        document.setStatus("DELETING");
+        document.setUpdatedAt(job.getUpdatedAt());
         documentMapper.update(document);
         submitAfterCommit(jobId);
         return summary(job);
@@ -149,14 +149,14 @@ public class DocumentLifecycleService {
                 .set(DOCUMENT_ENTITY.STATUS, target)
                 .set(DOCUMENT_ENTITY.UPDATED_AT, now);
         var changed = documentMapper.updateByQuery(update.toEntity(), false, QueryWrapper.create()
-                .where(DOCUMENT_ENTITY.ID.eq(document.id))
+                .where(DOCUMENT_ENTITY.ID.eq(document.getId()))
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(OWNER_ID))
                 .and(DOCUMENT_ENTITY.STATUS.eq(expected)));
         if (changed != 1) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_STATE_CHANGED", "Document state changed; refresh and retry");
         }
-        document.status = target;
-        document.updatedAt = now;
+        document.setStatus(target);
+        document.setUpdatedAt(now);
     }
 
     private DocumentEntity requireDocument(UUID documentId) {
@@ -178,14 +178,14 @@ public class DocumentLifecycleService {
     }
 
     public static void rejectLocked(DocumentEntity document) {
-        if ("DELETING".equals(document.status) || "DELETE_FAILED".equals(document.status)) {
+        if ("DELETING".equals(document.getStatus()) || "DELETE_FAILED".equals(document.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
         }
     }
 
     public static ManagementDtos.DeletionJobSummary summary(DocumentDeletionJobEntity job) {
-        return new ManagementDtos.DeletionJobSummary(UUID.fromString(job.id), UUID.fromString(job.documentId),
-                job.status, job.currentStage, job.attemptCount, job.errorCode, job.errorMessage,
-                job.requestedAt, job.startedAt, job.completedAt, job.updatedAt);
+        return new ManagementDtos.DeletionJobSummary(UUID.fromString(job.getId()), UUID.fromString(job.getDocumentId()),
+                job.getStatus(), job.getCurrentStage(), job.getAttemptCount(), job.getErrorCode(), job.getErrorMessage(),
+                job.getRequestedAt(), job.getStartedAt(), job.getCompletedAt(), job.getUpdatedAt());
     }
 }

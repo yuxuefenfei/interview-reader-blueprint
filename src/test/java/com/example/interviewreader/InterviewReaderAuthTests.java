@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "interview-reader.security.enabled=true",
         "interview-reader.security.username=tester",
         "interview-reader.security.password=secret",
+        "interview-reader.security.allowed-origins[0]=http://localhost",
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -58,8 +59,60 @@ class InterviewReaderAuthTests {
     }
 
     @Test
+    void responsesIncludeSecurityHeadersAndHealthAllowlistIsExact() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getHeader("X-Content-Type-Options")).isEqualTo("nosniff"))
+                .andExpect(result -> assertThat(result.getResponse().getHeader("X-Frame-Options")).isEqualTo("DENY"))
+                .andExpect(result -> assertThat(result.getResponse().getHeader("Content-Security-Policy")).contains("default-src 'self'"));
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/health/readiness"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/healthz"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
+    }
+
+    @Test
+    void stateChangingApiRejectsUntrustedOrigin() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "https://attacker.example")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "username": "tester", "password": "secret" }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ORIGIN_NOT_ALLOWED"));
+    }
+
+    @Test
+    void repeatedLoginFailuresAreRateLimitedWithRetryAfter() throws Exception {
+        for (var attempt = 1; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/auth/login")
+                            .header(HttpHeaders.ORIGIN, "http://localhost")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    { "username": "rate-target", "password": "wrong" }
+                                    """))
+                    .andExpect(status().isUnauthorized());
+        }
+        mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "username": "rate-target", "password": "wrong" }
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.RETRY_AFTER)).isNotBlank())
+                .andExpect(jsonPath("$.code").value("LOGIN_RATE_LIMITED"));
+    }
+    @Test
     void loginCreatesSessionCookieForProtectedApi() throws Exception {
         mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -70,6 +123,7 @@ class InterviewReaderAuthTests {
                 .andExpect(status().isUnauthorized());
 
         var response = mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -94,6 +148,7 @@ class InterviewReaderAuthTests {
     @Test
     void logoutInvalidatesSession() throws Exception {
         var session = mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -111,7 +166,7 @@ class InterviewReaderAuthTests {
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store"))
                 .andExpect(jsonPath("$.authenticated").value(true));
 
-        mockMvc.perform(post("/api/auth/logout").cookie(session))
+        mockMvc.perform(post("/api/auth/logout").header(HttpHeaders.ORIGIN, "http://localhost").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store"))
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0"))

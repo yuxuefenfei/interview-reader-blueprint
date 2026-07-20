@@ -20,8 +20,10 @@ const vueUsePureAnnotationCompatibility = {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "VITE_");
   const backendTarget = env.VITE_API_PROXY_TARGET || DEFAULT_API_PROXY_TARGET;
+  const buildId = new Date().toISOString().replace(/\D/g, "");
 
   return {
+    define: { __APP_BUILD_ID__: JSON.stringify(buildId) },
     plugins: [vueUsePureAnnotationCompatibility, vue()],
     server: {
       port: FRONTEND_DEV_PORT,

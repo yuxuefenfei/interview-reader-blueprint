@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import lombok.Getter;
+import lombok.Setter;
 
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
@@ -6,20 +8,23 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.time.OffsetDateTime;
 
+/** 文档彻底删除任务持久化实体。 */
+@Getter
+@Setter
 @Table("document_deletion_job")
 public class DocumentDeletionJobEntity {
     @Id(keyType = KeyType.None)
-    public String id;
-    public String documentId;
-    public String ownerId;
-    public String status;
-    public String currentStage;
-    public int attemptCount;
-    public String errorCode;
+    private String id;
+    private String documentId;
+    private String ownerId;
+    private String status;
+    private String currentStage;
+    private int attemptCount;
+    private String errorCode;
     @Column(isLarge = true)
-    public String errorMessage;
-    public OffsetDateTime requestedAt;
-    public OffsetDateTime startedAt;
-    public OffsetDateTime completedAt;
-    public OffsetDateTime updatedAt;
+    private String errorMessage;
+    private OffsetDateTime requestedAt;
+    private OffsetDateTime startedAt;
+    private OffsetDateTime completedAt;
+    private OffsetDateTime updatedAt;
 }

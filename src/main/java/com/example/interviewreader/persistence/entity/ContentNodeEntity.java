@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import lombok.Getter;
+import lombok.Setter;
 
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
@@ -6,26 +8,29 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import java.time.OffsetDateTime;
 
+/** 文档目录节点持久化实体。 */
+@Getter
+@Setter
 @Table("content_node")
 public class ContentNodeEntity {
     @Id(keyType = KeyType.None)
-    public String id;
-    public String versionId;
-    public String parentId;
-    public String nodeKey;
-    public String nodeType;
-    public String semanticRole;
-    public String title;
-    public int level;
-    public String path;
-    public int sortOrder;
-    public String anchor;
-    public Integer sourcePageStart;
-    public Integer sourcePageEnd;
+    private String id;
+    private String versionId;
+    private String parentId;
+    private String nodeKey;
+    private String nodeType;
+    private String semanticRole;
+    private String title;
+    private int level;
+    private String path;
+    private int sortOrder;
+    private String anchor;
+    private Integer sourcePageStart;
+    private Integer sourcePageEnd;
     @Column(isLarge = true)
-    public String sourceBbox;
-    public String contentHash;
+    private String sourceBbox;
+    private String contentHash;
     @Column(isLarge = true)
-    public String searchText;
-    public OffsetDateTime createdAt;
+    private String searchText;
+    private OffsetDateTime createdAt;
 }
