@@ -14,6 +14,7 @@ import java.util.UUID;
 public class AdminDocumentController {
     private final VersionRevisionService service;
     private final DocumentLifecycleService lifecycleService;
+    private final DocumentMetadataService metadataService;
 
 
     @GetMapping("/documents")
@@ -28,6 +29,19 @@ public class AdminDocumentController {
     @GetMapping("/documents/{documentId}")
     public ManagementDtos.AdminDocumentSummary document(@PathVariable UUID documentId) {
         return service.document(documentId);
+    }
+
+    @GetMapping("/documents/{documentId}/metadata")
+    public DocumentMetadataDtos.DocumentMetadata documentMetadata(@PathVariable UUID documentId) {
+        return metadataService.get(documentId);
+    }
+
+    @PatchMapping("/documents/{documentId}/metadata")
+    public DocumentMetadataDtos.DocumentMetadata updateDocumentMetadata(
+            @PathVariable UUID documentId,
+            @Valid @RequestBody DocumentMetadataDtos.UpdateDocumentMetadataRequest request
+    ) {
+        return metadataService.update(documentId, request);
     }
 
     @GetMapping("/documents/{documentId}/versions")

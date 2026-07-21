@@ -12,6 +12,7 @@ public final class ApiContractValues {
     public static final Set<String> IMPORT_STATUSES = Set.of(
             "UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING",
             "READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED");
+    public static final Set<String> IMPORT_RESOLUTIONS = Set.of("CREATE_NEW", "IMPORT_AS_NEW_VERSION");
     public static final Set<String> IMPORT_STAGES = Set.of(
             "UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING",
             "REVIEWING", "FAILED", "CANCELED", "COMMITTED", "DRAFT_DISCARDED");

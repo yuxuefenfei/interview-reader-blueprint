@@ -7,7 +7,7 @@ import { ElMessage } from "element-plus/es/components/message/index";
 import { ElMessageBox } from "element-plus/es/components/message-box/index";
 import { adminApi } from "../api/admin";
 import { formatTime, zh } from "../shared/presentation";
-import type { AdminDocumentSummary, DeletionJob, VersionSummary } from "../types/api";
+import type { AdminDocumentSummary, DeletionJob, DocumentMetadata, VersionSummary } from "../types/api";
 
 type ActionKind = "create" | "publish" | "discard" | "take-down" | "restore" | "delete-document" | "retry-delete";
 type MoreCommand = "create" | "discard";
@@ -16,6 +16,10 @@ const route = useRoute();
 const router = useRouter();
 const documentId = route.params.documentId as string;
 const document = ref<AdminDocumentSummary | null>(null);
+const metadata = ref<DocumentMetadata | null>(null);
+const metadataDialogVisible = ref(false);
+const metadataSaving = ref(false);
+const metadataForm = ref({ title: "", description: "", tags: [] as string[] });
 const versions = ref<VersionSummary[]>([]);
 const loading = ref(false);
 const loadError = ref("");
@@ -37,7 +41,9 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = "";
   try {
-    [document.value, versions.value] = await Promise.all([adminApi.document(documentId), adminApi.versions(documentId)]);
+    [document.value, versions.value, metadata.value] = await Promise.all([
+      adminApi.document(documentId), adminApi.versions(documentId), adminApi.documentMetadata(documentId)
+    ]);
     scheduleDeletionPoll(document.value.deletionJob);
   } catch (caught) {
     loadError.value = message(caught);
@@ -125,6 +131,50 @@ function begin(target: string, kind: ActionKind): boolean {
 }
 function finish(target: string, kind: ActionKind): void { if (isActive(target, kind)) activeAction.value = null; }
 
+function openMetadataEditor(): void {
+  if (!metadata.value || deletionLocked.value) return;
+  metadataForm.value = {
+    title: metadata.value.title,
+    description: metadata.value.description ?? "",
+    tags: [...metadata.value.tags]
+  };
+  metadataDialogVisible.value = true;
+}
+function normalizedTags(values: string[]): string[] {
+  const unique = new Map<string, string>();
+  for (const value of values) {
+    const display = value.trim();
+    if (display) unique.set(display.toLocaleLowerCase(), display);
+  }
+  return [...unique.values()];
+}
+async function saveMetadata(): Promise<void> {
+  const current = metadata.value;
+  if (!current || metadataSaving.value) return;
+  const title = metadataForm.value.title.trim();
+  const description = metadataForm.value.description.trim();
+  const tags = normalizedTags(metadataForm.value.tags);
+  if (!title) { ElMessage.warning("文档标题不能为空"); return; }
+  if (title.length > 500) { ElMessage.warning("文档标题不能超过 500 个字符"); return; }
+  if (description.length > 5000) { ElMessage.warning("文档描述不能超过 5000 个字符"); return; }
+  if (tags.length > 20 || tags.some((tag) => tag.length > 50)) { ElMessage.warning("最多设置 20 个标签，单个标签不能超过 50 个字符"); return; }
+  metadataSaving.value = true;
+  try {
+    const updated = await adminApi.updateDocumentMetadata(documentId, {
+      metadataRevision: current.metadataRevision,
+      title,
+      description: description || null,
+      tags
+    });
+    metadata.value = updated;
+    if (document.value) document.value.title = updated.title;
+    metadataDialogVisible.value = false;
+    ElMessage.success("文档资料已更新，阅读端将立即使用新资料");
+    if (updated.duplicateTitleCount > 0) ElMessage.warning(`另有 ${updated.duplicateTitleCount} 个同名文档，请结合只读标识区分。`);
+  } catch (caught) {
+    ElMessage.error(message(caught));
+  } finally { metadataSaving.value = false; }
+}
 async function createRevision(version: VersionSummary): Promise<void> {
   if (!begin(version.id, "create")) return;
   try {
@@ -227,6 +277,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         <span>{{ document?.code }} · 共 {{ document?.versionCount || 0 }} 个版本，{{ document?.draftCount || 0 }} 个草稿</span>
       </div>
       <div class="document-lifecycle-actions">
+        <el-button :icon="EditPen" :disabled="deletionLocked" data-testid="edit-document-metadata" @click="openMetadataEditor">编辑资料</el-button>
         <el-button v-if="document?.status === 'OFFLINE' && document.currentVersionId" type="success" :icon="RefreshRight" :loading="isActive(documentId, 'restore')" :disabled="actionsLocked && !isActive(documentId, 'restore')" data-testid="restore-document" @click="restore">重新上架</el-button>
         <el-button v-if="canPermanentlyDelete" type="danger" plain :icon="Delete" :loading="isActive(documentId, 'delete-document')" :disabled="actionsLocked && !isActive(documentId, 'delete-document')" data-testid="delete-document" @click="permanentlyDelete">永久删除文档</el-button>
         <el-button :icon="UploadFilled" :disabled="actionsLocked" @click="router.push({ path: '/admin/imports', query: { targetDocumentId: documentId } })">重新导入</el-button>
@@ -239,6 +290,15 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
     </el-alert>
     <div v-if="loadError" class="load-error-panel" role="alert"><span>{{ loadError }}</span><el-button :loading="loading" @click="load">重新加载</el-button></div>
 
+    <el-card v-if="metadata" shadow="never" class="document-metadata-card">
+      <template #header><div class="card-heading"><div><h2>文档资料</h2><span>资料独立于内容版本，保存后立即同步阅读端。</span></div><el-button :icon="EditPen" :disabled="deletionLocked" @click="openMetadataEditor">编辑资料</el-button></div></template>
+      <dl class="document-metadata-grid">
+        <div><dt>只读标识</dt><dd><code>{{ metadata.code }}</code></dd></div>
+        <div><dt>描述</dt><dd>{{ metadata.description || '暂无描述' }}</dd></div>
+        <div><dt>标签</dt><dd class="document-tag-list"><el-tag v-for="tag in metadata.tags" :key="tag" effect="plain">{{ tag }}</el-tag><span v-if="!metadata.tags.length" class="muted-text">暂无标签</span></dd></div>
+      </dl>
+      <el-alert v-if="metadata.duplicateTitleCount > 0" :title="`另有 ${metadata.duplicateTitleCount} 个同名文档，请结合只读标识区分。`" type="warning" :closable="false" show-icon />
+    </el-card>
     <el-card v-if="!loadError || versions.length" shadow="never" class="version-history-card">
       <template #header><div class="card-heading"><div><h2>版本历史</h2><span>当前发布版本单独置顶；下架只影响阅读端可见性，不删除任何数据。</span></div></div></template>
       <el-empty v-if="!loading && !versions.length" description="当前文档还没有版本" />
@@ -269,5 +329,13 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         </div>
       </template>
     </el-card>
-  </section>
+    <el-dialog v-model="metadataDialogVisible" title="编辑文档资料" width="min(560px, 92vw)" :close-on-click-modal="false">
+      <el-form label-position="top" @submit.prevent>
+        <el-form-item label="文档标题" required><el-input v-model="metadataForm.title" maxlength="500" show-word-limit /></el-form-item>
+        <el-form-item label="只读标识"><el-input :model-value="metadata?.code" disabled /></el-form-item>
+        <el-form-item label="描述"><el-input v-model="metadataForm.description" type="textarea" :rows="4" maxlength="5000" show-word-limit /></el-form-item>
+        <el-form-item label="标签"><el-select v-model="metadataForm.tags" multiple filterable allow-create default-first-option :multiple-limit="20" placeholder="输入标签后按回车"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select><span class="form-help">最多 20 个，单个标签最多 50 个字符；标签忽略大小写去重。</span></el-form-item>
+      </el-form>
+      <template #footer><el-button :disabled="metadataSaving" @click="metadataDialogVisible = false">取消</el-button><el-button type="primary" :loading="metadataSaving" data-testid="save-document-metadata" @click="saveMetadata">保存并立即生效</el-button></template>
+    </el-dialog>  </section>
 </template>

@@ -222,6 +222,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .muted-text { color: #7a8795; font-size: 13px; }
 .issue-list { display: grid; gap: 8px; }
 .job-actions { display: flex; justify-content: flex-end; padding-top: 2px; }
+.import-document-preview { display: grid; gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid #e4eaf0; }
+.import-document-preview-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+.import-document-preview-heading > div { display: grid; gap: 4px; }
+.import-document-preview-heading span { color: #718096; font-size: 13px; }
+.import-metadata-form .el-select { width: 100%; }
+.import-resolution-panel { display: grid; gap: 12px; }
+.import-resolution-panel .el-radio-group { display: grid; gap: 8px; align-items: start; }
+.import-metadata-actions { display: flex; justify-content: flex-end; }
 .editor-view { width: min(1500px, 100%); height: calc(100dvh - 82px); display: grid; grid-template-rows: auto minmax(0, 1fr); container-type: inline-size; }
 .editor-header { margin-bottom: 14px; }
 .editor-header-actions { align-items: center; flex-wrap: nowrap; gap: 12px; padding-top: 2px; }
@@ -344,3 +352,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .document-lifecycle-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .deletion-stage-label { display: block; margin-top: 4px; color: var(--text-secondary); }
 .document-detail-view > .el-alert { margin-bottom: 16px; }
+.document-metadata-card { margin-bottom: 16px; border-color: #d9e2e9; }
+.document-metadata-card .card-heading { align-items: center; }
+.document-metadata-grid { display: grid; gap: 14px; margin: 0; }
+.document-metadata-grid > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: start; }
+.document-metadata-grid dt { color: #718096; font-size: 13px; }
+.document-metadata-grid dd { margin: 0; color: #27364a; overflow-wrap: anywhere; }
+.document-tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.form-help { display: block; margin-top: 6px; color: #8795a8; font-size: 12px; line-height: 1.5; }

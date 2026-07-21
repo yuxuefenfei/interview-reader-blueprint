@@ -3,6 +3,7 @@ package com.example.interviewreader.importpkg;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.common.Hashes;
+import com.example.interviewreader.document.DocumentMetadataPolicy;
 import com.example.interviewreader.excelpkg.ExcelPackageService;
 import com.example.interviewreader.markdownpkg.MarkdownPackageService;
 import com.example.interviewreader.pdfpkg.PdfPackageService;
@@ -299,6 +300,54 @@ public class ImportPackageService {
         return sourceFileStorage.load(requireJob(jobId).getSourceObjectKey());
     }
 
+    public ImportDocumentDtos.ImportDocumentPreview documentMetadata(UUID jobId) {
+        var job = requireJob(jobId);
+        var documentPackage = readPackage(job.getNormalizedObjectKey());
+        var documentInfo = documentPackage.document();
+        var matchingDocument = job.getTargetDocumentId() == null
+                ? findDocumentByCode(documentInfo.documentKey())
+                : null;
+        return new ImportDocumentDtos.ImportDocumentPreview(
+                documentInfo.documentKey(),
+                documentInfo.title(),
+                documentInfo.description(),
+                documentInfo.tags() == null ? List.of() : documentInfo.tags(),
+                job.getTargetDocumentId() == null,
+                matchingDocument == null ? null : new ImportDocumentDtos.ExistingDocumentMatch(
+                        UUID.fromString(matchingDocument.getId()),
+                        matchingDocument.getCode(),
+                        matchingDocument.getTitle(),
+                        matchingDocument.getStatus()),
+                job.getTargetDocumentId() == null ? nextAvailableDocumentKey(documentInfo.documentKey()) : null,
+                job.getTargetDocumentId() == null ? duplicateTitleCount(documentInfo.title()) : 0);
+    }
+
+    @Transactional
+    public ImportDocumentDtos.ImportDocumentPreview reviseDocumentMetadata(
+            UUID jobId,
+            ImportDocumentDtos.UpdateImportDocumentMetadataRequest request
+    ) {
+        var job = loadJobForRevision(jobId);
+        if (job.getTargetDocumentId() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "IMPORT_TARGET_METADATA_READ_ONLY", "导入已有文档时不能修改文档级资料。");
+        }
+        var normalized = DocumentMetadataPolicy.normalize(request.title(), request.description(), request.tags());
+        var root = readTree(job.getNormalizedObjectKey());
+        if (!(root.path("document") instanceof ObjectNode documentNode)) {
+            throw new ApiException(HttpStatus.CONFLICT, "STAGED_DOCUMENT_MISSING", "导入快照缺少文档资料。");
+        }
+        documentNode.put("title", normalized.title());
+        if (normalized.description() == null) {
+            documentNode.putNull("description");
+        } else {
+            documentNode.put("description", normalized.description());
+        }
+        documentNode.set("tags", objectMapper.valueToTree(normalized.tags()));
+        job.setNormalizedObjectKey(toJson(root));
+        job.setCurrentStage("REVIEWING");
+        importJobMapper.update(job);
+        return documentMetadata(jobId);
+    }
     @Transactional
     public JsonNode reviseSection(UUID jobId, String sectionKey, JsonNode patch) {
         return reviseNormalizedItem(jobId, "sections", "sectionKey", sectionKey, patch);
@@ -311,12 +360,17 @@ public class ImportPackageService {
 
     @Transactional
     public DocumentVersionDto commit(UUID jobId) {
+        return commit(jobId, null);
+    }
+
+    @Transactional
+    public DocumentVersionDto commit(UUID jobId, ImportDocumentDtos.CommitImportRequest request) {
         var job = loadJobForCommit(jobId);
         if ("IMPORTED".equals(job.getStatus()) && job.getResultVersionId() != null) {
             return getVersion(UUID.fromString(job.getResultVersionId()));
         }
         if (!"READY".equals(job.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "Only READY import jobs can be committed");
+            throw new ApiException(HttpStatus.CONFLICT, "IMPORT_NOT_READY", "只有待提交的导入任务才能生成草稿。");
         }
 
         var documentPackage = readPackage(job.getNormalizedObjectKey());
@@ -326,31 +380,49 @@ public class ImportPackageService {
             job.setStatus("REVIEW_REQUIRED");
             job.setCurrentStage("VALIDATING");
             importJobMapper.update(job);
-            throw new ApiException(HttpStatus.CONFLICT, "Import package has blocking validation issues");
+            throw new ApiException(HttpStatus.CONFLICT, "IMPORT_REVIEW_REQUIRED", "导入包仍有阻断性校验问题。");
         }
 
-        var documentId = job.getTargetDocumentId() == null ? findDocumentId(documentPackage.document().documentKey()) : job.getTargetDocumentId();
+        var resolution = normalizeResolution(request == null ? null : request.resolution());
         var now = OffsetDateTime.now();
-        if (documentId == null) {
-            documentId = UUID.randomUUID().toString();
-            var document = new DocumentEntity();
-            document.setId(documentId);
-            document.setOwnerId(LOCAL_USER_ID);
-            document.setCode(documentPackage.document().documentKey());
-            document.setTitle(documentPackage.document().title());
-            document.setDescription(documentPackage.document().description());
-            document.setStatus("DRAFT");
-            documentMapper.insertSelective(document);
-        } else {
-            var document = documentMapper.selectOwnedForUpdate(documentId, LOCAL_USER_ID);
-            if (document == null) {
-                throw new ApiException(HttpStatus.NOT_FOUND, "Target document not found");
+        String documentId;
+        if (job.getTargetDocumentId() != null) {
+            if (resolution != null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "IMPORT_RESOLUTION_NOT_ALLOWED", "已指定目标文档的任务不接受冲突决议。");
             }
-            rejectDeletionLocked(document);
-            document.setTitle(documentPackage.document().title());
-            document.setDescription(documentPackage.document().description());
-            document.setUpdatedAt(now);
-            documentMapper.update(document);
+            documentId = requireImportTargetForUpdate(job.getTargetDocumentId()).getId();
+        } else {
+            var documentKey = documentPackage.document().documentKey().strip();
+            var matchingDocument = findDocumentByCode(documentKey);
+            if (matchingDocument != null && resolution == null) {
+                throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_CODE_CONFLICT", "文档标识已存在，请明确选择创建新文档或导入为已有文档的新版本。");
+            }
+            if (ImportDocumentDtos.IMPORT_AS_NEW_VERSION.equals(resolution)) {
+                if (matchingDocument == null) {
+                    throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_CODE_MATCH_MISSING", "匹配的目标文档已不存在，请刷新导入预览。");
+                }
+                documentId = requireImportTargetForUpdate(matchingDocument.getId()).getId();
+            } else {
+                if (resolution != null && !ImportDocumentDtos.CREATE_NEW.equals(resolution)) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "IMPORT_RESOLUTION_INVALID", "不支持的导入冲突决议。");
+                }
+                lockLocalUser();
+                var normalizedMetadata = DocumentMetadataPolicy.normalize(
+                        documentPackage.document().title(),
+                        documentPackage.document().description(),
+                        documentPackage.document().tags());
+                var document = new DocumentEntity();
+                documentId = UUID.randomUUID().toString();
+                document.setId(documentId);
+                document.setOwnerId(LOCAL_USER_ID);
+                document.setCode(nextAvailableDocumentKey(documentKey));
+                document.setTitle(normalizedMetadata.title());
+                document.setDescription(normalizedMetadata.description());
+                document.setMetadataRevision(0);
+                document.setStatus("DRAFT");
+                documentMapper.insertSelective(document);
+                upsertTags(documentId, normalizedMetadata.tags());
+            }
         }
 
         var versionId = UUID.randomUUID().toString();
@@ -374,12 +446,12 @@ public class ImportPackageService {
         insertSections(versionId, documentPackage);
         insertBlocks(versionId, documentPackage);
         insertAssets(versionId, documentPackage);
-        upsertTags(documentId, documentPackage.document().tags());
 
         var document = documentMapper.selectOneById(documentId);
         document.setUpdatedAt(now);
         documentMapper.update(document);
 
+        job.setTargetDocumentId(documentId);
         job.setStatus("IMPORTED");
         job.setResultVersionId(versionId);
         job.setCurrentStage("COMMITTED");
@@ -519,13 +591,61 @@ public class ImportPackageService {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
         }
     }
-    private String findDocumentId(String documentKey) {
-        var document = documentMapper.selectOneByQuery(QueryWrapper.create()
+    private long duplicateTitleCount(String title) {
+        return documentMapper.selectCountByQuery(QueryWrapper.create()
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.TITLE.eq(title)));
+    }
+    private DocumentEntity findDocumentByCode(String documentKey) {
+        return documentMapper.selectOneByQuery(QueryWrapper.create()
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .and(DOCUMENT_ENTITY.CODE.eq(documentKey)));
-        return document == null ? null : document.getId();
+    }
+
+    private DocumentEntity requireImportTargetForUpdate(String documentId) {
+        var document = documentMapper.selectOwnedForUpdate(documentId, LOCAL_USER_ID);
+        if (document == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "TARGET_DOCUMENT_NOT_FOUND", "目标文档不存在。");
+        }
+        rejectDeletionLocked(document);
+        return document;
+    }
+
+    private String nextAvailableDocumentKey(String requestedKey) {
+        var base = requestedKey == null ? "" : requestedKey.strip();
+        if (base.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "DOCUMENT_KEY_REQUIRED", "文档标识不能为空。");
+        }
+        base = truncateDocumentKey(base, "");
+        if (findDocumentByCode(base) == null) {
+            return base;
+        }
+        for (var sequence = 2; sequence < Integer.MAX_VALUE; sequence++) {
+            var suffix = "-" + sequence;
+            var candidate = truncateDocumentKey(base, suffix) + suffix;
+            if (findDocumentByCode(candidate) == null) {
+                return candidate;
+            }
+        }
+        throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_KEY_EXHAUSTED", "无法生成可用的文档标识。");
+    }
+
+    private static String truncateDocumentKey(String base, String suffix) {
+        var maxBaseLength = 120 - suffix.length();
+        return base.length() <= maxBaseLength ? base : base.substring(0, maxBaseLength);
+    }
+
+    private static String normalizeResolution(String resolution) {
+        return resolution == null || resolution.isBlank() ? null : resolution.strip().toUpperCase(Locale.ROOT);
+    }
+
+    private void lockLocalUser() {
+        if (appUserMapper.selectIdForUpdate(LOCAL_USER_ID) == null) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "LOCAL_USER_MISSING", "本地用户尚未初始化。");
+        }
     }
 
     private String findTagId(String normalized) {

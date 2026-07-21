@@ -1,12 +1,14 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AdminDocumentSummary, DeletionJob, VersionSummary } from "../types/api";
+import type { AdminDocumentSummary, DeletionJob, DocumentMetadata, VersionSummary } from "../types/api";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   document: vi.fn(),
   versions: vi.fn(),
+  documentMetadata: vi.fn(),
+  updateDocumentMetadata: vi.fn(),
   createRevision: vi.fn(),
   publish: vi.fn(),
   takeDown: vi.fn(),
@@ -18,7 +20,8 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   prompt: vi.fn(),
   messageError: vi.fn(),
-  messageSuccess: vi.fn()
+  messageSuccess: vi.fn(),
+  messageWarning: vi.fn()
 }));
 
 vi.mock("vue-router", () => ({
@@ -30,6 +33,8 @@ vi.mock("../api/admin", () => ({
   adminApi: {
     document: mocks.document,
     versions: mocks.versions,
+    documentMetadata: mocks.documentMetadata,
+    updateDocumentMetadata: mocks.updateDocumentMetadata,
     createRevision: mocks.createRevision,
     publish: mocks.publish,
     takeDown: mocks.takeDown,
@@ -42,7 +47,7 @@ vi.mock("../api/admin", () => ({
 }));
 
 vi.mock("element-plus/es/components/message/index", () => ({
-  ElMessage: { error: mocks.messageError, success: mocks.messageSuccess }
+  ElMessage: { error: mocks.messageError, success: mocks.messageSuccess, warning: mocks.messageWarning }
 }));
 
 vi.mock("element-plus/es/components/message-box/index", () => ({
@@ -64,6 +69,12 @@ const EmptyStub = defineComponent({ props: { description: String }, template: '<
 const DropdownStub = defineComponent({ emits: ["command"], template: '<div><slot /><slot name="dropdown" /></div>' });
 const DropdownMenuStub = defineComponent({ template: '<div><slot /></div>' });
 const DropdownItemStub = defineComponent({ template: '<button><slot /></button>' });
+const DialogStub = defineComponent({ props: { modelValue: Boolean }, template: '<div v-if="modelValue"><slot /><slot name="footer" /></div>' });
+const FormStub = defineComponent({ template: '<form><slot /></form>' });
+const FormItemStub = defineComponent({ template: '<label><slot /></label>' });
+const InputStub = defineComponent({ props: { modelValue: [String, Number] }, template: '<input :value="modelValue" />' });
+const SelectStub = defineComponent({ template: '<div><slot /></div>' });
+const OptionStub = defineComponent({ template: '<span />' });
 
 function version(overrides: Partial<VersionSummary> & Pick<VersionSummary, "id" | "versionNo" | "status">): VersionSummary {
   return {
@@ -91,6 +102,15 @@ const documentSummary: AdminDocumentSummary = {
   deletionJob: null
 };
 
+const documentMetadata: DocumentMetadata = {
+  documentId: "document-1",
+  code: "java-guide",
+  title: "Java 高级开发面试题",
+  description: "原始描述",
+  tags: ["Java", "面试"],
+  metadataRevision: 0,
+  duplicateTitleCount: 0
+};
 const failedDeletionJob: DeletionJob = {
   id: "delete-failed-1", documentId: "document-1", status: "FAILED", currentStage: "FAILED", attemptCount: 3,
   errorCode: "IOException", errorMessage: "Cannot delete managed source file",
@@ -116,7 +136,13 @@ function mountView() {
         ElEmpty: EmptyStub,
         ElDropdown: DropdownStub,
         ElDropdownMenu: DropdownMenuStub,
-        ElDropdownItem: DropdownItemStub
+        ElDropdownItem: DropdownItemStub,
+        ElDialog: DialogStub,
+        ElForm: FormStub,
+        ElFormItem: FormItemStub,
+        ElInput: InputStub,
+        ElSelect: SelectStub,
+        ElOption: OptionStub
       }
     }
   });
@@ -126,7 +152,9 @@ describe("AdminDocumentDetailView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.push.mockResolvedValue(undefined);
-    mocks.document.mockResolvedValue(documentSummary);
+    mocks.document.mockResolvedValue({ ...documentSummary });
+    mocks.documentMetadata.mockResolvedValue({ ...documentMetadata, tags: [...documentMetadata.tags] });
+    mocks.updateDocumentMetadata.mockResolvedValue({ ...documentMetadata, title: "更新后的标题", description: "更新后的描述", tags: ["Java"], metadataRevision: 1 });
     mocks.versions.mockResolvedValue(versionFixtures);
     mocks.createRevision.mockResolvedValue(versionFixtures[0]);
     mocks.publish.mockResolvedValue(undefined);
@@ -152,6 +180,25 @@ describe("AdminDocumentDetailView", () => {
     expect(wrapper.get('[data-version-id="v3"]').text()).toContain("不包含当前线上版本的后续变更");
   });
 
+  it("updates document metadata independently from content versions", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.get(".document-metadata-card").text()).toContain("原始描述");
+    await wrapper.get('[data-testid="edit-document-metadata"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="save-document-metadata"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.updateDocumentMetadata).toHaveBeenCalledWith("document-1", {
+      metadataRevision: 0,
+      title: documentMetadata.title,
+      description: documentMetadata.description,
+      tags: documentMetadata.tags
+    });
+    expect(wrapper.get("h1").text()).toBe("更新后的标题");
+    expect(mocks.messageSuccess).toHaveBeenCalledWith("文档资料已更新，阅读端将立即使用新资料");
+  });
   it("takes the current document down while explicitly preserving all data", async () => {
     const wrapper = mountView();
     await flushPromises();

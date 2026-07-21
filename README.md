@@ -132,6 +132,8 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 
 - `GET /api/admin/documents?query=...&page=1&size=20`
 - `GET /api/admin/documents/{documentId}`
+- `GET /api/admin/documents/{documentId}/metadata`
+- `PATCH /api/admin/documents/{documentId}/metadata`（标题、描述、标签；`code` 只读，使用 `metadataRevision` 乐观锁）
 - `GET /api/admin/documents/{documentId}/versions`
 - `POST /api/admin/documents/{documentId}/versions/{sourceVersionId}/revisions`
 - `POST /api/admin/documents/{documentId}/versions/{versionId}/publish`
@@ -151,6 +153,8 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - `POST /api/admin/import-jobs`
 - `GET /api/admin/import-jobs/{jobId}`
 - `GET /api/admin/import-jobs/{jobId}/issues`
+- `GET /api/admin/import-jobs/{jobId}/document-metadata`
+- `PATCH /api/admin/import-jobs/{jobId}/document-metadata`（仅新文档导入可修改暂存资料）
 - `GET /api/admin/import-jobs/{jobId}/raw-extraction`
 - `GET /api/admin/import-jobs/{jobId}/source-file`
 - `GET /api/admin/import-jobs/{jobId}/normalized-package`
@@ -170,6 +174,8 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - PDF（`.pdf`）
 
 PDF 导入会保存原始源文件、raw extraction 和 normalized package，复核页可按 issue/block 定位源页。
+
+PDF/Markdown 新文档的只读标识由源文件名去扩展名后规范化生成；Markdown 标题优先使用首个一级标题，否则回退源文件名。导入标识与现有文档冲突时必须明确选择“创建带 `-2`、`-3` 后缀的新文档”或“作为匹配文档的新版本”，不会静默合并或覆盖已有文档资料。指定目标文档及选择新版本导入时，标题、描述和标签保持只读。
 
 `POST /api/admin/exports` 同步导出 JSON Package、Excel Package、Markdown 或静态 HTML：
 

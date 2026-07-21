@@ -3,6 +3,7 @@ package com.example.interviewreader.pdfpkg;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.Hashes;
 import com.example.interviewreader.importpkg.DocumentPackage;
+import com.example.interviewreader.importpkg.ImportDocumentNaming;
 import com.example.interviewreader.importpkg.ImportIssueDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -643,10 +644,7 @@ public class PdfPackageService {
     }
 
     private static String baseName(String fileName) {
-        var normalized = fileName == null || fileName.isBlank() ? "pdf-document.pdf" : fileName;
-        var slashIndex = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'));
-        var name = slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
-        return name.toLowerCase(Locale.ROOT).endsWith(".pdf") ? name.substring(0, name.length() - 4) : name;
+        return ImportDocumentNaming.baseName(fileName, List.of(".pdf"), "PDF Document");
     }
 
     private static String cleanTitle(String value, String fallback) {
@@ -657,14 +655,7 @@ public class PdfPackageService {
     }
 
     private static String slug(String value) {
-        var slug = cleanTitle(value, "document")
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9\\u4e00-\\u9fa5]+", "-")
-                .replaceAll("(^-|-$)", "");
-        if (slug.isBlank()) {
-            return "document";
-        }
-        return slug.length() <= 80 ? slug : slug.substring(0, 80).replaceAll("-$", "");
+        return ImportDocumentNaming.slug(value, "document");
     }
 
     private static boolean startsWithCjk(String value) {

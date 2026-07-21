@@ -598,7 +598,7 @@ class InterviewReaderApiTests {
         ((ObjectNode) firstBlock.get("payload")).put("text", "HashMap 的设计目标没有变化，但新版补充了迁移锚点验证。");
         firstBlock.put("plainText", "HashMap 的设计目标没有变化，但新版补充了迁移锚点验证。");
 
-        var second = importAndCommit(objectMapper.writeValueAsBytes(changed));
+        var second = importAndCommitAsExistingVersion(objectMapper.writeValueAsBytes(changed));
         mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", second.documentId(), second.versionId()))
                 .andExpect(status().isNoContent());
         var secondPosition = firstChildFirstBlock(second.versionId());
@@ -866,6 +866,8 @@ class InterviewReaderApiTests {
         assertThat(job.get("status").asText()).isEqualTo("READY");
 
         var normalized = getJson("/api/admin/import-jobs/{jobId}/normalized-package", UUID.fromString(job.get("id").asText()));
+        assertThat(normalized.get("document").get("documentKey").asText()).isEqualTo("same-page-outline");
+        assertThat(normalized.get("document").get("title").asText()).isEqualTo("same-page-outline");
         var firstSection = findByField(normalized.get("sections"), "title", "9.1 Index terminology");
         var secondSection = findByField(normalized.get("sections"), "title", "9.2 Prefix rule");
         var firstKey = firstSection.get("sectionKey").asText();
@@ -1488,29 +1490,36 @@ class InterviewReaderApiTests {
     }
     private ImportResult importAndCommit(byte[] jsonPackage) throws Exception {
         var job = uploadJsonPackage(jsonPackage);
-        return commitReadyJob(job);
+        return commitReadyJob(job, "CREATE_NEW");
+    }
+
+    private ImportResult importAndCommitAsExistingVersion(byte[] jsonPackage) throws Exception {
+        var job = uploadJsonPackage(jsonPackage);
+        return commitReadyJob(job, "IMPORT_AS_NEW_VERSION");
     }
 
     private ImportResult importAndCommitExcel(byte[] workbook) throws Exception {
         var job = uploadPackage(workbook, "EXCEL", "document-package.xlsx");
-        return commitReadyJob(job);
+        return commitReadyJob(job, "CREATE_NEW");
     }
 
     private ImportResult importAndCommitMarkdown(byte[] markdown) throws Exception {
         var job = uploadPackage(markdown, "MARKDOWN", "document.md");
-        return commitReadyJob(job);
+        return commitReadyJob(job, "CREATE_NEW");
     }
 
     private ImportResult importAndCommitPdf(byte[] pdf, String fileName) throws Exception {
         var job = uploadPackage(pdf, "PDF", fileName);
-        return commitReadyJob(job);
+        return commitReadyJob(job, "CREATE_NEW");
     }
 
-    private ImportResult commitReadyJob(JsonNode job) throws Exception {
+    private ImportResult commitReadyJob(JsonNode job, String resolution) throws Exception {
         assertThat(job.get("status").asText()).isEqualTo("READY");
         var jobId = UUID.fromString(job.get("id").asText());
 
-        var versionBody = mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", jobId))
+        var versionBody = mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", jobId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"resolution\":\"" + resolution + "\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
                 .andReturn()

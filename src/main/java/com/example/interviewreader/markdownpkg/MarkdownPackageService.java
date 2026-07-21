@@ -2,6 +2,7 @@ package com.example.interviewreader.markdownpkg;
 
 import com.example.interviewreader.common.Hashes;
 import com.example.interviewreader.importpkg.DocumentPackage;
+import com.example.interviewreader.importpkg.ImportDocumentNaming;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
@@ -296,8 +297,10 @@ public class MarkdownPackageService {
 
         private DocumentPackage toPackage() {
             ensureSection();
-            var title = documentTitle == null ? "Markdown Document" : documentTitle;
-            var documentKey = slug(title, "markdown-document");
+            var sourceBaseName = ImportDocumentNaming.baseName(
+                    sourceFileName, List.of(".markdown", ".md"), "Markdown Document");
+            var title = documentTitle == null ? sourceBaseName : documentTitle;
+            var documentKey = ImportDocumentNaming.slug(sourceBaseName, "markdown-document");
             return new DocumentPackage(
                     "1.0",
                     new DocumentPackage.DocumentInfo(documentKey, title, "Imported from Markdown", "zh-CN", List.of()),
@@ -316,6 +319,8 @@ public class MarkdownPackageService {
         private void ensureSection() {
             if (currentSectionKey == null) {
                 addSection(1, "Markdown Document");
+                // 合成章节只用于承载无标题正文，不能冒充从源文件识别出的文档标题。
+                documentTitle = null;
             }
         }
 

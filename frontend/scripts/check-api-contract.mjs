@@ -46,7 +46,7 @@ const javaContract = fs.readFileSync(path.join(javaRoot, "com", "example", "inte
 for (const [constantName, schemaName] of [
   ["SOURCE_TYPES", "SourceType"], ["NODE_TYPES", "NodeType"], ["BLOCK_TYPES", "BlockType"],
   ["SEMANTIC_ROLES", "SemanticRole"], ["VERSION_STATUSES", "VersionStatus"],
-  ["IMPORT_STATUSES", "ImportStatus"], ["IMPORT_STAGES", "ImportStage"]
+  ["IMPORT_STATUSES", "ImportStatus"], ["IMPORT_STAGES", "ImportStage"], ["IMPORT_RESOLUTIONS", "ImportResolution"]
 ]) {
   const schemaValues = new Set(document.components.schemas[schemaName]?.enum ?? []);
   compareSets(`frontend ${constantName}`, new Set(readTsArray(tsSource, constantName)), `OpenAPI ${schemaName}`, schemaValues);
@@ -57,6 +57,7 @@ const interfaceSchemas = {
   AuthSession: "AuthSession", DocumentSummary: "DocumentSummary", DocumentListResponse: "DocumentPage",
   TocNode: "TocNode", ContentBlock: "ContentBlock", NodeContent: "NodeContent", SearchHit: "SearchHit",
   ReadingProgress: "ReadingProgress", ImportJob: "ImportJob", ImportIssue: "ImportIssue",
+  ExistingDocumentMatch: "ExistingDocumentMatch", ImportDocumentPreview: "ImportDocumentPreview", DocumentMetadata: "DocumentMetadata", DocumentVersion: "DocumentVersion",
   StagedSection: "DocumentPackageSection", StagedBlock: "DocumentPackageBlock", DocumentInfo: "DocumentInfo",
   VersionInfo: "VersionInfo", AssetInfo: "AssetInfo", DocumentPackage: "DocumentPackage",
   VersionSummary: "VersionSummary", EditableVersion: "EditableVersion", AdminDocumentSummary: "AdminDocumentSummary",
