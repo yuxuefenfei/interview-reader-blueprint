@@ -1,5 +1,7 @@
 package com.example.interviewreader.importpkg;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.mybatisflex.annotation.EnumValue;
 
 import java.util.Arrays;
@@ -27,6 +29,7 @@ public enum ImportStage {
         this.code = code;
     }
 
+    @JsonValue
     @EnumValue
     public String getCode() {
         return code;
@@ -53,5 +56,13 @@ public enum ImportStage {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(ImportStage::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonCreator
+    public static ImportStage fromCode(String value) {
+        return Arrays.stream(values())
+                .filter(stage -> stage.code.equals(value))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown import stage: " + value));
     }
 }

@@ -696,14 +696,14 @@ public class VersionRevisionService {
 
     private ManagementDtos.AdminDocumentSummary documentSummary(DocumentEntity document, List<DocumentVersionEntity> versions, DocumentDeletionJobEntity deletionJob) {
         return new ManagementDtos.AdminDocumentSummary(
-                uuid(document.getId()), document.getCode(), document.getTitle(), document.getStatus().getCode(), uuid(document.getCurrentVersionId()),
+                uuid(document.getId()), document.getCode(), document.getTitle(), document.getStatus(), uuid(document.getCurrentVersionId()),
                 versions.size(), versions.stream().filter(version -> version.getStatus() == DocumentVersionStatus.DRAFT).count(), document.getUpdatedAt(),
                 deletionJob == null ? null : DocumentLifecycleService.summary(deletionJob));
     }
 
     private ManagementDtos.VersionSummary summary(DocumentVersionEntity version) {
         return new ManagementDtos.VersionSummary(uuid(version.getId()), version.getVersionNo(), uuid(version.getParentVersionId()), version.getParentVersionNo(), uuid(version.getOriginImportJobId()),
-                version.getSourceType(), version.getSourceFileName(), version.getStatus().getCode(), version.getDraftRevision(), version.getPublishedAt(), version.getCreatedAt());
+                version.getSourceType(), version.getSourceFileName(), version.getStatus(), version.getDraftRevision(), version.getPublishedAt(), version.getCreatedAt());
     }
 
     private JsonNode tree(String value) {

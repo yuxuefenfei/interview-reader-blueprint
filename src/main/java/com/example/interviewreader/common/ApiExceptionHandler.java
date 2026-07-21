@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -42,6 +43,19 @@ public class ApiExceptionHandler {
         var problem = problemFactory.create(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", detail);
         problem.setProperty("fieldErrors", fields);
         return problem;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ProblemDetail handleUnreadableRequest(HttpMessageNotReadableException exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ApiException apiException) {
+                return handleApiException(apiException);
+            }
+            if (cause instanceof IllegalArgumentException illegalArgumentException) {
+                return handleIllegalArgument(illegalArgumentException);
+            }
+        }
+        return problemFactory.create(HttpStatus.BAD_REQUEST, "MALFORMED_JSON", "请求体格式不合法。");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

@@ -1,5 +1,6 @@
 package com.example.interviewreader.importpkg;
 
+import com.example.interviewreader.document.DocumentStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -12,7 +13,7 @@ public final class ImportDocumentDtos {
     private ImportDocumentDtos() {
     }
 
-    public record ExistingDocumentMatch(UUID id, String code, String title, String status) {
+    public record ExistingDocumentMatch(UUID id, String code, String title, DocumentStatus status) {
     }
 
     public record ImportDocumentPreview(

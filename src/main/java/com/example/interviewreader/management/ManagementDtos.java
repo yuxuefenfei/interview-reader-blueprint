@@ -1,6 +1,8 @@
 package com.example.interviewreader.management;
 
 import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.DocumentStatus;
+import com.example.interviewreader.document.DocumentVersionStatus;
 import com.example.interviewreader.document.NodeType;
 import com.example.interviewreader.document.SemanticRole;
 import com.example.interviewreader.document.SourceType;
@@ -18,7 +20,7 @@ public final class ManagementDtos {
     }
 
     public record AdminDocumentSummary(
-            UUID id, String code, String title, String status, UUID currentVersionId,
+            UUID id, String code, String title, DocumentStatus status, UUID currentVersionId,
             long versionCount, long draftCount, OffsetDateTime updatedAt, DeletionJobSummary deletionJob
     ) {
     }
@@ -27,7 +29,7 @@ public final class ManagementDtos {
     }
 
     public record DeletionJobSummary(
-            UUID id, UUID documentId, String status, String currentStage, int attemptCount,
+            UUID id, UUID documentId, DeletionJobStatus status, DeletionStage currentStage, int attemptCount,
             String errorCode, String errorMessage, OffsetDateTime requestedAt,
             OffsetDateTime startedAt, OffsetDateTime completedAt, OffsetDateTime updatedAt
     ) {
@@ -37,7 +39,7 @@ public final class ManagementDtos {
     }
     public record VersionSummary(
             UUID id, int versionNo, UUID parentVersionId, Integer parentVersionNo, UUID originImportJobId,
-            SourceType sourceType, String sourceFileName, String status, long draftRevision,
+            SourceType sourceType, String sourceFileName, DocumentVersionStatus status, long draftRevision,
             OffsetDateTime publishedAt, OffsetDateTime createdAt
     ) {
     }

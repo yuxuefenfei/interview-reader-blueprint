@@ -1,5 +1,7 @@
 package com.example.interviewreader.document;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.mybatisflex.annotation.EnumValue;
 
 import java.util.Arrays;
@@ -18,6 +20,7 @@ public enum DocumentVersionStatus {
         this.code = code;
     }
 
+    @JsonValue
     @EnumValue
     public String getCode() {
         return code;
@@ -25,5 +28,13 @@ public enum DocumentVersionStatus {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(DocumentVersionStatus::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonCreator
+    public static DocumentVersionStatus fromCode(String value) {
+        return Arrays.stream(values())
+                .filter(status -> status.code.equals(value))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown document version status: " + value));
     }
 }

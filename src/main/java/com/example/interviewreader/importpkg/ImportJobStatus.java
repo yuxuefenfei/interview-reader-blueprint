@@ -1,5 +1,7 @@
 package com.example.interviewreader.importpkg;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.mybatisflex.annotation.EnumValue;
 
 import java.util.Arrays;
@@ -28,24 +30,25 @@ public enum ImportJobStatus {
         this.code = code;
     }
 
+    @JsonValue
     @EnumValue
     public String getCode() {
         return code;
-    }
-
-    public boolean matches(String value) {
-        return code.equals(value);
     }
 
     public static boolean isCancelable(ImportJobStatus value) {
         return CANCELABLE.contains(value);
     }
 
-    public static boolean isCancelableCode(String value) {
-        return CANCELABLE.stream().anyMatch(status -> status.matches(value));
-    }
-
     public static Set<String> codes() {
         return Arrays.stream(values()).map(ImportJobStatus::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonCreator
+    public static ImportJobStatus fromCode(String value) {
+        return Arrays.stream(values())
+                .filter(status -> status.code.equals(value))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown import job status: " + value));
     }
 }

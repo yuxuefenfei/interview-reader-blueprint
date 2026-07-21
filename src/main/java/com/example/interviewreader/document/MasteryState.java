@@ -1,6 +1,8 @@
 package com.example.interviewreader.document;
 
 import com.example.interviewreader.common.ApiException;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.mybatisflex.annotation.EnumValue;
 import org.springframework.http.HttpStatus;
 
@@ -24,6 +26,7 @@ public enum MasteryState {
         this.intervalDays = intervalDays;
     }
 
+    @JsonValue
     @EnumValue
     public String getCode() {
         return code;
@@ -37,6 +40,7 @@ public enum MasteryState {
         return Arrays.stream(values()).map(MasteryState::getCode).collect(Collectors.toUnmodifiableSet());
     }
 
+    @JsonCreator
     public static MasteryState parse(String value) {
         var normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
         try {

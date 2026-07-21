@@ -247,7 +247,7 @@ public class ImportPackageService {
     @Transactional
     public ImportJobDto cancel(UUID jobId) {
         var dto = getImportJob(jobId);
-        if (!ImportJobStatus.isCancelableCode(dto.status())) {
+        if (!ImportJobStatus.isCancelable(dto.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "Only active import jobs can be canceled");
         }
         importJobWorker.cancel(jobId);
@@ -262,7 +262,7 @@ public class ImportPackageService {
             importJobMapper.update(job);
         }
         var canceled = getImportJob(jobId);
-        if (!ImportJobStatus.CANCELED.matches(canceled.status())) {
+        if (canceled.status() != ImportJobStatus.CANCELED) {
             throw new ApiException(HttpStatus.CONFLICT, "Only active import jobs can be canceled");
         }
         return canceled;
@@ -318,7 +318,7 @@ public class ImportPackageService {
                         UUID.fromString(matchingDocument.getId()),
                         matchingDocument.getCode(),
                         matchingDocument.getTitle(),
-                        matchingDocument.getStatus().getCode()),
+                        matchingDocument.getStatus()),
                 job.getTargetDocumentId() == null ? nextAvailableDocumentKey(documentInfo.documentKey()) : null,
                 job.getTargetDocumentId() == null ? duplicateTitleCount(documentInfo.title()) : 0);
     }
@@ -454,7 +454,7 @@ public class ImportPackageService {
         job.setResultVersionId(versionId);
         job.setCurrentStage(ImportStage.COMMITTED);
         importJobMapper.update(job);
-        return new DocumentVersionDto(UUID.fromString(versionId), UUID.fromString(documentId), version.getVersionNo(), DocumentVersionStatus.DRAFT.getCode(), documentPackage.schemaVersion());
+        return new DocumentVersionDto(UUID.fromString(versionId), UUID.fromString(documentId), version.getVersionNo(), DocumentVersionStatus.DRAFT, documentPackage.schemaVersion());
     }
 
     private void insertSections(String versionId, DocumentPackage documentPackage) {
@@ -759,7 +759,7 @@ public class ImportPackageService {
         if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document version not found");
         }
-        return new DocumentVersionDto(UUID.fromString(version.getId()), UUID.fromString(version.getDocumentId()), version.getVersionNo(), version.getStatus().getCode(), version.getSchemaVersion());
+        return new DocumentVersionDto(UUID.fromString(version.getId()), UUID.fromString(version.getDocumentId()), version.getVersionNo(), version.getStatus(), version.getSchemaVersion());
     }
 
     private DocumentPackage readPackage(String json) {
@@ -782,8 +782,8 @@ public class ImportPackageService {
                 UUID.fromString(job.getId()),
                 uuid(job.getTargetDocumentId()),
                 job.getSourceType(),
-                job.getStatus().getCode(),
-                job.getCurrentStage() == null ? null : job.getCurrentStage().getCode(),
+                job.getStatus(),
+                job.getCurrentStage(),
                 job.getProgress(),
                 readMap(job.getStatistics()),
                 job.getErrorCode(),

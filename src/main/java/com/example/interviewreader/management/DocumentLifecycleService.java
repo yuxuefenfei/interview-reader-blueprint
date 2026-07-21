@@ -187,7 +187,7 @@ public class DocumentLifecycleService {
 
     public static ManagementDtos.DeletionJobSummary summary(DocumentDeletionJobEntity job) {
         return new ManagementDtos.DeletionJobSummary(UUID.fromString(job.getId()), UUID.fromString(job.getDocumentId()),
-                job.getStatus().getCode(), job.getCurrentStage().getCode(), job.getAttemptCount(), job.getErrorCode(), job.getErrorMessage(),
+                job.getStatus(), job.getCurrentStage(), job.getAttemptCount(), job.getErrorCode(), job.getErrorMessage(),
                 job.getRequestedAt(), job.getStartedAt(), job.getCompletedAt(), job.getUpdatedAt());
     }
 }

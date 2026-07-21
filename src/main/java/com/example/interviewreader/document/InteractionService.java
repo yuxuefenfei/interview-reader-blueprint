@@ -111,7 +111,7 @@ public class InteractionService {
     @Transactional
     public ReviewStateDto upsertReviewState(UUID nodeId, ReviewStateRequest request) {
         verifyNodeBelongsToDocument(request.documentId(), nodeId);
-        var mastery = MasteryState.parse(request.mastery());
+        var mastery = request.mastery();
         var intervalDays = mastery.intervalDays();
         var dueAt = intervalDays == null ? null : OffsetDateTime.now().plusDays(intervalDays);
 
@@ -197,7 +197,7 @@ public class InteractionService {
                         row.nodeType,
                         row.semanticRole,
                         row.sourcePageStart,
-                        row.mastery == null ? MasteryState.UNKNOWN.getCode() : row.mastery,
+                        row.mastery == null ? MasteryState.UNKNOWN : row.mastery,
                         row.dueAt,
                         row.intervalDays,
                         row.repetitions == null ? 0 : row.repetitions))
@@ -212,7 +212,7 @@ public class InteractionService {
         public NodeType nodeType;
         public SemanticRole semanticRole;
         public Integer sourcePageStart;
-        public String mastery;
+        public MasteryState mastery;
         public OffsetDateTime dueAt;
         public Integer intervalDays;
         public Integer repetitions;
@@ -329,7 +329,7 @@ public class InteractionService {
                 uuid(entity.getId()),
                 uuid(entity.getDocumentId()),
                 uuid(entity.getNodeId()),
-                entity.getMastery().getCode(),
+                entity.getMastery(),
                 entity.getDueAt(),
                 entity.getIntervalDays(),
                 entity.getRepetitions(),

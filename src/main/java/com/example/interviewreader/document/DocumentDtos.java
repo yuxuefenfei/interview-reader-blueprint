@@ -135,7 +135,7 @@ public final class DocumentDtos {
 
     public record ReviewStateRequest(
             @NotNull UUID documentId,
-            @NotBlank String mastery
+            @NotNull MasteryState mastery
     ) {
     }
 
@@ -143,7 +143,7 @@ public final class DocumentDtos {
             UUID id,
             UUID documentId,
             UUID nodeId,
-            String mastery,
+            MasteryState mastery,
             OffsetDateTime dueAt,
             Integer intervalDays,
             int repetitions,
@@ -160,7 +160,7 @@ public final class DocumentDtos {
             NodeType nodeType,
             SemanticRole semanticRole,
             Integer sourcePageStart,
-            String mastery,
+            MasteryState mastery,
             OffsetDateTime dueAt,
             Integer intervalDays,
             int repetitions
