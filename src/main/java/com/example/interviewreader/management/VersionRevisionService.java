@@ -159,7 +159,7 @@ public class VersionRevisionService {
     @Transactional
     public void deleteDraft(UUID versionId) {
         var version = requireDraft(versionId);
-        resetImportJobs(version.getId(), ImportStage.DRAFT_DISCARDED);
+        resetImportJobs(version.getId());
         deleteContent(version.getId());
         documentVersionMapper.deleteById(version.getId());
         touchDocument(version.getDocumentId());
@@ -250,7 +250,7 @@ public class VersionRevisionService {
             node.setSortOrder(item.sortOrder());
             children.computeIfAbsent(Objects.toString(node.getParentId(), "ROOT"), ignored -> new ArrayList<>()).add(node);
         }
-        children.values().forEach(list -> list.sort(Comparator.comparingInt(ContentNodeEntity::getSortOrder).thenComparing(node -> node.getId())));
+        children.values().forEach(list -> list.sort(Comparator.comparingInt(ContentNodeEntity::getSortOrder).thenComparing(ContentNodeEntity::getId)));
         applyPaths(children, "ROOT", null, 1);
         persisted.forEach(contentNodeMapper::update);
         advanceDraft(version);
@@ -598,7 +598,7 @@ public class VersionRevisionService {
         }
     }
 
-    private void resetImportJobs(String versionId, ImportStage currentStage) {
+    private void resetImportJobs(String versionId) {
         var jobs = importJobMapper.selectListByQuery(QueryWrapper.create()
                 .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
                 .from(IMPORT_JOB_ENTITY)
@@ -607,7 +607,7 @@ public class VersionRevisionService {
             var update = UpdateWrapper.of(ImportJobEntity.class)
                     .set(IMPORT_JOB_ENTITY.RESULT_VERSION_ID, null)
                     .set(IMPORT_JOB_ENTITY.STATUS, ImportJobStatus.READY)
-                    .set(IMPORT_JOB_ENTITY.CURRENT_STAGE, currentStage)
+                    .set(IMPORT_JOB_ENTITY.CURRENT_STAGE, ImportStage.DRAFT_DISCARDED)
                     .set(IMPORT_JOB_ENTITY.ERROR_CODE, null)
                     .set(IMPORT_JOB_ENTITY.ERROR_MESSAGE, null);
             importJobMapper.updateByQuery(
@@ -722,7 +722,8 @@ public class VersionRevisionService {
         if (value == null || value.isBlank()) {
             return Map.of();
         }
-        return objectMapper.convertValue(tree(value), new TypeReference<Map<String, Object>>() { });
+        return objectMapper.convertValue(tree(value), new TypeReference<>() {
+        });
     }
 
     private String alt(String metadata) {

@@ -6,18 +6,20 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -36,7 +38,7 @@ public class AuthFilter extends OncePerRequestFilter {
     private final ApiProblemFactory problemFactory;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
             throws ServletException, IOException {
         applySecurityHeaders(response);
         if (properties.enabled() && requiresOriginCheck(request) && !hasAllowedOrigin(request)) {

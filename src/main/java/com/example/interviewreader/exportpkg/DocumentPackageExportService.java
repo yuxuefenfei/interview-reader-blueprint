@@ -47,7 +47,7 @@ public class DocumentPackageExportService {
                 .from(CONTENT_NODE_ENTITY)
                 .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(versionId)))
                 .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
-        var nodesById = nodes.stream().collect(Collectors.toMap(node -> node.getId(), Function.identity()));
+        var nodesById = nodes.stream().collect(Collectors.toMap(ContentNodeEntity::getId, Function.identity()));
         var tagIds = documentTagMapper.selectListByQuery(QueryWrapper.create()
                         .select(DOCUMENT_TAG_ENTITY.ALL_COLUMNS)
                         .from(DOCUMENT_TAG_ENTITY)

@@ -229,8 +229,7 @@ public class ImportPackageService {
             job.setNormalizedObjectKey(documentPackage == null ? "{}" : toJson(documentPackage));
             job.setFinishedAt(OffsetDateTime.now());
             importJobMapper.update(job);
-        } catch (ImportCanceledException exception) {
-            return;
+        } catch (ImportCanceledException ignored) {
         } catch (RuntimeException exception) {
             var job = job(jobId);
             if (job != null && job.getStatus() != ImportJobStatus.CANCELED) {
@@ -875,15 +874,15 @@ public class ImportPackageService {
 
     private SourceType detectSourceType(String fileName, byte[] bytes) {
         var normalizedName = Objects.toString(fileName, "").toLowerCase(Locale.ROOT);
-        if (startsWith(bytes, "%PDF-")) return SourceType.PDF;
+        if (startsWith(bytes)) return SourceType.PDF;
         if (normalizedName.endsWith(".xlsx") || looksLikeZip(bytes)) return SourceType.EXCEL;
         if (normalizedName.endsWith(".md") || normalizedName.endsWith(".markdown")) return SourceType.MARKDOWN;
         if (normalizedName.endsWith(".json") || firstNonWhitespace(bytes) == '{' || firstNonWhitespace(bytes) == '[') return SourceType.JSON_PACKAGE;
         throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_SOURCE_FILE", "无法识别文件格式，请上传 PDF、Excel、Markdown 或 JSON 文档包。");
     }
 
-    private static boolean startsWith(byte[] bytes, String prefix) {
-        var prefixBytes = prefix.getBytes(StandardCharsets.US_ASCII);
+    private static boolean startsWith(byte[] bytes) {
+        var prefixBytes = "%PDF-".getBytes(StandardCharsets.US_ASCII);
         if (bytes.length < prefixBytes.length) return false;
         for (var index = 0; index < prefixBytes.length; index++) {
             if (bytes[index] != prefixBytes[index]) return false;

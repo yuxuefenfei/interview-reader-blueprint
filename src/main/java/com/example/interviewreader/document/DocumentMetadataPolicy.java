@@ -2,6 +2,7 @@ package com.example.interviewreader.document;
 
 import com.example.interviewreader.common.ApiException;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,9 +35,15 @@ public final class DocumentMetadataPolicy {
             throw new ApiException(HttpStatus.BAD_REQUEST, "DOCUMENT_DESCRIPTION_TOO_LONG", "文档描述不能超过 5000 个字符。");
         }
 
+        var uniqueTags = getStringStringLinkedHashMap(tags);
+        return new Normalized(normalizedTitle, normalizedDescription, List.copyOf(uniqueTags.values()));
+    }
+
+    @NonNull
+    private static LinkedHashMap<String, String> getStringStringLinkedHashMap(List<String> tags) {
         var uniqueTags = new LinkedHashMap<String, String>();
         for (var tag : tags == null ? List.<String>of() : tags) {
-            var displayName = tag == null ? "" : tag.strip();
+            var displayName = tag.strip();
             if (displayName.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "DOCUMENT_TAG_REQUIRED", "标签不能为空。");
             }
@@ -48,7 +55,7 @@ public final class DocumentMetadataPolicy {
         if (uniqueTags.size() > TAG_MAX_COUNT) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "DOCUMENT_TAG_LIMIT_EXCEEDED", "每个文档最多设置 20 个标签。");
         }
-        return new Normalized(normalizedTitle, normalizedDescription, List.copyOf(uniqueTags.values()));
+        return uniqueTags;
     }
 
     public record Normalized(String title, String description, List<String> tags) {

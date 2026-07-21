@@ -90,7 +90,7 @@ public class MarkdownPackageService {
         if (paragraph.isEmpty()) {
             return;
         }
-        state.addTextBlock(BlockType.PARAGRAPH, String.join("\n", paragraph));
+        state.addTextBlock(String.join("\n", paragraph));
         paragraph.clear();
     }
 
@@ -196,7 +196,7 @@ public class MarkdownPackageService {
                     Hashes.sha256(title)));
         }
 
-        private void addTextBlock(BlockType blockType, String text) {
+        private void addTextBlock(String text) {
             ensureSection();
             blockIndex += 1;
             var payload = objectMapper.createObjectNode().put("text", text);
@@ -204,7 +204,7 @@ public class MarkdownPackageService {
                     "block-" + blockIndex,
                     currentSectionKey,
                     nextSeq(),
-                    blockType,
+                    BlockType.PARAGRAPH,
                     payload,
                     text,
                     null,

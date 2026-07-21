@@ -13,7 +13,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import java.util.concurrent.locks.LockSupport;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +24,7 @@ public class DocumentDeletionProcessor {
     private final ImportJobWorker importWorker;
     private final DocumentDeletionProperties properties;
 
+    @SuppressWarnings("BusyWait")
     public void process(UUID jobId) {
         while (true) {
             try {

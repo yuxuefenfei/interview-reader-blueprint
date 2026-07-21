@@ -69,7 +69,9 @@ public class ApiExceptionHandler {
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception) {
         var problem = problemFactory.create(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "服务器暂时无法处理该请求。");
-        LOGGER.error("Unhandled request failure traceId={}", problem.getProperties().get("traceId"), exception);
+        if (problem.getProperties() != null) {
+            LOGGER.error("Unhandled request failure traceId={}", problem.getProperties().get("traceId"), exception);
+        }
         return problem;
     }
 }

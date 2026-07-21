@@ -81,7 +81,7 @@ public class ExcelPackageService {
                     valueOrNull(documentRow, "source_file_name"),
                     valueOrNull(documentRow, "source_sha256"),
                     value(documentRow, "converter_version", "excel-0.1.0"),
-                    readMap(documentRow, "metadata_json", issues));
+                    readMap(documentRow, issues));
 
             var sectionRows = rows(sectionsSheet).stream()
                     .filter(this::enabled)
@@ -267,7 +267,7 @@ public class ExcelPackageService {
                 valueOrNull(row, "anchor"),
                 integerOrNull(row, "source_page_start", issues, sectionKey, null),
                 integerOrNull(row, "source_page_end", issues, sectionKey, null),
-                jsonOrNull(row, "source_bbox_json", issues, sectionKey, null),
+                jsonOrNull(row, issues, sectionKey, null),
                 valueOrNull(row, "content_hash"));
     }
 
@@ -311,8 +311,8 @@ public class ExcelPackageService {
                 value(row, "text_markdown", ""),
                 valueOrNull(row, "language"),
                 integerOrNull(row, "source_page", issues, sectionKey, blockKey),
-                jsonOrNull(row, "source_bbox_json", issues, sectionKey, blockKey),
-                decimalOrNull(row, "confidence", issues, sectionKey, blockKey),
+                jsonOrNull(row, issues, sectionKey, blockKey),
+                decimalOrNull(row, issues, sectionKey, blockKey),
                 valueOrNull(row, "content_hash"));
     }
 
@@ -427,15 +427,15 @@ public class ExcelPackageService {
         }
     }
 
-    private BigDecimal decimalOrNull(ExcelRow row, String key, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
-        var value = valueOrNull(row, key);
+    private BigDecimal decimalOrNull(ExcelRow row, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
+        var value = valueOrNull(row, "confidence");
         if (value == null) {
             return null;
         }
         try {
             return new BigDecimal(value);
         } catch (NumberFormatException exception) {
-            issues.add(issue("CELL_DECIMAL_INVALID", key + " must be a decimal", row.cellRef(key), sectionKey, blockKey));
+            issues.add(issue("CELL_DECIMAL_INVALID", "confidence" + " must be a decimal", row.cellRef("confidence"), sectionKey, blockKey));
             return null;
         }
     }
@@ -453,20 +453,20 @@ public class ExcelPackageService {
         }
     }
 
-    private JsonNode jsonOrNull(ExcelRow row, String key, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
-        var value = valueOrNull(row, key);
-        return value == null ? null : json(row, key, issues, sectionKey, blockKey);
+    private JsonNode jsonOrNull(ExcelRow row, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
+        var value = valueOrNull(row, "source_bbox_json");
+        return value == null ? null : json(row, "source_bbox_json", issues, sectionKey, blockKey);
     }
 
-    private Map<String, Object> readMap(ExcelRow row, String key, List<ImportIssueDto> issues) {
-        var value = valueOrNull(row, key);
+    private Map<String, Object> readMap(ExcelRow row, List<ImportIssueDto> issues) {
+        var value = valueOrNull(row, "metadata_json");
         if (value == null) {
             return Map.of();
         }
         try {
             return objectMapper.readValue(value, objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
         } catch (JsonProcessingException exception) {
-            issues.add(issue("CELL_JSON_INVALID", key + " contains invalid JSON", row.cellRef(key), null, null));
+            issues.add(issue("CELL_JSON_INVALID", "metadata_json" + " contains invalid JSON", row.cellRef("metadata_json"), null, null));
             return Map.of();
         }
     }
@@ -544,7 +544,7 @@ public class ExcelPackageService {
 
     private boolean hasPrimaryValue(String sheetName, Map<String, Integer> headers, Row row) {
         if (ASSETS.equals(sheetName)) {
-            var sha = cellValue(headers, row, "sha256");
+            var sha = cellValue(headers, row);
             if (sha != null && sha.startsWith("填写")) {
                 return false;
             }
@@ -569,8 +569,8 @@ public class ExcelPackageService {
         return false;
     }
 
-    private String cellValue(Map<String, Integer> headers, Row row, String key) {
-        var index = headers.get(key);
+    private String cellValue(Map<String, Integer> headers, Row row) {
+        var index = headers.get("sha256");
         return index == null ? null : cellString(row.getCell(index));
     }
 

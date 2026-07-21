@@ -85,6 +85,7 @@ public class AuthSessionService {
         return sessions.size();
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean constantTimeEquals(String expected, String actual) {
         if (actual == null) {
             return false;

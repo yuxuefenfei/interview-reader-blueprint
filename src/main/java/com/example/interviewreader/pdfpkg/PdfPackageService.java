@@ -672,6 +672,7 @@ public class PdfPackageService {
         return !value.isEmpty() && isCjk(value.charAt(value.length() - 1));
     }
 
+    @SuppressWarnings("UnnecessaryUnicodeEscape")
     private static boolean isCjk(char value) {
         return value >= '\u4e00' && value <= '\u9fff';
     }
@@ -924,7 +925,7 @@ public class PdfPackageService {
     private static final class PositionedTextStripper extends PDFTextStripper {
         private final List<PositionedLine> lines = new ArrayList<>();
 
-        private PositionedTextStripper() throws IOException {
+        private PositionedTextStripper() {
         }
 
         @Override
@@ -953,7 +954,7 @@ public class PdfPackageService {
     private static final class FontStatsStripper extends PDFTextStripper {
         private final Map<FontKey, Integer> counts = new LinkedHashMap<>();
 
-        private FontStatsStripper() throws IOException {
+        private FontStatsStripper() {
         }
 
         @Override

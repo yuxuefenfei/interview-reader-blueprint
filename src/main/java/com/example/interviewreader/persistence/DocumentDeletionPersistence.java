@@ -2,20 +2,8 @@ package com.example.interviewreader.persistence;
 
 import com.example.interviewreader.document.DocumentStatus;
 import com.example.interviewreader.management.DeletionJobStatus;
-import com.example.interviewreader.persistence.entity.DocumentDeletionJobEntity;
-import com.example.interviewreader.persistence.entity.DocumentEntity;
-import com.example.interviewreader.persistence.mapper.AssetMapper;
-import com.example.interviewreader.persistence.mapper.BookmarkMapper;
-import com.example.interviewreader.persistence.mapper.DocumentDeletionJobMapper;
-import com.example.interviewreader.persistence.mapper.DocumentMapper;
-import com.example.interviewreader.persistence.mapper.DocumentTagMapper;
-import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
-import com.example.interviewreader.persistence.mapper.ImportIssueMapper;
-import com.example.interviewreader.persistence.mapper.ImportJobMapper;
-import com.example.interviewreader.persistence.mapper.NoteMapper;
-import com.example.interviewreader.persistence.mapper.ReadingProgressMapper;
-import com.example.interviewreader.persistence.mapper.ReviewStateMapper;
-import com.example.interviewreader.persistence.mapper.TagMapper;
+import com.example.interviewreader.persistence.entity.*;
+import com.example.interviewreader.persistence.mapper.*;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.update.UpdateWrapper;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +33,7 @@ import static com.example.interviewreader.persistence.entity.table.TagEntityTabl
  * <p>删除链路涉及多个表、外部文件引用检查和行锁，集中在此处使用 MyBatis-Flex Wrapper，
  * 避免业务服务混用多种数据访问方式。</p>
  */
+
 @Repository
 @RequiredArgsConstructor
 public class DocumentDeletionPersistence {
@@ -101,18 +90,18 @@ public class DocumentDeletionPersistence {
                 .limit(limit));
     }
 
-    public int deleteExpiredJobs(OffsetDateTime cutoff) {
-        return deletionJobMapper.deleteByQuery(QueryWrapper.create()
+    public void deleteExpiredJobs(OffsetDateTime cutoff) {
+        deletionJobMapper.deleteByQuery(QueryWrapper.create()
                 .where(DOCUMENT_DELETION_JOB_ENTITY.STATUS.eq(DeletionJobStatus.COMPLETED))
                 .and(DOCUMENT_DELETION_JOB_ENTITY.COMPLETED_AT.lt(cutoff)));
     }
 
-    public int insertJob(DocumentDeletionJobEntity job) {
-        return deletionJobMapper.insertSelective(job);
+    public void insertJob(DocumentDeletionJobEntity job) {
+        deletionJobMapper.insertSelective(job);
     }
 
-    public int updateJob(DocumentDeletionJobEntity job) {
-        return deletionJobMapper.update(job);
+    public void updateJob(DocumentDeletionJobEntity job) {
+        deletionJobMapper.update(job);
     }
 
     public DocumentEntity lockOwnedDocument(String documentId, String ownerId) {
@@ -138,14 +127,14 @@ public class DocumentDeletionPersistence {
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(documentId)));
         var versionIds = versions.stream()
-                .map(version -> version.getId())
+                .map(DocumentVersionEntity::getId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         var importJobIds = importJobMapper.selectListByQuery(QueryWrapper.create()
                         .select(IMPORT_JOB_ENTITY.ID)
                         .from(IMPORT_JOB_ENTITY)
                         .where(IMPORT_JOB_ENTITY.TARGET_DOCUMENT_ID.eq(documentId)))
                 .stream()
-                .map(job -> job.getId())
+                .map(ImportJobEntity::getId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (!versionIds.isEmpty()) {
             importJobMapper.selectListByQuery(QueryWrapper.create()
@@ -153,10 +142,10 @@ public class DocumentDeletionPersistence {
                             .from(IMPORT_JOB_ENTITY)
                             .where(IMPORT_JOB_ENTITY.RESULT_VERSION_ID.in(versionIds)))
                     .stream()
-                    .map(job -> job.getId())
+                    .map(ImportJobEntity::getId)
                     .forEach(importJobIds::add);
             versions.stream()
-                    .map(version -> version.getOriginImportJobId())
+                    .map(DocumentVersionEntity::getOriginImportJobId)
                     .filter(java.util.Objects::nonNull)
                     .forEach(importJobIds::add);
         }
@@ -165,7 +154,7 @@ public class DocumentDeletionPersistence {
                         .from(DOCUMENT_TAG_ENTITY)
                         .where(DOCUMENT_TAG_ENTITY.DOCUMENT_ID.eq(documentId)))
                 .stream()
-                .map(link -> link.getTagId())
+                .map(DocumentTagEntity::getTagId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         return new DeletionReferences(jobId, documentId, ownerId, versionIds, importJobIds, tagIds);
     }
@@ -194,7 +183,7 @@ public class DocumentDeletionPersistence {
                             .from(ASSET_ENTITY)
                             .where(ASSET_ENTITY.VERSION_ID.in(references.versionIds())))
                     .stream()
-                    .map(asset -> asset.getObjectKey())
+                    .map(AssetEntity::getObjectKey)
                     .filter(java.util.Objects::nonNull)
                     .forEach(keys::add);
         }

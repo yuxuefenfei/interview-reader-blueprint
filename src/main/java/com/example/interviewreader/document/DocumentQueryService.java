@@ -608,6 +608,7 @@ public class DocumentQueryService {
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean containsIgnoreCase(String value, String needle) {
         return lower(value).contains(lower(needle));
     }
