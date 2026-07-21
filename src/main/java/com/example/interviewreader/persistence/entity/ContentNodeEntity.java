@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import com.example.interviewreader.document.NodeType;
+import com.example.interviewreader.document.SemanticRole;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,8 +20,8 @@ public class ContentNodeEntity {
     private String versionId;
     private String parentId;
     private String nodeKey;
-    private String nodeType;
-    private String semanticRole;
+    private NodeType nodeType;
+    private SemanticRole semanticRole;
     private String title;
     private int level;
     private String path;

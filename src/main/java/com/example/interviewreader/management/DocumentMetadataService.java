@@ -3,6 +3,7 @@ package com.example.interviewreader.management;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.document.DocumentMetadataPolicy;
+import com.example.interviewreader.document.DocumentStatus;
 import com.example.interviewreader.persistence.entity.DocumentEntity;
 import com.example.interviewreader.persistence.entity.DocumentTagEntity;
 import com.example.interviewreader.persistence.entity.TagEntity;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+import static com.example.interviewreader.persistence.entity.table.AppUserEntityTableDef.APP_USER_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentEntityTableDef.DOCUMENT_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentTagEntityTableDef.DOCUMENT_TAG_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.TagEntityTableDef.TAG_ENTITY;
@@ -64,7 +66,7 @@ public class DocumentMetadataService {
                         .where(DOCUMENT_ENTITY.ID.eq(documentId.toString()))
                         .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                         .and(DOCUMENT_ENTITY.METADATA_REVISION.eq(request.metadataRevision()))
-                        .and(DOCUMENT_ENTITY.STATUS.notIn("DELETING", "DELETE_FAILED")));
+                        .and(DOCUMENT_ENTITY.STATUS.notIn(DocumentStatus.DELETING, DocumentStatus.DELETE_FAILED)));
         if (updated != 1) {
             var latest = requireOwnedDocument(documentId);
             rejectDeletionLocked(latest);
@@ -72,7 +74,12 @@ public class DocumentMetadataService {
         }
 
         // 标签名称对单用户全局唯一；使用用户行锁串行化跨文档的新标签创建。
-        if (appUserMapper.selectIdForUpdate(LOCAL_USER_ID) == null) {
+        var user = appUserMapper.selectOneByQuery(QueryWrapper.create()
+                .select(APP_USER_ENTITY.ID)
+                .from(APP_USER_ENTITY)
+                .where(APP_USER_ENTITY.ID.eq(LOCAL_USER_ID))
+                .forUpdate());
+        if (user == null) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "LOCAL_USER_MISSING", "本地用户尚未初始化。");
         }
         replaceTags(documentId.toString(), normalized.tags());
@@ -174,7 +181,7 @@ public class DocumentMetadataService {
     }
 
     private static void rejectDeletionLocked(DocumentEntity document) {
-        if ("DELETING".equals(document.getStatus()) || "DELETE_FAILED".equals(document.getStatus())) {
+        if (DocumentStatus.isDeletionLocked(document.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "永久删除流程已锁定当前文档。");
         }
     }

@@ -1,4 +1,5 @@
 package com.example.interviewreader.persistence.entity;
+import com.example.interviewreader.document.BlockType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,7 +21,7 @@ public class ContentBlockEntity {
     private String nodeId;
     private String blockKey;
     private int seq;
-    private String blockType;
+    private BlockType blockType;
     @Column(isLarge = true)
     private String payload;
     @Column(isLarge = true)

@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 import static com.example.interviewreader.persistence.entity.table.BookmarkEntityTableDef.BOOKMARK_ENTITY;
@@ -30,6 +29,11 @@ import static com.example.interviewreader.persistence.entity.table.ReviewStateEn
 @RequiredArgsConstructor
 public class InteractionService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
+    private static final String MASTERY_ORDER_SQL =
+            "CASE COALESCE(review_state.mastery, '" + MasteryState.UNKNOWN.getCode() + "') "
+                    + "WHEN '" + MasteryState.HARD.getCode() + "' THEN 0 "
+                    + "WHEN '" + MasteryState.UNKNOWN.getCode() + "' THEN 1 "
+                    + "WHEN '" + MasteryState.FUZZY.getCode() + "' THEN 2 ELSE 3 END";
 
     private final BookmarkMapper bookmarkMapper;
     private final NoteMapper noteMapper;
@@ -107,8 +111,8 @@ public class InteractionService {
     @Transactional
     public ReviewStateDto upsertReviewState(UUID nodeId, ReviewStateRequest request) {
         verifyNodeBelongsToDocument(request.documentId(), nodeId);
-        var mastery = normalizeMastery(request.mastery());
-        var intervalDays = intervalDays(mastery);
+        var mastery = MasteryState.parse(request.mastery());
+        var intervalDays = mastery.intervalDays();
         var dueAt = intervalDays == null ? null : OffsetDateTime.now().plusDays(intervalDays);
 
         var existing = reviewStateMapper.selectOneByQuery(QueryWrapper.create()
@@ -125,7 +129,7 @@ public class InteractionService {
             reviewState.setMastery(mastery);
             reviewState.setDueAt(dueAt);
             reviewState.setIntervalDays(intervalDays);
-            reviewState.setRepetitions("UNKNOWN".equals(mastery) ? 0 : 1);
+            reviewState.setRepetitions(mastery == MasteryState.UNKNOWN ? 0 : 1);
             reviewStateMapper.insertSelective(reviewState);
             return getReviewState(uuid(reviewState.getId()));
         }
@@ -134,7 +138,7 @@ public class InteractionService {
         existing.setMastery(mastery);
         existing.setDueAt(dueAt);
         existing.setIntervalDays(intervalDays);
-        existing.setRepetitions("UNKNOWN".equals(mastery) ? 0 : existing.getRepetitions() + 1);
+        existing.setRepetitions(mastery == MasteryState.UNKNOWN ? 0 : existing.getRepetitions() + 1);
         existing.setUpdatedAt(OffsetDateTime.now());
         reviewStateMapper.update(existing);
         return getReviewState(uuid(existing.getId()));
@@ -165,12 +169,12 @@ public class InteractionService {
                 .leftJoin(REVIEW_STATE_ENTITY).on(REVIEW_STATE_ENTITY.NODE_ID.eq(CONTENT_NODE_ENTITY.ID)
                         .and(REVIEW_STATE_ENTITY.USER_ID.eq(LOCAL_USER_ID)))
                 .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED"))
-                .and(CONTENT_NODE_ENTITY.NODE_TYPE.eq("QUESTION")
-                        .or(CONTENT_NODE_ENTITY.SEMANTIC_ROLE.eq("QUESTION")))
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED))
+                .and(CONTENT_NODE_ENTITY.NODE_TYPE.eq(NodeType.QUESTION)
+                        .or(CONTENT_NODE_ENTITY.SEMANTIC_ROLE.eq(SemanticRole.QUESTION)))
                 .orderByUnSafely(
-                        "CASE COALESCE(review_state.mastery, 'UNKNOWN') WHEN 'HARD' THEN 0 WHEN 'UNKNOWN' THEN 1 WHEN 'FUZZY' THEN 2 ELSE 3 END",
+                        MASTERY_ORDER_SQL,
                         "CASE WHEN review_state.due_at IS NULL OR review_state.due_at <= CURRENT_TIMESTAMP THEN 0 ELSE 1 END",
                         "content_node.title ASC")
                 .limit(safeLimit);
@@ -181,7 +185,7 @@ public class InteractionService {
             query.and(REVIEW_STATE_ENTITY.ID.isNull()
                     .or(REVIEW_STATE_ENTITY.DUE_AT.isNull())
                     .or(REVIEW_STATE_ENTITY.DUE_AT.le(now))
-                    .or(REVIEW_STATE_ENTITY.MASTERY.eq("UNKNOWN")));
+                    .or(REVIEW_STATE_ENTITY.MASTERY.eq(MasteryState.UNKNOWN)));
         }
         return contentNodeMapper.selectListByQueryAs(query, ReviewQueueRow.class).stream()
                 .map(row -> new ReviewQueueItem(
@@ -193,7 +197,7 @@ public class InteractionService {
                         row.nodeType,
                         row.semanticRole,
                         row.sourcePageStart,
-                        row.mastery == null ? "UNKNOWN" : row.mastery,
+                        row.mastery == null ? MasteryState.UNKNOWN.getCode() : row.mastery,
                         row.dueAt,
                         row.intervalDays,
                         row.repetitions == null ? 0 : row.repetitions))
@@ -205,8 +209,8 @@ public class InteractionService {
         public String versionId;
         public String nodeId;
         public String title;
-        public String nodeType;
-        public String semanticRole;
+        public NodeType nodeType;
+        public SemanticRole semanticRole;
         public Integer sourcePageStart;
         public String mastery;
         public OffsetDateTime dueAt;
@@ -296,24 +300,6 @@ public class InteractionService {
         }
     }
 
-    private String normalizeMastery(String value) {
-        var mastery = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
-        return switch (mastery) {
-            case "UNKNOWN", "HARD", "FUZZY", "KNOWN" -> mastery;
-            default -> throw new ApiException(HttpStatus.BAD_REQUEST, "mastery must be UNKNOWN, HARD, FUZZY or KNOWN");
-        };
-    }
-
-    private Integer intervalDays(String mastery) {
-        return switch (mastery) {
-            case "HARD" -> 1;
-            case "FUZZY" -> 3;
-            case "KNOWN" -> 7;
-            default -> null;
-        };
-    }
-
-
     private static BookmarkDto mapBookmark(BookmarkEntity entity) {
         return new BookmarkDto(
                 uuid(entity.getId()),
@@ -343,7 +329,7 @@ public class InteractionService {
                 uuid(entity.getId()),
                 uuid(entity.getDocumentId()),
                 uuid(entity.getNodeId()),
-                entity.getMastery(),
+                entity.getMastery().getCode(),
                 entity.getDueAt(),
                 entity.getIntervalDays(),
                 entity.getRepetitions(),

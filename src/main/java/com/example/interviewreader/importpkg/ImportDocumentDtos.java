@@ -9,9 +9,6 @@ import java.util.UUID;
 
 /** 导入任务中的文档级资料预览、编辑与冲突决议 DTO。 */
 public final class ImportDocumentDtos {
-    public static final String CREATE_NEW = "CREATE_NEW";
-    public static final String IMPORT_AS_NEW_VERSION = "IMPORT_AS_NEW_VERSION";
-
     private ImportDocumentDtos() {
     }
 
@@ -37,6 +34,6 @@ public final class ImportDocumentDtos {
     ) {
     }
 
-    public record CommitImportRequest(String resolution) {
+    public record CommitImportRequest(ImportResolution resolution) {
     }
 }

@@ -15,7 +15,7 @@ public class DocumentPackageNormalizer {
         var issues = new ArrayList<ImportIssueDto>();
         for (var block : source.blocks()) {
             if (block == null || !DocumentBlockContent.isMeaningful(block.blockType(), block.plainText(), block.payload())) {
-                if (block != null) issues.add(new ImportIssueDto("WARNING", "EMPTY_CONTENT_BLOCK_REMOVED",
+                if (block != null) issues.add(new ImportIssueDto(ImportIssueSeverity.WARNING, "EMPTY_CONTENT_BLOCK_REMOVED",
                         "Removed an empty content block during import normalization", block.sourcePage(), block.sectionKey(), block.blockKey()));
                 continue;
             }

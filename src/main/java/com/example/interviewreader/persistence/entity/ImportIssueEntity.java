@@ -1,4 +1,5 @@
 package com.example.interviewreader.persistence.entity;
+import com.example.interviewreader.importpkg.ImportIssueSeverity;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,7 +17,7 @@ public class ImportIssueEntity {
     @Id(keyType = KeyType.None)
     private String id;
     private String jobId;
-    private String severity;
+    private ImportIssueSeverity severity;
     private String issueCode;
     @Column(isLarge = true)
     private String message;

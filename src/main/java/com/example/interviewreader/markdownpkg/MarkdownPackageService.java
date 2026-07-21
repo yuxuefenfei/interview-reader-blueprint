@@ -1,6 +1,10 @@
 package com.example.interviewreader.markdownpkg;
 
 import com.example.interviewreader.common.Hashes;
+import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.NodeType;
+import com.example.interviewreader.document.SemanticRole;
+import com.example.interviewreader.document.SourceType;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.importpkg.ImportDocumentNaming;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -86,7 +90,7 @@ public class MarkdownPackageService {
         if (paragraph.isEmpty()) {
             return;
         }
-        state.addTextBlock("paragraph", String.join("\n", paragraph));
+        state.addTextBlock(BlockType.PARAGRAPH, String.join("\n", paragraph));
         paragraph.clear();
     }
 
@@ -192,7 +196,7 @@ public class MarkdownPackageService {
                     Hashes.sha256(title)));
         }
 
-        private void addTextBlock(String blockType, String text) {
+        private void addTextBlock(BlockType blockType, String text) {
             ensureSection();
             blockIndex += 1;
             var payload = objectMapper.createObjectNode().put("text", text);
@@ -221,7 +225,7 @@ public class MarkdownPackageService {
                     "block-" + blockIndex,
                     currentSectionKey,
                     nextSeq(),
-                    "code",
+                    BlockType.CODE,
                     payload,
                     text,
                     normalizedLanguage,
@@ -250,7 +254,7 @@ public class MarkdownPackageService {
                     "block-" + blockIndex,
                     currentSectionKey,
                     nextSeq(),
-                    ordered ? "ordered_list" : "unordered_list",
+                    ordered ? BlockType.ORDERED_LIST : BlockType.UNORDERED_LIST,
                     payload,
                     plainText,
                     null,
@@ -284,7 +288,7 @@ public class MarkdownPackageService {
                     "block-" + blockIndex,
                     currentSectionKey,
                     nextSeq(),
-                    "table",
+                    BlockType.TABLE,
                     payload,
                     plainText,
                     null,
@@ -306,7 +310,7 @@ public class MarkdownPackageService {
                     new DocumentPackage.DocumentInfo(documentKey, title, "Imported from Markdown", "zh-CN", List.of()),
                     new DocumentPackage.VersionInfo(
                             "v1",
-                            "MARKDOWN",
+                            SourceType.MARKDOWN,
                             sourceFileName,
                             sourceSha256,
                             converterVersion,
@@ -334,12 +338,12 @@ public class MarkdownPackageService {
             return result;
         }
 
-        private String guessNodeType(String title) {
-            return title.endsWith("?") || title.endsWith("？") ? "QUESTION" : "SECTION";
+        private NodeType guessNodeType(String title) {
+            return title.endsWith("?") || title.endsWith("？") ? NodeType.QUESTION : NodeType.SECTION;
         }
 
-        private String guessSemanticRole(String title) {
-            return title.endsWith("?") || title.endsWith("？") ? "QUESTION" : null;
+        private SemanticRole guessSemanticRole(String title) {
+            return title.endsWith("?") || title.endsWith("？") ? SemanticRole.QUESTION : null;
         }
     }
 

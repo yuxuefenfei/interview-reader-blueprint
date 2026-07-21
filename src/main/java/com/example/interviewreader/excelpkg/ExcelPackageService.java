@@ -1,7 +1,12 @@
 package com.example.interviewreader.excelpkg;
 
+import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.NodeType;
+import com.example.interviewreader.document.SemanticRole;
+import com.example.interviewreader.document.SourceType;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.importpkg.ImportIssueDto;
+import com.example.interviewreader.importpkg.ImportIssueSeverity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,7 +67,7 @@ public class ExcelPackageService {
             var documentKey = required(documentRow, "document_key", issues, null, null);
             var title = required(documentRow, "title", issues, null, null);
             var versionKey = value(documentRow, "version_key", "v1");
-            var sourceType = value(documentRow, "source_type", "EXCEL");
+            var sourceType = sourceType(documentRow, issues);
 
             var document = new DocumentPackage.DocumentInfo(
                     documentKey,
@@ -132,7 +137,7 @@ public class ExcelPackageService {
         write(row, 3, documentPackage.document().language());
         write(row, 4, String.join(",", Objects.requireNonNullElse(documentPackage.document().tags(), List.of())));
         write(row, 5, documentPackage.version().versionKey());
-        write(row, 6, documentPackage.version().sourceType());
+        write(row, 6, documentPackage.version().sourceType().getCode());
         write(row, 7, documentPackage.version().sourceFileName());
         write(row, 8, documentPackage.version().sourceSha256());
         write(row, 9, documentPackage.version().converterVersion());
@@ -151,8 +156,8 @@ public class ExcelPackageService {
             write(row, 2, section.sectionKey());
             write(row, 3, section.parentSectionKey());
             write(row, 4, section.level());
-            write(row, 5, section.nodeType());
-            write(row, 6, section.semanticRole());
+            write(row, 5, section.nodeType().getCode());
+            write(row, 6, section.semanticRole() == null ? null : section.semanticRole().getCode());
             write(row, 7, section.title());
             write(row, 8, section.sortOrder());
             write(row, 9, section.sourcePageStart());
@@ -175,7 +180,7 @@ public class ExcelPackageService {
             write(row, 1, block.blockKey());
             write(row, 2, block.sectionKey());
             write(row, 3, block.seq());
-            write(row, 4, block.blockType());
+            write(row, 4, block.blockType().getCode());
             write(row, 5, textMarkdown(block));
             write(row, 6, block.language());
             write(row, 7, toJson(block.payload()));
@@ -255,8 +260,8 @@ public class ExcelPackageService {
                 sectionKey,
                 valueOrNull(row, "parent_section_key"),
                 integer(row, "level", issues, sectionKey, null),
-                value(row, "node_type", "SECTION"),
-                valueOrNull(row, "semantic_role"),
+                nodeType(row, issues, sectionKey),
+                semanticRole(row, issues, sectionKey),
                 required(row, "title", issues, sectionKey, null),
                 integer(row, "sort_order", issues, sectionKey, null),
                 valueOrNull(row, "anchor"),
@@ -296,7 +301,7 @@ public class ExcelPackageService {
     private DocumentPackage.BlockInfo block(ExcelRow row, List<ImportIssueDto> issues) {
         var blockKey = required(row, "block_key", issues, valueOrNull(row, "section_key"), null);
         var sectionKey = required(row, "section_key", issues, null, blockKey);
-        var blockType = value(row, "block_type", "paragraph");
+        var blockType = blockType(row, issues, sectionKey, blockKey);
         return new DocumentPackage.BlockInfo(
                 blockKey,
                 sectionKey,
@@ -320,25 +325,64 @@ public class ExcelPackageService {
                 valueOrNull(row, "alt"));
     }
 
-    private JsonNode payload(ExcelRow row, String blockType, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
+    private JsonNode payload(ExcelRow row, BlockType blockType, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
         var payloadJson = valueOrNull(row, "payload_json");
         if (payloadJson != null) {
             return json(row, "payload_json", issues, sectionKey, blockKey);
         }
         var text = value(row, "text_markdown", "");
+        if (blockType == null) {
+            return objectMapper.createObjectNode().put("text", text);
+        }
         return switch (blockType) {
-            case "divider" -> objectMapper.createObjectNode();
-            case "unordered_list", "ordered_list" -> objectMapper.createObjectNode()
+            case DIVIDER -> objectMapper.createObjectNode();
+            case UNORDERED_LIST, ORDERED_LIST -> objectMapper.createObjectNode()
                     .set("items", objectMapper.valueToTree(text.lines().filter(line -> !line.isBlank()).toList()));
-            case "code" -> objectMapper.createObjectNode()
+            case CODE -> objectMapper.createObjectNode()
                     .put("language", value(row, "language", "text"))
                     .put("text", text);
-            case "table", "image", "formula" -> {
-                issues.add(issue("PAYLOAD_JSON_REQUIRED", blockType + " blocks require payload_json", row.cellRef("payload_json"), sectionKey, blockKey));
+            case TABLE, IMAGE, FORMULA -> {
+                issues.add(issue("PAYLOAD_JSON_REQUIRED", blockType.getCode() + " blocks require payload_json", row.cellRef("payload_json"), sectionKey, blockKey));
                 yield objectMapper.createObjectNode();
             }
             default -> objectMapper.createObjectNode().put("text", text);
         };
+    }
+
+    private SourceType sourceType(ExcelRow row, List<ImportIssueDto> issues) {
+        try {
+            return SourceType.fromCode(value(row, "source_type", SourceType.EXCEL.getCode()));
+        } catch (IllegalArgumentException exception) {
+            issues.add(issue("SOURCE_TYPE_INVALID", exception.getMessage(), row.cellRef("source_type"), null, null));
+            return null;
+        }
+    }
+
+    private NodeType nodeType(ExcelRow row, List<ImportIssueDto> issues, String sectionKey) {
+        try {
+            return NodeType.fromCode(value(row, "node_type", NodeType.SECTION.getCode()));
+        } catch (IllegalArgumentException exception) {
+            issues.add(issue("NODE_TYPE_INVALID", exception.getMessage(), row.cellRef("node_type"), sectionKey, null));
+            return null;
+        }
+    }
+
+    private SemanticRole semanticRole(ExcelRow row, List<ImportIssueDto> issues, String sectionKey) {
+        try {
+            return SemanticRole.fromNullableCode(valueOrNull(row, "semantic_role"));
+        } catch (IllegalArgumentException exception) {
+            issues.add(issue("SEMANTIC_ROLE_INVALID", exception.getMessage(), row.cellRef("semantic_role"), sectionKey, null));
+            return null;
+        }
+    }
+
+    private BlockType blockType(ExcelRow row, List<ImportIssueDto> issues, String sectionKey, String blockKey) {
+        try {
+            return BlockType.fromCode(value(row, "block_type", BlockType.PARAGRAPH.getCode()));
+        } catch (IllegalArgumentException exception) {
+            issues.add(issue("BLOCK_TYPE_INVALID", exception.getMessage(), row.cellRef("block_type"), sectionKey, blockKey));
+            return null;
+        }
     }
 
     private boolean enabled(ExcelRow row) {
@@ -448,7 +492,7 @@ public class ExcelPackageService {
     }
 
     private ImportIssueDto issue(String code, String message, String cellRef, String sectionKey, String blockKey) {
-        return new ImportIssueDto("BLOCKING", code, message, null, sectionKey, blockKey, cellRef);
+        return new ImportIssueDto(ImportIssueSeverity.BLOCKING, code, message, null, sectionKey, blockKey, cellRef);
     }
 
     private void writeHeader(Sheet sheet, CellStyle style, List<String> headers) {

@@ -35,16 +35,15 @@ public class MarkdownPackageService {
 
     private void appendBlock(StringBuilder markdown, DocumentPackage.BlockInfo block) {
         switch (block.blockType()) {
-            case "paragraph", "heading_note" -> markdown.append(text(block)).append("\n\n");
-            case "unordered_list" -> appendList(markdown, block, false);
-            case "ordered_list" -> appendList(markdown, block, true);
-            case "code" -> appendCode(markdown, block);
-            case "table" -> appendTable(markdown, block);
-            case "quote" -> appendQuote(markdown, block);
-            case "callout" -> appendCallout(markdown, block);
-            case "formula" -> markdown.append("$$\n").append(payloadText(block.payload(), "latex", text(block))).append("\n$$\n\n");
-            case "image" -> appendImage(markdown, block);
-            case "divider" -> markdown.append("---\n\n");
+            case UNORDERED_LIST -> appendList(markdown, block, false);
+            case ORDERED_LIST -> appendList(markdown, block, true);
+            case CODE -> appendCode(markdown, block);
+            case TABLE -> appendTable(markdown, block);
+            case QUOTE -> appendQuote(markdown, block);
+            case CALLOUT -> appendCallout(markdown, block);
+            case FORMULA -> markdown.append("$$\n").append(payloadText(block.payload(), "latex", text(block))).append("\n$$\n\n");
+            case IMAGE -> appendImage(markdown, block);
+            case DIVIDER -> markdown.append("---\n\n");
             default -> markdown.append(text(block)).append("\n\n");
         }
     }

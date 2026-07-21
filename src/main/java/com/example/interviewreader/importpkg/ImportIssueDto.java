@@ -1,7 +1,7 @@
 package com.example.interviewreader.importpkg;
 
 public record ImportIssueDto(
-        String severity,
+        ImportIssueSeverity severity,
         String issueCode,
         String message,
         Integer sourcePage,
@@ -10,7 +10,7 @@ public record ImportIssueDto(
         String cellRef
 ) {
     public ImportIssueDto(
-            String severity,
+            ImportIssueSeverity severity,
             String issueCode,
             String message,
             Integer sourcePage,

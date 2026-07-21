@@ -3,9 +3,15 @@ package com.example.interviewreader.management;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.document.DocumentQueryService;
+import com.example.interviewreader.document.DocumentVersionStatus;
+import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.NodeType;
 import com.example.interviewreader.importpkg.DocumentBlockContent;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.importpkg.DocumentPackageValidator;
+import com.example.interviewreader.importpkg.ImportIssueSeverity;
+import com.example.interviewreader.importpkg.ImportJobStatus;
+import com.example.interviewreader.importpkg.ImportStage;
 import com.example.interviewreader.persistence.entity.*;
 import com.example.interviewreader.persistence.mapper.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,11 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.*;
 
-import static com.example.interviewreader.document.ApiContractValues.BLOCK_TYPES;
-import static com.example.interviewreader.document.ApiContractValues.NODE_TYPES;
 import static com.example.interviewreader.persistence.entity.table.AssetEntityTableDef.ASSET_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentBlockEntityTableDef.CONTENT_BLOCK_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ContentNodeEntityTableDef.CONTENT_NODE_ENTITY;
+import static com.example.interviewreader.persistence.entity.table.DocumentDeletionJobEntityTableDef.DOCUMENT_DELETION_JOB_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentEntityTableDef.DOCUMENT_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentVersionEntityTableDef.DOCUMENT_VERSION_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.ImportJobEntityTableDef.IMPORT_JOB_ENTITY;
@@ -68,7 +73,7 @@ public class VersionRevisionService {
                 .limit(offset, safeSize + 1));
         var hasNext = documents.size() > safeSize;
         var pageItems = hasNext ? documents.subList(0, safeSize) : documents;
-        var ids = pageItems.stream().map(row -> row.getId()).toList();
+        var ids = pageItems.stream().map(DocumentEntity::getId).toList();
         var versions = ids.isEmpty() ? List.<DocumentVersionEntity>of() : documentVersionMapper.selectListByQuery(QueryWrapper.create()
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
@@ -77,7 +82,7 @@ public class VersionRevisionService {
         versions.forEach(version -> byDocument.computeIfAbsent(version.getDocumentId(), ignored -> new ArrayList<>()).add(version));
         var deletionByDocument = ids.isEmpty() ? Map.<String, DocumentDeletionJobEntity>of() : deletionJobMapper.selectListByQuery(QueryWrapper.create()
                 .where(com.example.interviewreader.persistence.entity.table.DocumentDeletionJobEntityTableDef.DOCUMENT_DELETION_JOB_ENTITY.DOCUMENT_ID.in(ids)))
-                .stream().collect(java.util.stream.Collectors.toMap(job -> job.getDocumentId(), job -> job));
+                .stream().collect(java.util.stream.Collectors.toMap(DocumentDeletionJobEntity::getDocumentId, job -> job));
         return new ManagementDtos.AdminDocumentPage(pageItems.stream()
                 .map(document -> documentSummary(document, byDocument.getOrDefault(document.getId(), List.of()), deletionByDocument.get(document.getId())))
                 .toList(), safePage, safeSize, hasNext);
@@ -89,7 +94,7 @@ public class VersionRevisionService {
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(document.getId())));
-        return documentSummary(document, versions, deletionJobMapper.selectByDocument(document.getId(), LOCAL_USER_ID));
+        return documentSummary(document, versions, deleteJob(document.getId()));
     }
 
     public List<ManagementDtos.VersionSummary> versions(UUID documentId) {
@@ -119,7 +124,7 @@ public class VersionRevisionService {
         draft.setSourceFileSha256(source.getSourceFileSha256());
         draft.setConverterVersion(source.getConverterVersion());
         draft.setSchemaVersion(source.getSchemaVersion());
-        draft.setStatus("DRAFT");
+        draft.setStatus(DocumentVersionStatus.DRAFT);
         draft.setLanguage(source.getLanguage());
         draft.setMetadata(source.getMetadata());
         documentVersionMapper.insertSelective(draft);
@@ -143,7 +148,7 @@ public class VersionRevisionService {
             throw new ApiException(HttpStatus.CONFLICT, "Draft was updated by another session");
         }
         var issues = validator.validate(request.documentPackage());
-        if (issues.stream().anyMatch(issue -> "BLOCKING".equals(issue.severity()))) {
+        if (issues.stream().anyMatch(issue -> issue.severity() == ImportIssueSeverity.BLOCKING)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Draft contains blocking structure errors");
         }
         replaceContent(version.getId(), request.documentPackage());
@@ -154,7 +159,7 @@ public class VersionRevisionService {
     @Transactional
     public void deleteDraft(UUID versionId) {
         var version = requireDraft(versionId);
-        resetImportJobs(version.getId(), "DRAFT_DISCARDED");
+        resetImportJobs(version.getId(), ImportStage.DRAFT_DISCARDED);
         deleteContent(version.getId());
         documentVersionMapper.deleteById(version.getId());
         touchDocument(version.getDocumentId());
@@ -202,7 +207,7 @@ public class VersionRevisionService {
         }
         node.setTitle(request.title().trim());
         node.setNodeType(requiredNodeType(request.nodeType()));
-        node.setSemanticRole(blankToNull(request.semanticRole()));
+        node.setSemanticRole(request.semanticRole());
         node.setAnchor(blankToNull(request.anchor()) == null ? slug(node.getNodeKey()) : request.anchor().trim());
         contentNodeMapper.update(node);
         refreshNodeSearchText(version.getId(), node.getId());
@@ -224,7 +229,7 @@ public class VersionRevisionService {
         if (persisted.size() != request.nodes().size()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "STRUCTURE_MISMATCH", "结构更新必须包含当前版本的全部节点。");
         }
-        var byId = persisted.stream().collect(java.util.stream.Collectors.toMap(node -> node.getId(), node -> node));
+        var byId = persisted.stream().collect(java.util.stream.Collectors.toMap(ContentNodeEntity::getId, node -> node));
         var requested = new HashMap<String, ManagementDtos.StructureNode>();
         for (var item : request.nodes()) {
             if (item == null || item.id() == null || byId.get(id(item.id())) == null || requested.put(id(item.id()), item) != null) {
@@ -245,7 +250,7 @@ public class VersionRevisionService {
             node.setSortOrder(item.sortOrder());
             children.computeIfAbsent(Objects.toString(node.getParentId(), "ROOT"), ignored -> new ArrayList<>()).add(node);
         }
-        children.values().forEach(list -> list.sort(Comparator.comparingInt((ContentNodeEntity node) -> node.getSortOrder()).thenComparing(node -> node.getId())));
+        children.values().forEach(list -> list.sort(Comparator.comparingInt(ContentNodeEntity::getSortOrder).thenComparing(node -> node.getId())));
         applyPaths(children, "ROOT", null, 1);
         persisted.forEach(contentNodeMapper::update);
         advanceDraft(version);
@@ -436,7 +441,7 @@ public class VersionRevisionService {
                 false,
                 QueryWrapper.create()
                         .where(DOCUMENT_VERSION_ENTITY.ID.eq(version.getId()))
-                        .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("DRAFT"))
+                        .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.DRAFT))
                         .and(DOCUMENT_VERSION_ENTITY.DRAFT_REVISION.eq(expectedRevision)));
         if (updated != 1) {
             throw new ApiException(HttpStatus.CONFLICT, "DRAFT_REVISION_CONFLICT", "草稿已被其他操作更新，请刷新后再试。");
@@ -476,25 +481,17 @@ public class VersionRevisionService {
         catch (NumberFormatException exception) { throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", "内容块游标不合法。"); }
     }
 
-    private static String requiredBlockType(String value) {
-        if (value == null || value.isBlank()) {
+    private static BlockType requiredBlockType(BlockType value) {
+        if (value == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "内容块类型不能为空。");
         }
-        var blockType = value.trim().toLowerCase(Locale.ROOT);
-        if (!BLOCK_TYPES.contains(blockType)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BLOCK_TYPE_INVALID", "不支持的内容块类型：" + value);
-        }
-        return blockType;
+        return value;
     }
-    private static String requiredNodeType(String value) {
-        if (value == null || value.isBlank()) {
+    private static NodeType requiredNodeType(NodeType value) {
+        if (value == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "节点类型不能为空。");
         }
-        var nodeType = value.trim().toUpperCase(Locale.ROOT);
-        if (!NODE_TYPES.contains(nodeType)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "NODE_TYPE_INVALID", "不支持的节点类型：" + value);
-        }
-        return nodeType;
+        return value;
     }
     private DocumentPackage packageFor(DocumentVersionEntity version) {
         var document = requireDocument(uuid(version.getDocumentId()));
@@ -503,7 +500,7 @@ public class VersionRevisionService {
                 .from(CONTENT_NODE_ENTITY)
                 .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.getId()))
                 .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
-        var nodeKeys = nodes.stream().collect(java.util.stream.Collectors.toMap(node -> node.getId(), node -> node.getNodeKey()));
+        var nodeKeys = nodes.stream().collect(java.util.stream.Collectors.toMap(ContentNodeEntity::getId, ContentNodeEntity::getNodeKey));
         var sections = nodes.stream().map(node -> new DocumentPackage.SectionInfo(
                 node.getNodeKey(), node.getParentId() == null ? null : nodeKeys.get(node.getParentId()), node.getLevel(), node.getNodeType(),
                 node.getSemanticRole(), node.getTitle(), node.getSortOrder(), node.getAnchor(), node.getSourcePageStart(), node.getSourcePageEnd(),
@@ -548,8 +545,8 @@ public class VersionRevisionService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Unknown parent section: " + section.parentSectionKey());
             }
             node.setNodeKey(section.sectionKey());
-            node.setNodeType(section.nodeType().toUpperCase(Locale.ROOT));
-            node.setSemanticRole(blankToNull(section.semanticRole()));
+            node.setNodeType(section.nodeType());
+            node.setSemanticRole(section.semanticRole());
             node.setTitle(section.title());
             node.setLevel(section.level());
             node.setSortOrder(section.sortOrder());
@@ -601,7 +598,7 @@ public class VersionRevisionService {
         }
     }
 
-    private void resetImportJobs(String versionId, String currentStage) {
+    private void resetImportJobs(String versionId, ImportStage currentStage) {
         var jobs = importJobMapper.selectListByQuery(QueryWrapper.create()
                 .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
                 .from(IMPORT_JOB_ENTITY)
@@ -609,7 +606,7 @@ public class VersionRevisionService {
         for (var job : jobs) {
             var update = UpdateWrapper.of(ImportJobEntity.class)
                     .set(IMPORT_JOB_ENTITY.RESULT_VERSION_ID, null)
-                    .set(IMPORT_JOB_ENTITY.STATUS, "READY")
+                    .set(IMPORT_JOB_ENTITY.STATUS, ImportJobStatus.READY)
                     .set(IMPORT_JOB_ENTITY.CURRENT_STAGE, currentStage)
                     .set(IMPORT_JOB_ENTITY.ERROR_CODE, null)
                     .set(IMPORT_JOB_ENTITY.ERROR_MESSAGE, null);
@@ -641,7 +638,12 @@ public class VersionRevisionService {
     }
 
     private DocumentEntity requireDocumentForUpdate(UUID documentId) {
-        var document = documentMapper.selectOwnedForUpdate(id(documentId), LOCAL_USER_ID);
+        var document = documentMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.ID.eq(id(documentId)))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .forUpdate());
         if (document == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
         }
@@ -660,7 +662,7 @@ public class VersionRevisionService {
     private DocumentVersionEntity requireDraft(UUID versionId) {
         var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create().select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS).from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(versionId))));
-        if (version == null || !"DRAFT".equals(version.getStatus())) {
+        if (version == null || version.getStatus() != DocumentVersionStatus.DRAFT) {
             throw new ApiException(HttpStatus.CONFLICT, "Only draft versions can be edited");
         }
         DocumentLifecycleService.rejectLocked(requireDocument(uuid(version.getDocumentId())));
@@ -669,7 +671,13 @@ public class VersionRevisionService {
 
     private int nextVersionNo(String documentId) {
         // createRevision 已锁定所属文档行，同一文档的版本号分配因此会按事务串行执行。
-        return documentVersionMapper.selectMaxVersionNo(documentId) + 1;
+        var latest = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_VERSION_ENTITY.VERSION_NO)
+                .from(DOCUMENT_VERSION_ENTITY)
+                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(documentId))
+                .orderBy(DOCUMENT_VERSION_ENTITY.VERSION_NO.desc())
+                .limit(1));
+        return latest == null ? 1 : latest.getVersionNo() + 1;
     }
 
     private void touchDocument(String documentId) {
@@ -678,16 +686,24 @@ public class VersionRevisionService {
         documentMapper.update(document);
     }
 
+    private DocumentDeletionJobEntity deleteJob(String documentId) {
+        return deletionJobMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_DELETION_JOB_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_DELETION_JOB_ENTITY)
+                .where(DOCUMENT_DELETION_JOB_ENTITY.DOCUMENT_ID.eq(documentId))
+                .and(DOCUMENT_DELETION_JOB_ENTITY.OWNER_ID.eq(LOCAL_USER_ID)));
+    }
+
     private ManagementDtos.AdminDocumentSummary documentSummary(DocumentEntity document, List<DocumentVersionEntity> versions, DocumentDeletionJobEntity deletionJob) {
         return new ManagementDtos.AdminDocumentSummary(
-                uuid(document.getId()), document.getCode(), document.getTitle(), document.getStatus(), uuid(document.getCurrentVersionId()),
-                versions.size(), versions.stream().filter(version -> "DRAFT".equals(version.getStatus())).count(), document.getUpdatedAt(),
+                uuid(document.getId()), document.getCode(), document.getTitle(), document.getStatus().getCode(), uuid(document.getCurrentVersionId()),
+                versions.size(), versions.stream().filter(version -> version.getStatus() == DocumentVersionStatus.DRAFT).count(), document.getUpdatedAt(),
                 deletionJob == null ? null : DocumentLifecycleService.summary(deletionJob));
     }
 
     private ManagementDtos.VersionSummary summary(DocumentVersionEntity version) {
         return new ManagementDtos.VersionSummary(uuid(version.getId()), version.getVersionNo(), uuid(version.getParentVersionId()), version.getParentVersionNo(), uuid(version.getOriginImportJobId()),
-                version.getSourceType(), version.getSourceFileName(), version.getStatus(), version.getDraftRevision(), version.getPublishedAt(), version.getCreatedAt());
+                version.getSourceType(), version.getSourceFileName(), version.getStatus().getCode(), version.getDraftRevision(), version.getPublishedAt(), version.getCreatedAt());
     }
 
     private JsonNode tree(String value) {

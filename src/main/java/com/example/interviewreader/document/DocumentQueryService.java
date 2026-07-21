@@ -46,7 +46,7 @@ public class DocumentQueryService {
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"));
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED));
         if (!normalizedQuery.isBlank()) {
             wrapper.and(DOCUMENT_ENTITY.TITLE.like(normalizedQuery)
                     .or(DOCUMENT_ENTITY.CODE.like(normalizedQuery)));
@@ -62,7 +62,7 @@ public class DocumentQueryService {
         var hasNext = documents.size() > safeLimit;
         var pageItems = hasNext ? documents.subList(0, safeLimit) : documents;
         var nextCursor = hasNext ? encodeDocumentCursor(pageItems.getLast()) : null;
-        var progressByDocument = progressByDocument(pageItems.stream().map(document -> document.getId()).toList());
+        var progressByDocument = progressByDocument(pageItems.stream().map(DocumentEntity::getId).toList());
         return new DocumentPage(pageItems.stream()
                 .map(document -> mapDocumentSummary(document, progressByDocument.get(document.getId())))
                 .toList(), nextCursor);
@@ -73,7 +73,7 @@ public class DocumentQueryService {
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
                 .and(DOCUMENT_ENTITY.ID.eq(id(documentId))));
         if (document == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
@@ -85,7 +85,7 @@ public class DocumentQueryService {
     public void publish(UUID documentId, UUID versionId) {
         var targetDocument = documentMapper.selectOneById(id(documentId));
         if (targetDocument == null) throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
-        if ("DELETING".equals(targetDocument.getStatus()) || "DELETE_FAILED".equals(targetDocument.getStatus())) {
+        if (DocumentStatus.isDeletionLocked(targetDocument.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
         }
         var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
@@ -96,23 +96,23 @@ public class DocumentQueryService {
         if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Version not found");
         }
-        if (!"DRAFT".equals(version.getStatus())) {
+        if (version.getStatus() != DocumentVersionStatus.DRAFT) {
             throw new ApiException(HttpStatus.CONFLICT, "Only a draft version can be published");
         }
         var previousVersionId = previousPublishedVersionId(documentId, versionId);
         var now = OffsetDateTime.now();
         for (var published : publishedVersions(documentId)) {
             if (!published.getId().equals(id(versionId))) {
-                published.setStatus("RETIRED");
+                published.setStatus(DocumentVersionStatus.RETIRED);
                 documentVersionMapper.update(published);
             }
         }
-        version.setStatus("PUBLISHED");
+        version.setStatus(DocumentVersionStatus.PUBLISHED);
         version.setPublishedAt(now);
         documentVersionMapper.update(version);
 
         {
-            targetDocument.setStatus("PUBLISHED");
+            targetDocument.setStatus(DocumentStatus.PUBLISHED);
             targetDocument.setCurrentVersionId(id(versionId));
             targetDocument.setUpdatedAt(now);
             documentMapper.update(targetDocument);
@@ -183,8 +183,8 @@ public class DocumentQueryService {
                 .innerJoin(DOCUMENT_VERSION_ENTITY).on(CONTENT_NODE_ENTITY.VERSION_ID.eq(DOCUMENT_VERSION_ENTITY.ID))
                 .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
                 .where(CONTENT_BLOCK_ENTITY.PLAIN_TEXT.like(needle))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED"))
-                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED))
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .orderBy(CONTENT_BLOCK_ENTITY.VERSION_ID.asc(), CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc())
                 .limit(searchLimit);
@@ -194,8 +194,8 @@ public class DocumentQueryService {
                 .innerJoin(DOCUMENT_VERSION_ENTITY).on(CONTENT_NODE_ENTITY.VERSION_ID.eq(DOCUMENT_VERSION_ENTITY.ID))
                 .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
                 .where(CONTENT_NODE_ENTITY.TITLE.like(needle))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED"))
-                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED))
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .orderBy(CONTENT_NODE_ENTITY.PATH.asc())
                 .limit(searchLimit);
@@ -207,18 +207,18 @@ public class DocumentQueryService {
         var titleMatchedNodes = contentNodeMapper.selectListByQuery(nodeQuery);
 
         var nodeIds = new ArrayList<String>();
-        matchedBlocks.stream().map(block -> block.getNodeId()).distinct().forEach(nodeIds::add);
-        titleMatchedNodes.stream().map(node -> node.getId()).filter(id -> !nodeIds.contains(id)).forEach(nodeIds::add);
+        matchedBlocks.stream().map(ContentBlockEntity::getNodeId).distinct().forEach(nodeIds::add);
+        titleMatchedNodes.stream().map(ContentNodeEntity::getId).filter(id -> !nodeIds.contains(id)).forEach(nodeIds::add);
         if (nodeIds.isEmpty()) {
             return List.of();
         }
 
         var nodesById = nodesById(nodeIds);
         var bodyMatchedNodeIds = matchedBlocks.stream()
-                .map(block -> block.getNodeId())
+                .map(ContentBlockEntity::getNodeId)
                 .collect(java.util.stream.Collectors.toSet());
         var missingTitleBlockNodeIds = titleMatchedNodes.stream()
-                .map(node -> node.getId())
+                .map(ContentNodeEntity::getId)
                 .filter(nodeId -> !bodyMatchedNodeIds.contains(nodeId))
                 .toList();
         if (!missingTitleBlockNodeIds.isEmpty()) {
@@ -226,9 +226,9 @@ public class DocumentQueryService {
             matchedBlocks.addAll(firstBlocksInNodes(missingTitleBlockNodeIds));
         }
 
-        var versionIds = nodesById.values().stream().map(node -> node.getVersionId()).distinct().toList();
+        var versionIds = nodesById.values().stream().map(ContentNodeEntity::getVersionId).distinct().toList();
         var versionsById = versionsById(versionIds);
-        var documentIds = versionsById.values().stream().map(version -> version.getDocumentId()).distinct().toList();
+        var documentIds = versionsById.values().stream().map(DocumentVersionEntity::getDocumentId).distinct().toList();
         var documentsById = documentsById(documentIds);
 
         var hits = new ArrayList<SearchHit>();
@@ -298,7 +298,7 @@ public class DocumentQueryService {
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.ID.in(versionIds))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
         var result = new LinkedHashMap<String, DocumentVersionEntity>();
         rows.forEach(row -> result.put(row.getId(), row));
         return result;
@@ -313,7 +313,7 @@ public class DocumentQueryService {
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.ID.in(documentIds))
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED")));
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED)));
         var result = new LinkedHashMap<String, DocumentEntity>();
         rows.forEach(row -> result.put(row.getId(), row));
         return result;
@@ -326,7 +326,12 @@ public class DocumentQueryService {
 
     @Transactional
     public ReadingProgress upsertProgress(UUID documentId, ReadingProgress progress) {
-        var document = documentMapper.selectOwnedForUpdate(id(documentId), LOCAL_USER_ID);
+        var document = documentMapper.selectOneByQuery(QueryWrapper.create()
+                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .from(DOCUMENT_ENTITY)
+                .where(DOCUMENT_ENTITY.ID.eq(id(documentId)))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .forUpdate());
         if (document == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
         }
@@ -375,9 +380,9 @@ public class DocumentQueryService {
                 .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
                 .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(progress.versionId())))
                 .and(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED"))
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED))
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .and(DOCUMENT_ENTITY.STATUS.eq("PUBLISHED")));
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED)));
         if (version == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "READING_VERSION_INVALID", "阅读版本不属于目标文档或尚未发布。");
         }
@@ -429,7 +434,7 @@ public class DocumentQueryService {
                 .select(DOCUMENT_VERSION_ENTITY.ID)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(versionId)))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
         if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Published version not found");
         }
@@ -440,12 +445,12 @@ public class DocumentQueryService {
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
         return versions.stream()
                 .filter(version -> !version.getId().equals(id(nextVersionId)))
                 .max(Comparator
-                        .comparing((DocumentVersionEntity version) -> version.getPublishedAt(), Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparingInt(version -> version.getVersionNo()))
+                        .comparing(DocumentVersionEntity::getPublishedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparingInt(DocumentVersionEntity::getVersionNo))
                 .map(version -> uuid(version.getId()))
                 .orElse(null);
     }
@@ -455,7 +460,7 @@ public class DocumentQueryService {
                 .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq("PUBLISHED")));
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
     }
 
     private void migrateReadingProgress(UUID documentId, UUID previousVersionId, UUID nextVersionId) {
@@ -620,8 +625,8 @@ public class DocumentQueryService {
         private final String parentId;
         private final String title;
         private final int level;
-        private final String nodeType;
-        private final String semanticRole;
+        private final NodeType nodeType;
+        private final SemanticRole semanticRole;
         private final String anchor;
         private final Integer sourcePageStart;
         private final int sortOrder;
@@ -632,8 +637,8 @@ public class DocumentQueryService {
                 String parentId,
                 String title,
                 int level,
-                String nodeType,
-                String semanticRole,
+                NodeType nodeType,
+                SemanticRole semanticRole,
                 String anchor,
                 Integer sourcePageStart,
                 int sortOrder

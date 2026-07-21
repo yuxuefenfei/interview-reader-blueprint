@@ -1,6 +1,6 @@
 package com.example.interviewreader.management;
 
-import com.example.interviewreader.persistence.mapper.DocumentDeletionJobMapper;
+import com.example.interviewreader.persistence.DocumentDeletionPersistence;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
@@ -22,14 +22,14 @@ public class DocumentDeletionWorker {
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final Map<UUID, Future<?>> futures = new ConcurrentHashMap<>();
     private final DocumentDeletionProcessor processor;
-    private final DocumentDeletionJobMapper jobMapper;
+    private final DocumentDeletionPersistence deletionPersistence;
 
     public DocumentDeletionWorker(DocumentDeletionProperties properties, DocumentDeletionProcessor processor,
-                                  DocumentDeletionJobMapper jobMapper, MeterRegistry meterRegistry) {
+                                  DocumentDeletionPersistence deletionPersistence, MeterRegistry meterRegistry) {
         this.enabled = properties.workerEnabled();
         this.permits = new Semaphore(properties.maxConcurrency());
         this.processor = processor;
-        this.jobMapper = jobMapper;
+        this.deletionPersistence = deletionPersistence;
         Gauge.builder("interview.reader.deletion.jobs.submitted", futures, Map::size)
                 .description("已提交且尚未结束的永久删除任务数")
                 .register(meterRegistry);
@@ -40,7 +40,7 @@ public class DocumentDeletionWorker {
 
     @EventListener(ApplicationReadyEvent.class)
     public void resumeDurableJobs() {
-        jobMapper.selectRecoverable().forEach(job -> submit(UUID.fromString(job.getId())));
+        deletionPersistence.findRecoverableJobs().forEach(job -> submit(UUID.fromString(job.getId())));
     }
 
     public void submit(UUID jobId) {

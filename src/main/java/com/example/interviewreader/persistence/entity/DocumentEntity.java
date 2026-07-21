@@ -1,5 +1,6 @@
 package com.example.interviewreader.persistence.entity;
 
+import com.example.interviewreader.document.DocumentStatus;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
@@ -23,7 +24,7 @@ public class DocumentEntity {
     private String description;
     /** 文档级资料的乐观锁版本，不随内容版本编辑而变化。 */
     private long metadataRevision;
-    private String status;
+    private DocumentStatus status;
     private String currentVersionId;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

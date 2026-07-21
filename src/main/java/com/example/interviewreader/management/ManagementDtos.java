@@ -1,5 +1,9 @@
 package com.example.interviewreader.management;
 
+import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.NodeType;
+import com.example.interviewreader.document.SemanticRole;
+import com.example.interviewreader.document.SourceType;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.OffsetDateTime;
@@ -33,7 +37,7 @@ public final class ManagementDtos {
     }
     public record VersionSummary(
             UUID id, int versionNo, UUID parentVersionId, Integer parentVersionNo, UUID originImportJobId,
-            String sourceType, String sourceFileName, String status, long draftRevision,
+            SourceType sourceType, String sourceFileName, String status, long draftRevision,
             OffsetDateTime publishedAt, OffsetDateTime createdAt
     ) {
     }
@@ -52,7 +56,7 @@ public final class ManagementDtos {
     }
 
     public record EditorNode(
-            UUID id, UUID parentId, String nodeKey, String nodeType, String semanticRole,
+            UUID id, UUID parentId, String nodeKey, NodeType nodeType, SemanticRole semanticRole,
             String title, int level, int sortOrder, String anchor, Integer sourcePageStart, Integer sourcePageEnd
     ) {
     }
@@ -61,12 +65,12 @@ public final class ManagementDtos {
     }
 
     public record EditorBlock(
-            UUID id, String blockKey, int seq, String blockType, JsonNode payload,
+            UUID id, String blockKey, int seq, BlockType blockType, JsonNode payload,
             String plainText, String language, Integer sourcePage, JsonNode sourceBbox, Double confidence
     ) {
     }
 
-    public record UpdateNodeRequest(long draftRevision, String title, String nodeType, String semanticRole, String anchor) {
+    public record UpdateNodeRequest(long draftRevision, String title, NodeType nodeType, SemanticRole semanticRole, String anchor) {
     }
 
     public record StructureUpdateRequest(long draftRevision, List<StructureNode> nodes) {
@@ -75,10 +79,10 @@ public final class ManagementDtos {
     public record StructureNode(UUID id, UUID parentId, int sortOrder) {
     }
 
-    public record CreateBlockRequest(long draftRevision, String blockType, JsonNode payload, String plainText, String language) {
+    public record CreateBlockRequest(long draftRevision, BlockType blockType, JsonNode payload, String plainText, String language) {
     }
 
-    public record UpdateBlockRequest(long draftRevision, String blockType, JsonNode payload, String plainText, String language) {
+    public record UpdateBlockRequest(long draftRevision, BlockType blockType, JsonNode payload, String plainText, String language) {
     }
 
     public record BlockCleanupRequest(long draftRevision) {

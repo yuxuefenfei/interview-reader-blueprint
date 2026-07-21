@@ -2,9 +2,14 @@ package com.example.interviewreader.pdfpkg;
 
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.Hashes;
+import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.NodeType;
+import com.example.interviewreader.document.SemanticRole;
+import com.example.interviewreader.document.SourceType;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.importpkg.ImportDocumentNaming;
 import com.example.interviewreader.importpkg.ImportIssueDto;
+import com.example.interviewreader.importpkg.ImportIssueSeverity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +30,7 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -43,25 +49,25 @@ public class PdfPackageService {
 
     public PdfParseResult parse(byte[] fileBytes, String sourceFileName, String sourceSha256, String converterVersion) {
         if (!looksLikePdf(fileBytes)) {
-            return new PdfParseResult(null, List.of(issue("BLOCKING", "PDF_MAGIC_INVALID", "Uploaded file is not a PDF")), null);
+            return new PdfParseResult(null, List.of(issue(ImportIssueSeverity.BLOCKING, "PDF_MAGIC_INVALID", "Uploaded file is not a PDF")), null);
         }
         try (var document = Loader.loadPDF(fileBytes)) {
             if (document.isEncrypted()) {
-                return new PdfParseResult(null, List.of(issue("BLOCKING", "PDF_ENCRYPTED", "Encrypted PDF is not supported")), null);
+                return new PdfParseResult(null, List.of(issue(ImportIssueSeverity.BLOCKING, "PDF_ENCRYPTED", "Encrypted PDF is not supported")), null);
             }
             var pageCount = document.getNumberOfPages();
             if (pageCount < 1) {
-                return new PdfParseResult(null, List.of(issue("BLOCKING", "PDF_EMPTY", "PDF has no pages")), null);
+                return new PdfParseResult(null, List.of(issue(ImportIssueSeverity.BLOCKING, "PDF_EMPTY", "PDF has no pages")), null);
             }
             if (pageCount > MAX_PAGES) {
-                return new PdfParseResult(null, List.of(issue("BLOCKING", "PDF_TOO_MANY_PAGES", "PDF page count exceeds " + MAX_PAGES)), null);
+                return new PdfParseResult(null, List.of(issue(ImportIssueSeverity.BLOCKING, "PDF_TOO_MANY_PAGES", "PDF page count exceeds " + MAX_PAGES)), null);
             }
 
             var issues = new ArrayList<ImportIssueDto>();
             var outlineSections = outlineSections(document);
             var hasOutline = !outlineSections.isEmpty();
             if (outlineSections.isEmpty()) {
-                issues.add(issue("WARNING", "PDF_OUTLINE_MISSING", "PDF has no outline; imported as a single document section"));
+                issues.add(issue(ImportIssueSeverity.WARNING, "PDF_OUTLINE_MISSING", "PDF has no outline; imported as a single document section"));
                 outlineSections = List.of(new OutlineSection(
                         "s0001-" + slug(baseName(sourceFileName)),
                         null,
@@ -74,7 +80,7 @@ public class PdfPackageService {
             var sections = buildSections(outlineSections, pageCount);
             var blocks = buildBlocks(document, outlineSections, pageCount, issues);
             if (blocks.isEmpty()) {
-                issues.add(issue("BLOCKING", "PDF_TEXT_EMPTY", "PDF text layer did not produce readable content"));
+                issues.add(issue(ImportIssueSeverity.BLOCKING, "PDF_TEXT_EMPTY", "PDF text layer did not produce readable content"));
             }
             var rawExtraction = rawExtraction(document, sourceFileName, sourceSha256, classification, outlineSections, blocks, issues);
 
@@ -88,7 +94,7 @@ public class PdfPackageService {
                             List.of("PDF")),
                     new DocumentPackage.VersionInfo(
                             sourceSha256.substring(0, 12),
-                            "PDF",
+                            SourceType.PDF,
                             sourceFileName,
                             sourceSha256,
                             converterVersion,
@@ -234,7 +240,7 @@ public class PdfPackageService {
             var candidates = candidatesBySection.get(section.sectionKey());
             if (candidates.isEmpty()) {
                 issues.add(new ImportIssueDto(
-                        "WARNING",
+                        ImportIssueSeverity.WARNING,
                         "PDF_SECTION_EMPTY",
                         "No readable text extracted for PDF section",
                         section.pageStart(),
@@ -258,9 +264,9 @@ public class PdfPackageService {
                         pageBbox(candidate),
                         confidence(candidate),
                         Hashes.sha256(plainText)));
-                if ("table_snapshot".equals(candidate.blockType())) {
+                if (candidate.blockType() == BlockType.TABLE_SNAPSHOT) {
                     issues.add(new ImportIssueDto(
-                            "WARNING",
+                            ImportIssueSeverity.WARNING,
                             "PDF_TABLE_REVIEW_REQUIRED",
                             "Possible PDF table was preserved as a low-confidence snapshot for manual review",
                             candidate.pageNumber(),
@@ -314,7 +320,7 @@ public class PdfPackageService {
             var covered = text.isBlank() || blockCount > 0;
             if (!covered) {
                 issues.add(new ImportIssueDto(
-                        "WARNING",
+                        ImportIssueSeverity.WARNING,
                         "PDF_PAGE_TEXT_UNMAPPED",
                         "PDF page has text but no normalized content block",
                         page,
@@ -424,7 +430,7 @@ public class PdfPackageService {
         var paragraph = new StringBuilder();
         var code = new StringBuilder();
         var listItems = new ArrayList<String>();
-        var listType = "unordered_list";
+        var listType = BlockType.UNORDERED_LIST;
         var tableLines = new ArrayList<String>();
         for (var rawLine : text.lines().toList()) {
             var rawText = rawLine.stripTrailing();
@@ -478,7 +484,7 @@ public class PdfPackageService {
                 flushParagraph(result, paragraph, pageNumber, mediaBox);
                 flushCode(result, code, pageNumber, mediaBox);
                 flushTableSnapshot(result, tableLines, pageNumber, mediaBox);
-                var nextListType = isOrderedListLine(line) ? "ordered_list" : "unordered_list";
+                var nextListType = isOrderedListLine(line) ? BlockType.ORDERED_LIST : BlockType.UNORDERED_LIST;
                 if (!listItems.isEmpty() && !listType.equals(nextListType)) {
                     flushList(result, listItems, listType, pageNumber, mediaBox);
                 }
@@ -531,7 +537,7 @@ public class PdfPackageService {
         var text = paragraph.toString().strip();
         paragraph.setLength(0);
         if (text.length() > 1) {
-            result.add(new PdfBlockCandidate("paragraph", text, List.of(), null, pageNumber, mediaBox, null));
+            result.add(new PdfBlockCandidate(BlockType.PARAGRAPH, text, List.of(), null, pageNumber, mediaBox, null));
         }
     }
 
@@ -542,11 +548,11 @@ public class PdfPackageService {
         var text = trimCode(code.toString());
         code.setLength(0);
         if (text.length() > 1) {
-            result.add(new PdfBlockCandidate("code", text, List.of(), inferLanguage(text), pageNumber, mediaBox, null));
+            result.add(new PdfBlockCandidate(BlockType.CODE, text, List.of(), inferLanguage(text), pageNumber, mediaBox, null));
         }
     }
 
-    private void flushList(List<PdfBlockCandidate> result, List<String> items, String blockType, int pageNumber, PDRectangle mediaBox) {
+    private void flushList(List<PdfBlockCandidate> result, List<String> items, BlockType blockType, int pageNumber, PDRectangle mediaBox) {
         if (items.isEmpty()) {
             return;
         }
@@ -560,27 +566,27 @@ public class PdfPackageService {
         }
         var text = String.join("\n", lines);
         if (lines.size() >= 2) {
-            result.add(new PdfBlockCandidate("table_snapshot", text, List.copyOf(lines), null, pageNumber, mediaBox, null));
+            result.add(new PdfBlockCandidate(BlockType.TABLE_SNAPSHOT, text, List.copyOf(lines), null, pageNumber, mediaBox, null));
         } else {
-            result.add(new PdfBlockCandidate("paragraph", text, List.of(), null, pageNumber, mediaBox, null));
+            result.add(new PdfBlockCandidate(BlockType.PARAGRAPH, text, List.of(), null, pageNumber, mediaBox, null));
         }
         lines.clear();
     }
 
-    private String nodeType(OutlineSection section) {
+    private NodeType nodeType(OutlineSection section) {
         if (section.level() == 1 && (section.title().contains("?") || section.title().contains("？"))) {
-            return "QUESTION";
+            return NodeType.QUESTION;
         }
         return switch (section.level()) {
-            case 1 -> "CHAPTER";
-            case 2 -> "SECTION";
-            case 3 -> "SUBSECTION";
-            default -> "OTHER";
+            case 1 -> NodeType.CHAPTER;
+            case 2 -> NodeType.SECTION;
+            case 3 -> NodeType.SUBSECTION;
+            default -> NodeType.OTHER;
         };
     }
 
-    private String semanticRole(OutlineSection section) {
-        return section.title().contains("?") || section.title().contains("？") ? "QUESTION" : null;
+    private SemanticRole semanticRole(OutlineSection section) {
+        return section.title().contains("?") || section.title().contains("？") ? SemanticRole.QUESTION : null;
     }
 
     private JsonNode textPayload(String text) {
@@ -589,11 +595,11 @@ public class PdfPackageService {
 
     private JsonNode payload(PdfBlockCandidate candidate) {
         return switch (candidate.blockType()) {
-            case "unordered_list", "ordered_list" -> objectMapper.valueToTree(Map.of("items", candidate.items()));
-            case "code" -> objectMapper.valueToTree(Map.of(
+            case UNORDERED_LIST, ORDERED_LIST -> objectMapper.valueToTree(Map.of("items", candidate.items()));
+            case CODE -> objectMapper.valueToTree(Map.of(
                     "language", candidate.language() == null ? "text" : candidate.language(),
                     "text", candidate.text()));
-            case "table_snapshot" -> objectMapper.valueToTree(Map.of(
+            case TABLE_SNAPSHOT -> objectMapper.valueToTree(Map.of(
                     "lines", candidate.items(),
                     "text", candidate.text()));
             default -> textPayload(candidate.text());
@@ -602,8 +608,8 @@ public class PdfPackageService {
 
     private BigDecimal confidence(PdfBlockCandidate candidate) {
         return switch (candidate.blockType()) {
-            case "paragraph" -> PDF_TEXT_CONFIDENCE;
-            case "table_snapshot" -> PDF_TABLE_SNAPSHOT_CONFIDENCE;
+            case PARAGRAPH -> PDF_TEXT_CONFIDENCE;
+            case TABLE_SNAPSHOT -> PDF_TABLE_SNAPSHOT_CONFIDENCE;
             default -> PDF_HEURISTIC_CONFIDENCE;
         };
     }
@@ -626,7 +632,7 @@ public class PdfPackageService {
                 "height", bounds.height()));
     }
 
-    private ImportIssueDto issue(String severity, String code, String message) {
+    private ImportIssueDto issue(ImportIssueSeverity severity, String code, String message) {
         return new ImportIssueDto(severity, code, message, null, null, null);
     }
 
@@ -693,7 +699,7 @@ public class PdfPackageService {
             return false;
         }
         var cells = line.split("\\s{2,}");
-        return cells.length >= 2 && List.of(cells).stream().allMatch(cell -> !cell.isBlank() && cell.length() <= 80);
+        return cells.length >= 2 && Stream.of(cells).allMatch(cell -> !cell.isBlank() && cell.length() <= 80);
     }
 
     private static boolean isCodeLine(String rawText, String line) {
@@ -757,7 +763,7 @@ public class PdfPackageService {
         }
         var heading = rawText.substring(0, annotationStart).strip();
         var annotation = rawText.substring(annotationStart).strip();
-        if (heading.isBlank() || !heading.chars().anyMatch(value -> isCjk((char) value)) || !annotation.matches("^@[A-Za-z][\\w.]*.*")) {
+        if (heading.isBlank() || heading.chars().noneMatch(value -> isCjk((char) value)) || !annotation.matches("^@[A-Za-z][\\w.]*.*")) {
             return null;
         }
         return new HeadingAnnotationSplit(heading, annotation);
@@ -873,7 +879,7 @@ public class PdfPackageService {
     }
 
     private record PdfBlockCandidate(
-            String blockType,
+            BlockType blockType,
             String text,
             List<String> items,
             String language,
@@ -882,7 +888,7 @@ public class PdfPackageService {
             BlockBounds bounds
     ) {
         private String plainText() {
-            return "unordered_list".equals(blockType) || "ordered_list".equals(blockType)
+            return blockType == BlockType.UNORDERED_LIST || blockType == BlockType.ORDERED_LIST
                     ? String.join("\n", items)
                     : text;
         }

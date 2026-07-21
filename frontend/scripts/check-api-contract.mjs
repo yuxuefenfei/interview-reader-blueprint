@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { parse } from "yaml";
+import {fileURLToPath} from "node:url";
+import {parse} from "yaml";
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = path.resolve(frontendRoot, "..");
@@ -44,9 +44,16 @@ if (!document.components?.schemas?.Problem) failures.push("Problem schema is mis
 const tsSource = fs.readFileSync(path.join(frontendRoot, "src", "types", "api.ts"), "utf8");
 const javaContract = fs.readFileSync(path.join(javaRoot, "com", "example", "interviewreader", "document", "ApiContractValues.java"), "utf8");
 for (const [constantName, schemaName] of [
-  ["SOURCE_TYPES", "SourceType"], ["NODE_TYPES", "NodeType"], ["BLOCK_TYPES", "BlockType"],
-  ["SEMANTIC_ROLES", "SemanticRole"], ["VERSION_STATUSES", "VersionStatus"],
-  ["IMPORT_STATUSES", "ImportStatus"], ["IMPORT_STAGES", "ImportStage"], ["IMPORT_RESOLUTIONS", "ImportResolution"]
+  ["SOURCE_TYPES", "SourceType"],
+  ["NODE_TYPES", "NodeType"],
+  ["BLOCK_TYPES", "BlockType"],
+  ["SEMANTIC_ROLES", "SemanticRole"],
+  ["MASTERY_STATES", "MasteryState"],
+  ["VERSION_STATUSES", "VersionStatus"],
+  ["IMPORT_STATUSES", "ImportStatus"],
+  ["IMPORT_STAGES", "ImportStage"],
+  ["IMPORT_RESOLUTIONS", "ImportResolution"],
+  ["IMPORT_ISSUE_SEVERITIES", "ImportIssueSeverity"]
 ]) {
   const schemaValues = new Set(document.components.schemas[schemaName]?.enum ?? []);
   compareSets(`frontend ${constantName}`, new Set(readTsArray(tsSource, constantName)), `OpenAPI ${schemaName}`, schemaValues);
@@ -149,9 +156,27 @@ function readTsArray(source, name) {
   return [...body.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
 }
 function readJavaSet(source, name) {
-  const body = source.match(new RegExp(`${name} = Set\\.of\\(([\\s\\S]*?)\\);`))?.[1];
-  if (!body) throw new Error(`Cannot read Java constant ${name}`);
-  return [...body.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  const assignmentStart = source.indexOf(`${name} =`);
+  const assignmentEnd = source.indexOf(";", assignmentStart);
+  if (assignmentStart < 0 || assignmentEnd < 0) throw new Error(`Cannot read Java constant ${name}`);
+  const assignment = source.slice(assignmentStart, assignmentEnd + 1);
+  const literalValues = [...assignment.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  if (literalValues.length) return literalValues;
+
+  const enumName = assignment.match(/=\s*(\w+)\.codes\(\)/)?.[1];
+  if (!enumName) throw new Error(`Cannot read Java constant ${name}`);
+  const enumFile = walk(javaRoot).find((candidate) => candidate.endsWith(`${path.sep}${enumName}.java`));
+  if (!enumFile) throw new Error(`Cannot find Java enum ${enumName}`);
+  const enumSource = fs.readFileSync(enumFile, "utf8");
+  const enumStart = enumSource.indexOf(`enum ${enumName}`);
+  const constantsStart = enumSource.indexOf("{", enumStart) + 1;
+  const constantsEnd = enumSource.indexOf(";", constantsStart);
+  if (enumStart < 0 || constantsStart <= 0 || constantsEnd < 0) throw new Error(`Cannot read Java enum ${enumName}`);
+  return enumSource.slice(constantsStart, constantsEnd)
+      .split(/\r?\n/)
+      .map((line) => line.match(/^\s*([A-Z][A-Z0-9_]*)\s*(?:\(\s*"([^"]+)"[^)]*\))?\s*,?\s*$/))
+      .filter(Boolean)
+      .map((match) => match[2] ?? match[1]);
 }
 function readTsInterface(source, name) {
   const body = source.match(new RegExp(`export interface ${name} \\{([^}]*)\\}`))?.[1];

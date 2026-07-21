@@ -1,4 +1,7 @@
 package com.example.interviewreader.persistence.entity;
+import com.example.interviewreader.document.SourceType;
+import com.example.interviewreader.importpkg.ImportJobStatus;
+import com.example.interviewreader.importpkg.ImportStage;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,14 +20,14 @@ public class ImportJobEntity {
     private String id;
     private String ownerId;
     private String targetDocumentId;
-    private String sourceType;
+    private SourceType sourceType;
     private String sourceObjectKey;
     private String sourceSha256;
     private String converterVersion;
     private String importFingerprint;
-    private String status;
+    private ImportJobStatus status;
     private int progress;
-    private String currentStage;
+    private ImportStage currentStage;
     private String resultVersionId;
     private String errorCode;
     @Column(isLarge = true)

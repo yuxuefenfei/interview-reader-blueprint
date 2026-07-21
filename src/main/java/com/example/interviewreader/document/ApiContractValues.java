@@ -1,24 +1,25 @@
 package com.example.interviewreader.document;
 
+import com.example.interviewreader.importpkg.ImportJobStatus;
+import com.example.interviewreader.importpkg.ImportIssueSeverity;
+import com.example.interviewreader.importpkg.ImportResolution;
+import com.example.interviewreader.importpkg.ImportStage;
+
 import java.util.Set;
 
 public final class ApiContractValues {
-    public static final Set<String> SOURCE_TYPES = Set.of("PDF", "EXCEL", "JSON_PACKAGE", "MARKDOWN", "MANUAL");
-    public static final Set<String> NODE_TYPES = Set.of("PART", "CHAPTER", "SECTION", "SUBSECTION", "QUESTION", "APPENDIX", "OTHER");
-    public static final Set<String> BLOCK_TYPES = Set.of(
-            "paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table",
-            "quote", "callout", "formula", "image", "divider", "table_snapshot");
-    public static final Set<String> VERSION_STATUSES = Set.of("DRAFT", "PUBLISHED", "RETIRED");
-    public static final Set<String> IMPORT_STATUSES = Set.of(
-            "UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING",
-            "READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED");
-    public static final Set<String> IMPORT_RESOLUTIONS = Set.of("CREATE_NEW", "IMPORT_AS_NEW_VERSION");
-    public static final Set<String> IMPORT_STAGES = Set.of(
-            "UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING",
-            "REVIEWING", "FAILED", "CANCELED", "COMMITTED", "DRAFT_DISCARDED");
-    public static final Set<String> SEMANTIC_ROLES = Set.of(
-            "QUESTION", "ANSWER", "EXPLANATION", "CONCLUSION", "INTRODUCTION", "DIRECTORY");
-    public static final Set<String> MASTERY_STATES = Set.of("UNKNOWN", "HARD", "FUZZY", "KNOWN");
+    public static final Set<String> SOURCE_TYPES = SourceType.codes();
+    public static final Set<String> NODE_TYPES = NodeType.codes();
+    public static final Set<String> BLOCK_TYPES = BlockType.codes();
+    public static final Set<String> VERSION_STATUSES = DocumentVersionStatus.codes();
+    public static final Set<String> IMPORT_STATUSES = ImportJobStatus.codes();
+    public static final Set<String> IMPORT_ISSUE_SEVERITIES = ImportIssueSeverity.codes();
+
+    public static final Set<String> IMPORT_RESOLUTIONS = ImportResolution.codes();
+    public static final Set<String> IMPORT_STAGES = ImportStage.codes();
+
+    public static final Set<String> SEMANTIC_ROLES = SemanticRole.codes();
+    public static final Set<String> MASTERY_STATES = MasteryState.codes();
 
     private ApiContractValues() {
     }

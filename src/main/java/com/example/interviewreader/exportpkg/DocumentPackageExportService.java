@@ -2,6 +2,7 @@ package com.example.interviewreader.exportpkg;
 
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
+import com.example.interviewreader.document.SourceType;
 import com.example.interviewreader.importpkg.DocumentPackage;
 import com.example.interviewreader.persistence.entity.*;
 import com.example.interviewreader.persistence.mapper.*;
@@ -209,7 +210,7 @@ public class DocumentPackageExportService {
             String title,
             String description,
             int versionNo,
-            String sourceType,
+            SourceType sourceType,
             String sourceFileName,
             String sourceSha256,
             String converterVersion,

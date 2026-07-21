@@ -1,5 +1,6 @@
 package com.example.interviewreader.exportpkg;
 
+import com.example.interviewreader.document.SourceType;
 import com.example.interviewreader.persistence.entity.DocumentEntity;
 import com.example.interviewreader.persistence.entity.DocumentTagEntity;
 import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
@@ -31,7 +32,7 @@ class DocumentPackageExportServiceTests {
         document.setTitle("Java 面试题");
         var version = new DocumentVersionEntity();
         version.setVersionNo(1);
-        version.setSourceType("PDF");
+        version.setSourceType(SourceType.PDF);
         version.setSchemaVersion("1.0");
         version.setLanguage("zh-CN");
         version.setMetadata("{}");

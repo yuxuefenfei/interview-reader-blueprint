@@ -4,15 +4,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
-
-import static com.example.interviewreader.document.ApiContractValues.BLOCK_TYPES;
-import static com.example.interviewreader.document.ApiContractValues.NODE_TYPES;
-import static com.example.interviewreader.document.ApiContractValues.SOURCE_TYPES;
 
 @Component
 public class DocumentPackageValidator {
@@ -52,7 +47,7 @@ public class DocumentPackageValidator {
             if (isBlank(documentPackage.version().versionKey())) {
                 issues.add(blocking("VERSION_KEY_REQUIRED", "version.versionKey is required", null, null));
             }
-            if (!SOURCE_TYPES.contains(nullToEmpty(documentPackage.version().sourceType()).toUpperCase(Locale.ROOT))) {
+            if (documentPackage.version().sourceType() == null) {
                 issues.add(blocking("SOURCE_TYPE_INVALID", "version.sourceType is invalid", null, null));
             }
             var sourceSha256 = documentPackage.version().sourceSha256();
@@ -83,7 +78,7 @@ public class DocumentPackageValidator {
             if (section.level() == null || section.level() < 1 || section.level() > 32) {
                 issues.add(blocking("SECTION_LEVEL_INVALID", "level must be between 1 and 32", section.sectionKey(), null));
             }
-            if (!NODE_TYPES.contains(nullToEmpty(section.nodeType()).toUpperCase(Locale.ROOT))) {
+            if (section.nodeType() == null) {
                 issues.add(blocking("NODE_TYPE_INVALID", "nodeType is invalid", section.sectionKey(), null));
             }
             if (isBlank(section.title())) {
@@ -137,7 +132,7 @@ public class DocumentPackageValidator {
             } else if (!seqKeys.add(block.sectionKey() + "#" + block.seq())) {
                 issues.add(blocking("BLOCK_SEQ_DUPLICATE", "Duplicate seq in section: " + block.seq(), block.sectionKey(), block.blockKey()));
             }
-            if (!BLOCK_TYPES.contains(nullToEmpty(block.blockType()))) {
+            if (block.blockType() == null) {
                 issues.add(blocking("BLOCK_TYPE_INVALID", "blockType is invalid", block.sectionKey(), block.blockKey()));
             }
             if (block.payload() == null || block.payload().isNull()) {
@@ -179,14 +174,11 @@ public class DocumentPackageValidator {
     }
 
     private ImportIssueDto blocking(String code, String message, String sectionKey, String blockKey) {
-        return new ImportIssueDto("BLOCKING", code, message, null, sectionKey, blockKey);
+        return new ImportIssueDto(ImportIssueSeverity.BLOCKING, code, message, null, sectionKey, blockKey);
     }
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
-    private static String nullToEmpty(String value) {
-        return value == null ? "" : value;
-    }
 }

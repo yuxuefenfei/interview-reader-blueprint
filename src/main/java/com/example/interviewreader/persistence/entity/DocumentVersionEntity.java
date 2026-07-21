@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import com.example.interviewreader.document.DocumentVersionStatus;
+import com.example.interviewreader.document.SourceType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,12 +23,12 @@ public class DocumentVersionEntity {
     private Integer parentVersionNo;
     private String originImportJobId;
     private long draftRevision;
-    private String sourceType;
+    private SourceType sourceType;
     private String sourceFileName;
     private String sourceFileSha256;
     private String converterVersion;
     private String schemaVersion;
-    private String status;
+    private DocumentVersionStatus status;
     private String language;
     @Column(isLarge = true)
     private String metadata;

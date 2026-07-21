@@ -793,7 +793,7 @@ components:
       enum: [paragraph, heading_note, unordered_list, ordered_list, code, table, quote, callout, formula, image, divider, table_snapshot]
     SemanticRole:
       type: string
-      enum: [QUESTION, ANSWER, EXPLANATION, CONCLUSION, INTRODUCTION, DIRECTORY]
+      enum: [QUESTION, ANSWER, EXPLANATION, CONCLUSION, INTRODUCTION, DIRECTORY, PRINCIPLE, PRACTICE, PITFALL, FOLLOW_UP]
     VersionStatus:
       type: string
       enum: [DRAFT, PUBLISHED, RETIRED]
@@ -811,7 +811,7 @@ components:
       enum: [UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, READY, REVIEW_REQUIRED, IMPORTED, FAILED, CANCELED]
     ImportStage:
       type: string
-      enum: [UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, REVIEWING, FAILED, CANCELED, COMMITTED, DRAFT_DISCARDED]
+      enum: [UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, READY, REVIEW_REQUIRED, REVIEWING, FAILED, CANCELED, COMMITTED, DRAFT_DISCARDED]
     MasteryState:
       type: string
       enum: [UNKNOWN, HARD, FUZZY, KNOWN]
@@ -1252,6 +1252,9 @@ components:
     ImportResolution:
       type: string
       enum: [CREATE_NEW, IMPORT_AS_NEW_VERSION]
+    ImportIssueSeverity:
+      type: string
+      enum: [BLOCKING, WARNING]
     ExistingDocumentMatch:
       type: object
       required: [id, code, title, status]
@@ -1295,7 +1298,7 @@ components:
       type: object
       required: [severity, issueCode, message, sourcePage, sectionKey, blockKey, cellRef]
       properties:
-        severity: { type: string, enum: [WARNING, BLOCKING] }
+        severity: { $ref: "#/components/schemas/ImportIssueSeverity" }
         issueCode: { type: string }
         message: { type: string }
         sourcePage: { type: [integer, "null"] }

@@ -1,20 +1,19 @@
 package com.example.interviewreader.importpkg;
 
+import com.example.interviewreader.document.BlockType;
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Locale;
 
 public final class DocumentBlockContent {
     private DocumentBlockContent() {
     }
 
-    public static boolean isMeaningful(String blockType, String plainText, JsonNode payload) {
-        var type = blockType == null ? "" : blockType.toLowerCase(Locale.ROOT);
-        if ("divider".equals(type)) return true;
-        if ("image".equals(type)) return hasText(payload, "assetKey") || hasText(payload, "src") || hasText(payload, "url");
-        if ("unordered_list".equals(type) || "ordered_list".equals(type)) {
+    public static boolean isMeaningful(BlockType blockType, String plainText, JsonNode payload) {
+        if (blockType == BlockType.DIVIDER) return true;
+        if (blockType == BlockType.IMAGE) return hasText(payload, "assetKey") || hasText(payload, "src") || hasText(payload, "url");
+        if (blockType == BlockType.UNORDERED_LIST || blockType == BlockType.ORDERED_LIST) {
             return hasNonBlankArrayItem(payload, "items") || hasText(plainText);
         }
-        if ("table".equals(type) || "table_snapshot".equals(type)) {
+        if (blockType == BlockType.TABLE || blockType == BlockType.TABLE_SNAPSHOT) {
             return hasNonBlankArrayItem(payload, "rows") || hasNonBlankArrayItem(payload, "columns") || hasText(plainText);
         }
         return hasText(plainText) || hasText(payload, "text") || hasText(payload, "latex");

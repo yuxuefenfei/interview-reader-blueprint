@@ -1,5 +1,8 @@
 package com.example.interviewreader.importpkg;
 
+import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.NodeType;
+import com.example.interviewreader.document.SourceType;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,8 +40,8 @@ class DocumentPackageNormalizerTest {
         var json = JsonNodeFactory.instance;
         var documentPackage = new DocumentPackage("1.0",
                 new DocumentPackage.DocumentInfo("document", "标题", null, "zh-CN", List.of()),
-                new DocumentPackage.VersionInfo("v1", "MANUAL", null, null, null, java.util.Map.of()),
-                List.of(new DocumentPackage.SectionInfo("section", null, 1, "SECTION", null, "标题", 1, "title", null, null, null, null)),
+                new DocumentPackage.VersionInfo("v1", SourceType.MANUAL, null, null, null, java.util.Map.of()),
+                List.of(new DocumentPackage.SectionInfo("section", null, 1, NodeType.SECTION, null, "标题", 1, "title", null, null, null, null)),
                 List.of(block("empty", 1, "paragraph", json.objectNode().put("text", ""), "")),
                 List.of());
 
@@ -48,6 +51,6 @@ class DocumentPackageNormalizerTest {
     }
 
     private static DocumentPackage.BlockInfo block(String key, int seq, String type, com.fasterxml.jackson.databind.JsonNode payload, String plainText) {
-        return new DocumentPackage.BlockInfo(key, "section", seq, type, payload, plainText, null, null, null, null, null);
+        return new DocumentPackage.BlockInfo(key, "section", seq, BlockType.fromCode(type), payload, plainText, null, null, null, null, null);
     }
 }

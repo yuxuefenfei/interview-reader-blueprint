@@ -1,4 +1,6 @@
 package com.example.interviewreader.persistence.entity;
+import com.example.interviewreader.management.DeletionJobStatus;
+import com.example.interviewreader.management.DeletionStage;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,8 +19,8 @@ public class DocumentDeletionJobEntity {
     private String id;
     private String documentId;
     private String ownerId;
-    private String status;
-    private String currentStage;
+    private DeletionJobStatus status;
+    private DeletionStage currentStage;
     private int attemptCount;
     private String errorCode;
     @Column(isLarge = true)

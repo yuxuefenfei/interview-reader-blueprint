@@ -1,5 +1,9 @@
 package com.example.interviewreader.importpkg;
 
+import com.example.interviewreader.document.BlockType;
+import com.example.interviewreader.document.NodeType;
+import com.example.interviewreader.document.SemanticRole;
+import com.example.interviewreader.document.SourceType;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,7 +28,7 @@ public record DocumentPackage(
 
     public record VersionInfo(
             String versionKey,
-            String sourceType,
+            SourceType sourceType,
             String sourceFileName,
             String sourceSha256,
             String converterVersion,
@@ -36,8 +40,8 @@ public record DocumentPackage(
             String sectionKey,
             String parentSectionKey,
             Integer level,
-            String nodeType,
-            String semanticRole,
+            NodeType nodeType,
+            SemanticRole semanticRole,
             String title,
             Integer sortOrder,
             String anchor,
@@ -52,7 +56,7 @@ public record DocumentPackage(
             String blockKey,
             String sectionKey,
             Integer seq,
-            String blockType,
+            BlockType blockType,
             JsonNode payload,
             String plainText,
             String language,

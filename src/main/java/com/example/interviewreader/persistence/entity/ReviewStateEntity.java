@@ -1,4 +1,5 @@
 package com.example.interviewreader.persistence.entity;
+import com.example.interviewreader.document.MasteryState;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,7 +18,7 @@ public class ReviewStateEntity {
     private String userId;
     private String documentId;
     private String nodeId;
-    private String mastery;
+    private MasteryState mastery;
     private OffsetDateTime dueAt;
     private Integer intervalDays;
     private int repetitions;
