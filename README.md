@@ -1,6 +1,6 @@
 # Interview Reader
 
-基于 `docs/` 蓝图落地的 Spring Boot + Vue 模块化单体。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
+基于 [`docs/architecture/system-design.md`](docs/architecture/system-design.md) 设计方案落地的 Spring Boot + Vue 模块化单体。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
 
 ## 环境
 
@@ -102,7 +102,7 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - `frontend/src/shared/runtimeConfig.ts` 统一维护前端开发端口与代理默认值，`runtimePolicy.ts` 统一维护轮询和离线缓存策略；`frontend/src/offline/database.ts` 统一维护 IndexedDB 名称、版本和 store。
 - `npm run contract:check` 会比较 OpenAPI、Java Controller、前后端枚举、TypeScript 响应字段、响应式断点和上传限制；前端生产构建与 CI 都会自动运行该检查。
 - `pom.xml` 会拒绝非 JDK 21 或低于 Maven 3.9 的构建环境，并通过 `npm ci` 使用锁文件安装前端依赖。
-- 生产部署、健康检查、指标、备份恢复与 Flyway 回滚流程见 [生产运行手册](docs/operations-runbook.md)。
+- 生产部署、健康检查、指标、备份恢复与 Flyway 回滚流程见 [生产运行手册](docs/operations/runbook.md)。
 ## 已实现 API
 
 完整契约位于 `docs/api/openapi.yaml`。除登录和会话查询外，业务 API 均要求 `IR_SESSION` Cookie。
@@ -164,7 +164,7 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - `POST /api/admin/import-jobs/{jobId}/commit`
 - `POST /api/admin/exports`
 
-示例包位于 `docs/examples/document-package.example.json`。Excel 导入模板位于 `docs/templates/interview-reader-import-template.xlsx`。
+示例包位于 `docs/import/examples/document-package.example.json`。Excel 导入模板位于 `docs/import/templates/interview-reader-import-template.xlsx`。
 
 `POST /api/admin/import-jobs` 使用 `multipart/form-data`，必填字段为 `file`，可选字段为 `targetDocumentId`。服务端根据文件内容与扩展名识别类型，支持：
 

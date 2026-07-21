@@ -45,7 +45,7 @@ Codex 提示词：
 
 Codex 提示词：
 
-> 根据 schemas/document-package.schema.json 和 db/schema-mysql.sql，实现 JSON Package 导入。导入必须先 staging/validate，再事务提交。发布版本不可变。为所有规则写 JUnit + H2 MySQL 模式集成测试。
+> 根据 docs/import/schemas/document-package.schema.json 和 docs/database/schema-mysql.sql，实现 JSON Package 导入。导入必须先 staging/validate，再事务提交。发布版本不可变。为所有规则写 JUnit + H2 MySQL 模式集成测试。
 
 ## M2：目录与阅读 API
 

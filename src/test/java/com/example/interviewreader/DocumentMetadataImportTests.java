@@ -202,7 +202,7 @@ class DocumentMetadataImportTests {
 
     private byte[] packageBytes(String code, String title, String description, String tag) throws Exception {
         var root = (ObjectNode) objectMapper.readTree(java.nio.file.Files.readString(
-                java.nio.file.Path.of("docs/examples/document-package.example.json")));
+                java.nio.file.Path.of("docs/import/examples/document-package.example.json")));
         var document = (ObjectNode) root.get("document");
         document.put("documentKey", code);
         document.put("title", title);

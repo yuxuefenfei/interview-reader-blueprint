@@ -99,7 +99,7 @@ class InterviewReaderApiTests {
 
     @Test
     void jsonPackageCanBeImportedCommittedAndRead() throws Exception {
-        var imported = importAndCommit(Files.readAllBytes(Path.of("docs/examples/document-package.example.json")));
+        var imported = importAndCommit(Files.readAllBytes(Path.of("docs/import/examples/document-package.example.json")));
 
         mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", imported.jobId()))
                 .andExpect(status().isOk())
@@ -183,7 +183,7 @@ class InterviewReaderApiTests {
 
     @Test
     void takeDownPreservesPublishedVersionAndReadingDataAndRestoreIsIdempotent() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "take-down-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
         publish(imported);
@@ -227,7 +227,7 @@ class InterviewReaderApiTests {
 
     @Test
     void permanentDeletionRequiresOfflineAndExactTitleThenRemovesImportFilesAndData() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "permanent-delete-" + UUID.randomUUID());
         var title = source.get("document").get("title").asText();
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
@@ -270,7 +270,7 @@ class InterviewReaderApiTests {
 
     @Test
     void failedDeletionAutoRetriesThreeTimesAndManualRetryNeedsNoTitle() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "retry-delete-" + UUID.randomUUID());
         var title = source.get("document").get("title").asText();
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
@@ -300,7 +300,7 @@ class InterviewReaderApiTests {
         var marker = "published-search-" + UUID.randomUUID();
         var imports = new java.util.ArrayList<ImportResult>();
         for (var index = 0; index < 6; index++) {
-            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
             ((ObjectNode) source.get("document")).put("documentKey", marker + "-key-" + index);
             ((ObjectNode) source.get("document")).put("title", marker + " title " + index);
             ((ObjectNode) source.get("version")).put("versionKey", marker + "-version-" + index);
@@ -326,7 +326,7 @@ class InterviewReaderApiTests {
 
     @Test
     void concurrentRevisionCreationAllocatesUniqueSequentialNumbers() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "concurrent-revision-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
         var ready = new CountDownLatch(2);
@@ -357,7 +357,7 @@ class InterviewReaderApiTests {
 
     @Test
     void concurrentReadingProgressKeepsNewestClientPosition() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "concurrent-progress-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
         publish(imported);
@@ -403,7 +403,7 @@ class InterviewReaderApiTests {
     }
     @Test
     void readingProgressRejectsMissingRatioAndCrossDocumentPositions() throws Exception {
-        var firstSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var firstSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) firstSource.get("document")).put("documentKey", "progress-first-" + UUID.randomUUID());
         ((ObjectNode) firstSource.get("version")).put("versionKey", "progress-first-version");
         var first = importAndCommit(objectMapper.writeValueAsBytes(firstSource));
@@ -411,7 +411,7 @@ class InterviewReaderApiTests {
                         first.documentId(), first.versionId()))
                 .andExpect(status().isNoContent());
 
-        var secondSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var secondSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) secondSource.get("document")).put("documentKey", "progress-other-" + UUID.randomUUID());
         ((ObjectNode) secondSource.get("version")).put("versionKey", "progress-other-version");
         var second = importAndCommit(objectMapper.writeValueAsBytes(secondSource));
@@ -453,7 +453,7 @@ class InterviewReaderApiTests {
     void documentLibraryUsesDatabaseCursorPagination() throws Exception {
         var marker = "cursor-page-" + UUID.randomUUID();
         for (var index = 0; index < 3; index++) {
-            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
             ((ObjectNode) source.get("document")).put("documentKey", marker + "-key-" + index);
             ((ObjectNode) source.get("document")).put("title", marker + " title " + index);
             ((ObjectNode) source.get("version")).put("versionKey", "cursor-" + index);
@@ -492,7 +492,7 @@ class InterviewReaderApiTests {
 
     @Test
     void importJobRecordsWorkerStageAndStatistics() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "worker-stage-" + UUID.randomUUID());
 
         var job = uploadJsonPackage(objectMapper.writeValueAsBytes(source));
@@ -508,7 +508,7 @@ class InterviewReaderApiTests {
 
     @Test
     void uploadedSourceFileNameIsStoredAsSafeBaseName() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "safe-filename-" + UUID.randomUUID());
 
         var job = uploadPackage(objectMapper.writeValueAsBytes(source), "JSON_PACKAGE", "..\\..\\evil.json");
@@ -556,7 +556,7 @@ class InterviewReaderApiTests {
 
     @Test
     void completedImportJobCannotBeCanceled() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "cancel-ready-" + UUID.randomUUID());
         var job = uploadJsonPackage(objectMapper.writeValueAsBytes(source));
 
@@ -566,7 +566,7 @@ class InterviewReaderApiTests {
 
     @Test
     void publishingNewVersionResetsReadingProgressWhenBlockIdentityChanges() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "progress-migration-" + UUID.randomUUID());
 
         var first = importAndCommit(objectMapper.writeValueAsBytes(source));
@@ -619,7 +619,7 @@ class InterviewReaderApiTests {
 
     @Test
     void exportedJsonPackageCanBeImportedAgainWithStableHashes() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "roundtrip-" + UUID.randomUUID());
         var sections = (ArrayNode) source.get("sections");
         ((ObjectNode) sections.get(0)).put("contentHash", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
@@ -640,7 +640,7 @@ class InterviewReaderApiTests {
 
     @Test
     void repeatedUploadAndCommitReuseExistingImportResult() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "idempotent-" + UUID.randomUUID());
         var bytes = objectMapper.writeValueAsBytes(source);
 
@@ -661,7 +661,7 @@ class InterviewReaderApiTests {
     @Test
     void failedAndCanceledImportsCanCreateFreshRetryJobs() throws Exception {
         for (var terminalStatus : List.of("FAILED", "CANCELED")) {
-            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+            var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
             ((ObjectNode) source.get("document")).put("documentKey", "retry-" + terminalStatus.toLowerCase() + "-" + UUID.randomUUID());
             var bytes = objectMapper.writeValueAsBytes(source);
             var first = uploadJsonPackage(bytes);
@@ -680,7 +680,7 @@ class InterviewReaderApiTests {
 
     @Test
     void concurrentIdenticalUploadsReuseOneActiveImportJob() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "concurrent-import-" + UUID.randomUUID());
         var bytes = objectMapper.writeValueAsBytes(source);
         var ready = new CountDownLatch(2);
@@ -707,7 +707,7 @@ class InterviewReaderApiTests {
     }
     @Test
     void excelTemplateCanBeImportedAndPreservesCodeWhitespace() throws Exception {
-        var imported = importAndCommitExcel(Files.readAllBytes(Path.of("docs/templates/interview-reader-import-template.xlsx")));
+        var imported = importAndCommitExcel(Files.readAllBytes(Path.of("docs/import/templates/interview-reader-import-template.xlsx")));
         publish(imported);
         var tocBody = mockMvc.perform(get("/api/reader/versions/{versionId}/toc", imported.versionId()))
                 .andExpect(status().isOk())
@@ -782,10 +782,10 @@ class InterviewReaderApiTests {
     @Test
     void pdfSamplesCanBeImportedCommittedAndRead() throws Exception {
         var samples = List.of(
-                Path.of("docs/Java高级开发面试题完整答案.pdf"),
-                Path.of("docs/Redis高级面试题完整答案.pdf"),
-                Path.of("docs/MySQL与PostgreSQL高级面试题完整答案.pdf"),
-                Path.of("docs/Elasticsearch搜索引擎高级面试题完整答案.pdf"));
+                Path.of("docs/samples/pdf/Java高级开发面试题完整答案.pdf"),
+                Path.of("docs/samples/pdf/Redis高级面试题完整答案.pdf"),
+                Path.of("docs/samples/pdf/MySQL与PostgreSQL高级面试题完整答案.pdf"),
+                Path.of("docs/samples/pdf/Elasticsearch搜索引擎高级面试题完整答案.pdf"));
 
         for (var sample : samples) {
             var imported = importAndCommitPdf(Files.readAllBytes(sample), sample.getFileName().toString());
@@ -927,7 +927,7 @@ class InterviewReaderApiTests {
 
     @Test
     void exportedExcelCanBeImportedAgainWithStableHashes() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "excel-roundtrip-" + UUID.randomUUID());
         var sections = (ArrayNode) source.get("sections");
         ((ObjectNode) sections.get(0)).put("contentHash", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
@@ -948,7 +948,7 @@ class InterviewReaderApiTests {
 
     @Test
     void markdownExportRendersHeadingsCodeAndTables() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "markdown-export-" + UUID.randomUUID());
         var blocks = (ArrayNode) source.get("blocks");
         blocks.add(objectMapper.readTree("""
@@ -998,7 +998,7 @@ class InterviewReaderApiTests {
 
     @Test
     void staticHtmlExportEscapesTextAndRendersSemanticBlocks() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "static-html-export-" + UUID.randomUUID());
         var blocks = (ArrayNode) source.get("blocks");
         ((ObjectNode) blocks.get(0).get("payload")).put("text", "安全文本 <script>alert('x')</script>");
@@ -1050,7 +1050,7 @@ class InterviewReaderApiTests {
 
     @Test
     void bookmarkNoteAndReviewStateCanBeSavedForPublishedContent() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "interactions-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
         mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
@@ -1143,7 +1143,7 @@ class InterviewReaderApiTests {
 
     @Test
     void reviewQueueReturnsRandomQuestionsAndCanFilterDueOnly() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "review-queue-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
         mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
@@ -1193,7 +1193,7 @@ class InterviewReaderApiTests {
 
     @Test
     void reviewStateRejectsUnknownMastery() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "review-invalid-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
         publish(imported);
@@ -1220,7 +1220,7 @@ class InterviewReaderApiTests {
     @Test
     void excelParentSectionErrorReportsCellReference() throws Exception {
         var brokenWorkbook = withCellValue(
-                Files.readAllBytes(Path.of("docs/templates/interview-reader-import-template.xlsx")),
+                Files.readAllBytes(Path.of("docs/import/templates/interview-reader-import-template.xlsx")),
                 "Sections",
                 2,
                 3,
@@ -1261,7 +1261,7 @@ class InterviewReaderApiTests {
 
     @Test
     void duplicateSectionKeyIsReportedAsBlockingIssue() throws Exception {
-        var root = (JsonNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var root = (JsonNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         var mutable = (ObjectNode) root.deepCopy();
         var sections = (ArrayNode) mutable.get("sections");
         sections.add(sections.get(0).deepCopy());
@@ -1289,7 +1289,7 @@ class InterviewReaderApiTests {
 
     @Test
     void orphanParentAndLevelJumpAreReportedAsBlockingIssues() throws Exception {
-        var root = (JsonNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var root = (JsonNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         var mutable = (ObjectNode) root.deepCopy();
         var sections = (ArrayNode) mutable.get("sections");
         ((ObjectNode) sections.get(1)).put("parentSectionKey", "missing-parent");
@@ -1318,7 +1318,7 @@ class InterviewReaderApiTests {
 
     @Test
     void stagedPackageCanBeRevisedBeforeCommit() throws Exception {
-        var root = (JsonNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var root = (JsonNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         var mutable = (ObjectNode) root.deepCopy();
         ((ObjectNode) mutable.get("document")).put("documentKey", "review-revision-" + UUID.randomUUID());
         var sections = (ArrayNode) mutable.get("sections");
@@ -1393,7 +1393,7 @@ class InterviewReaderApiTests {
     }
     @Test
     void revisionSummaryKeepsSourceVersionNumberWhenParentIsDeleted() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "revision-parent-" + UUID.randomUUID());
         var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
 
@@ -1419,7 +1419,7 @@ class InterviewReaderApiTests {
 
     @Test
     void editorUsesLightweightSnapshotAndDiscardReleasesImportJobReference() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/examples/document-package.example.json")));
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
         ((ObjectNode) source.get("document")).put("documentKey", "editor-snapshot-" + UUID.randomUUID());
         var job = uploadPackage(objectMapper.writeValueAsBytes(source), "PDF", "document-package.json");
         var jobId = UUID.fromString(job.get("id").asText());
