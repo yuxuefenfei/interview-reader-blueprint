@@ -13,6 +13,7 @@ import { ElIcon } from "element-plus/es/components/icon/index";
 import { ElInput } from "element-plus/es/components/input/index";
 import { ElLoading } from "element-plus/es/components/loading/index";
 import { ElOption, ElSelect } from "element-plus/es/components/select/index";
+import { ElPopover } from "element-plus/es/components/popover/index";
 import { ElProgress } from "element-plus/es/components/progress/index";
 import { ElRadioButton, ElRadioGroup } from "element-plus/es/components/radio/index";
 import { ElTable, ElTableColumn } from "element-plus/es/components/table/index";
@@ -47,6 +48,7 @@ const app = createApp(App).use(router);
   ElIcon,
   ElInput,
   ElOption,
+  ElPopover,
   ElProgress,
   ElRadioButton,
   ElRadioGroup,

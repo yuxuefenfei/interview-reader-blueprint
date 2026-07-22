@@ -25,7 +25,9 @@ export const COLUMN_WIDTH_OPTIONS = [
 const THEME_ORDER: ReaderTheme[] = ["light", "dark", "sepia"];
 
 function readNumber(key: string, fallback: number, min: number, max: number): number {
-  const raw = Number(localStorage.getItem(key));
+  const stored = localStorage.getItem(key);
+  if (stored === null || stored.trim() === "") return fallback;
+  const raw = Number(stored);
   if (!Number.isFinite(raw)) return fallback;
   return Math.min(max, Math.max(min, raw));
 }

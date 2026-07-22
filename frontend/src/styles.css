@@ -268,6 +268,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   --reader-line: #dce4e9;
   --reader-accent: #0f766e;
   --reader-code-bg: #fbfcfe;
+  --reader-font-size: 18px;
+  --reader-line-height: 1.85;
+  --reader-column: 740px;
   min-height: 100vh;
   display: grid;
   grid-template-columns: var(--toc-w) minmax(0, 1fr);
@@ -370,12 +373,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 /* Content area */
 .reader-content { min-width: 0; overflow: auto; overscroll-behavior: contain; }
 .reader-article {
-  width: min(100%, 740px);
+  width: min(100%, var(--reader-column));
   margin: 0 auto;
   padding: 48px clamp(24px, 5vw, 64px) 32px;
 }
 .reader-article h1 { margin: 0 0 28px; font-size: clamp(26px, 3vw, 34px); line-height: 1.28; letter-spacing: 0; }
-.content-block { color: var(--reader-text); font-size: 18px; line-height: 1.85; }
+.content-block { color: var(--reader-text); font-size: var(--reader-font-size); line-height: var(--reader-line-height); }
 .paragraph, .heading-note, .content-block blockquote { margin: 0 0 20px; white-space: pre-wrap; }
 .heading-note { font-weight: 700; }
 .reader-list { margin: 0 0 20px; padding-left: 1.35em; }
@@ -437,9 +440,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 /* Pagination */
 .chapter-pagination {
-  width: min(100%, 740px); display: flex; justify-content: space-between; gap: 12px;
+  width: min(100%, var(--reader-column)); display: flex; align-items: center; justify-content: space-between; gap: 12px;
   margin: 0 auto; padding: 16px clamp(24px, 5vw, 64px) 64px;
 }
+.chapter-position { color: var(--reader-muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .reader-state { display: grid; min-height: 48vh; place-items: center; color: var(--reader-muted); }
 .reader-load-more { padding: 8px 0 24px; text-align: center; }
 .reader-fab { display: none; }
@@ -465,7 +469,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .reader-heading { min-width: 0; flex: 1; }
   .reader-heading strong { font-size: 14px; }
   .reader-heading span { display: none; }
-  .reader-header-actions .el-button:not(:first-child), .reader-admin-link { display: none; }
+  .reader-header-actions > .el-button, .reader-admin-link { display: none; }
   .reader-theme-switch { display: none; }
   .reader-header-progress { display: none; }
   .mobile-chapter-progress { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; overflow: hidden; background: var(--reader-line); display: block; }
@@ -474,7 +478,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .reader-content { height: calc(100dvh - 60px); overflow: auto; }
   .reader-article { padding: 30px 18px 28px; }
   .reader-article h1 { margin-bottom: 24px; font-size: 27px; }
-  .content-block { font-size: 17px; line-height: 1.78; }
+  .content-block { font-size: max(16px, calc(var(--reader-font-size) - 1px)); line-height: var(--reader-line-height); }
   .paragraph, .heading-note, .content-block blockquote { margin-bottom: 17px; }
   .code-block { margin: 20px -2px; }
   .code-block pre, .table-snapshot pre { padding: 15px; font-size: 13px; }
@@ -698,8 +702,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   }
 }
 
-/* ── Reader header search button ────────────────────────────── */
-.reader-header-search-btn {
+/* ── Reader header tools and comfort panel ─────────────────── */
+.reader-header-search-btn, .reader-comfort-button {
   display: inline-flex; align-items: center; gap: 6px;
   min-height: 32px; padding: 0 12px;
   border: 1px solid var(--reader-line); border-radius: var(--radius-sm);
@@ -707,11 +711,33 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   font-size: 13px; cursor: pointer;
   transition: background-color 120ms, color 120ms, border-color 120ms;
 }
-.reader-header-search-btn:hover {
+.reader-header-search-btn:hover, .reader-comfort-button:hover,
+.reader-comfort-button[aria-expanded="true"] {
   background: var(--brand-100); color: var(--brand-700);
   border-color: var(--brand-500);
 }
-.reader-header-search-btn .el-icon { font-size: 15px; }
+.reader-header-search-btn .el-icon, .reader-comfort-button .el-icon { font-size: 15px; }
+.reader-page.theme-dark .reader-header-search-btn:hover,
+.reader-page.theme-dark .reader-comfort-button:hover,
+.reader-page.theme-dark .reader-comfort-button[aria-expanded="true"] { background: #1b3c3d; color: #b4fff0; }
+.reader-comfort-panel { display: grid; gap: 18px; color: var(--ink-900); }
+.reader-comfort-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-bottom: 13px; border-bottom: 1px solid var(--line-100); }
+.reader-comfort-panel > header > div { display: grid; gap: 3px; }
+.reader-comfort-panel > header strong { font-size: 15px; }
+.reader-comfort-panel > header span { color: var(--ink-500); font-size: 12px; }
+.reader-comfort-panel > header button { padding: 2px 0; border: 0; background: transparent; color: var(--brand-600); cursor: pointer; font-size: 12px; }
+.reader-comfort-panel fieldset { display: grid; gap: 9px; margin: 0; padding: 0; border: 0; }
+.reader-comfort-panel legend { width: 100%; margin-bottom: 9px; color: var(--ink-700); font-size: 13px; font-weight: 650; }
+.reader-comfort-panel output { float: right; color: var(--brand-600); font-variant-numeric: tabular-nums; }
+.comfort-option-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.comfort-option-grid.font-options { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.comfort-option-grid button { min-height: 34px; padding: 5px 7px; border: 1px solid var(--line-200); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--ink-700); cursor: pointer; font-size: 12px; transition: background-color 120ms, border-color 120ms, color 120ms; }
+.comfort-option-grid button:hover { border-color: var(--brand-500); color: var(--brand-700); }
+.comfort-option-grid button.active { border-color: var(--brand-500); background: var(--brand-100); color: var(--brand-700); font-weight: 700; }
 @media (max-width: 760px) {
   .reader-header-search-btn { display: none; }
+  .reader-comfort-button { width: 44px; min-width: 44px; min-height: 44px; justify-content: center; padding: 0; border: 0; }
+  .reader-comfort-button span { display: none; }
+  .reader-comfort-button .el-icon { font-size: 21px; }
+  .reader-comfort-popper { max-width: calc(100vw - 24px); }
 }

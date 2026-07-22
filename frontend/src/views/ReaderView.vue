@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowLeft, ArrowRight, Close, Menu, Search } from "@element-plus/icons-vue";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { ArrowLeft, ArrowRight, Close, Menu, Reading, Search } from "@element-plus/icons-vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
@@ -10,9 +10,17 @@ import { cacheNodeContent, getCachedNodeContent } from "../offline/contentCache"
 import { enqueueReadingProgress, flushReadingProgressQueue, shouldQueueReadingProgress } from "../offline/progressQueue";
 import type { DocumentSummary, NodeContent, ReadingProgress, TocNode } from "../types/api";
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
+import {
+  COLUMN_WIDTH_OPTIONS,
+  comfortStyle,
+  FONT_SIZE_OPTIONS,
+  LINE_HEIGHT_OPTIONS,
+  loadReaderComfort,
+  loadReaderTheme,
+  persistReaderComfort,
+  type ReaderTheme
+} from "../utils/readingComfort";
 import { firstReadableNode, flattenToc, isQuestionNode } from "../utils/toc";
-
-type Theme = "light" | "dark" | "sepia";
 
 defineProps<{ username?: string | null }>();
 const emit = defineEmits<{ logout: [] }>();
@@ -27,12 +35,14 @@ const loading = ref(false);
 const error = ref("");
 const drawer = ref(false);
 const searchOpen = ref(false);
+const comfortOpen = ref(false);
 const toolsOpen = ref(false);
 const query = ref("");
 const searchHits = ref<Awaited<ReturnType<typeof readerApi.search>>>([]);
 const readingArea = ref<HTMLElement | null>(null);
 const chapterProgress = ref(0);
-const theme = ref<Theme>((localStorage.getItem("reader.theme") as Theme) || "light");
+const theme = ref<ReaderTheme>(loadReaderTheme());
+const comfort = reactive(loadReaderComfort());
 const loadingMore = ref(false);
 const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
@@ -44,8 +54,11 @@ const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activ
 const nextNode = computed(() => activeIndex.value >= 0 && activeIndex.value < readable.value.length - 1 ? readable.value[activeIndex.value + 1] : null);
 const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
+const readerComfortStyle = computed(() => comfortStyle(comfort));
+const chapterPosition = computed(() => activeIndex.value >= 0 ? `${activeIndex.value + 1} / ${readable.value.length}` : `0 / ${readable.value.length}`);
 
 watch(theme, (value) => localStorage.setItem("reader.theme", value));
+watch(comfort, (value) => persistReaderComfort(value), { deep: true });
 watch(() => route.params.documentId, () => { void openFromRoute(); });
 onMounted(async () => {
   window.addEventListener("online", flushOfflineProgress);
@@ -198,12 +211,17 @@ async function jump(hit: { documentId: string; nodeId: string }): Promise<void> 
   searchOpen.value = false;
 }
 
-function setTheme(t: Theme): void { theme.value = t; }
+function setTheme(value: ReaderTheme): void { theme.value = value; }
+function resetComfort(): void {
+  comfort.fontSize = 18;
+  comfort.lineHeight = 1.85;
+  comfort.columnWidth = 740;
+}
 function message(value: unknown): string { return toUserMessage(value, "加载失败"); }
 </script>
 
 <template>
-  <div class="reader-page" :class="`theme-${theme}`">
+  <div class="reader-page" :class="`theme-${theme}`" :style="readerComfortStyle">
     <header class="reader-header">
       <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true">
         <el-icon><Menu /></el-icon>
@@ -224,6 +242,52 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           <el-icon><Search /></el-icon>
           <span>搜索</span>
         </button>
+        <el-popover v-model:visible="comfortOpen" placement="bottom-end" :width="340" trigger="click" popper-class="reader-comfort-popper">
+          <template #reference>
+            <button
+              class="reader-comfort-button"
+              type="button"
+              aria-label="阅读设置"
+              title="阅读设置"
+              :aria-expanded="comfortOpen"
+            >
+              <el-icon><Reading /></el-icon>
+              <span>阅读设置</span>
+            </button>
+          </template>
+          <section class="reader-comfort-panel" aria-label="阅读舒适度设置">
+            <header>
+              <div><strong>阅读舒适度</strong><span>设置会自动保存在当前设备</span></div>
+              <button type="button" @click="resetComfort">恢复默认</button>
+            </header>
+            <fieldset>
+              <legend>阅读主题</legend>
+              <div class="comfort-option-grid theme-options">
+                <button type="button" :class="{ active: theme === 'light' }" :aria-pressed="theme === 'light'" @click="setTheme('light')">浅色</button>
+                <button type="button" :class="{ active: theme === 'sepia' }" :aria-pressed="theme === 'sepia'" @click="setTheme('sepia')">护眼</button>
+                <button type="button" :class="{ active: theme === 'dark' }" :aria-pressed="theme === 'dark'" @click="setTheme('dark')">深色</button>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>正文字号 <output>{{ comfort.fontSize }}px</output></legend>
+              <div class="comfort-option-grid font-options">
+                <button v-for="value in FONT_SIZE_OPTIONS" :key="value" type="button" :class="{ active: comfort.fontSize === value }" :aria-pressed="comfort.fontSize === value" @click="comfort.fontSize = value">{{ value }}</button>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>行距</legend>
+              <div class="comfort-option-grid">
+                <button v-for="option in LINE_HEIGHT_OPTIONS" :key="option.value" type="button" :class="{ active: comfort.lineHeight === option.value }" :aria-pressed="comfort.lineHeight === option.value" @click="comfort.lineHeight = option.value">{{ option.label.replace(/\s[\d.]+$/, '') }}</button>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>正文栏宽</legend>
+              <div class="comfort-option-grid">
+                <button v-for="option in COLUMN_WIDTH_OPTIONS" :key="option.value" type="button" :class="{ active: comfort.columnWidth === option.value }" :aria-pressed="comfort.columnWidth === option.value" @click="comfort.columnWidth = option.value">{{ option.label.replace(/\s\d+$/, '') }}</button>
+              </div>
+            </fieldset>
+          </section>
+        </el-popover>
         <!-- 三档主题切换 -->
         <div class="reader-theme-switch" role="group" aria-label="阅读主题">
           <button type="button" :class="{ active: theme === 'light' }" :aria-pressed="theme === 'light'" @click="setTheme('light')">浅色</button>
@@ -269,6 +333,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         </article>
         <nav class="chapter-pagination" aria-label="章节翻页">
           <el-button :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button>
+          <span class="chapter-position" aria-live="polite">{{ chapterPosition }}</span>
           <el-button type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
         </nav>
       </template>
