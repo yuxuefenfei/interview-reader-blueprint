@@ -2,11 +2,11 @@
 import { ArrowLeft, ArrowRight, Document, UploadFilled, Reading, SwitchButton } from "@element-plus/icons-vue";
 import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { BRAND_ICON_URL } from "../shared/branding";
 
 defineProps<{ username?: string | null }>();
 const emit = defineEmits<{ logout: [] }>();
 const router = useRouter();
-const brandIconUrl = "/icon.svg";
 const collapsedPreference = localStorage.getItem("admin.sidebar.collapsed");
 const collapsed = ref(collapsedPreference === null ? true : collapsedPreference === "true");
 
@@ -17,7 +17,7 @@ watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", Stri
   <div class="admin-layout" :class="{ 'sidebar-collapsed': collapsed }">
     <aside class="admin-sidebar">
       <button class="admin-brand" type="button" title="返回阅读器" @click="router.push('/reader')">
-        <img class="brand-mark" :src="brandIconUrl" alt="" aria-hidden="true" />
+        <img class="brand-mark" :src="BRAND_ICON_URL" alt="" aria-hidden="true" />
         <span>Interview Reader</span>
       </button>
       <nav aria-label="管理菜单">

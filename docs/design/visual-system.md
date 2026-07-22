@@ -122,7 +122,7 @@
 ## 6. 图标与品牌标
 
 - 继续使用 `@element-plus/icons-vue`，描边权重与字号对齐（导航约 18–20px）。
-- `brand-mark`：保留青绿对角渐变或改为纯色 `#0f766e` + 内嵌白页线条（与 `icon.svg` 一致），避免再引入蓝色半区。
+- `brand-mark`：统一引用 `icon.svg`；图形为青绿色渐变底、白色打开书页与三条题干线，避免用 CSS 伪元素重复绘制或引入第二套标识。
 - PWA `theme-color` 保持 `#0f766e`。
 
 ## 7. Element Plus 主题对齐

@@ -30,6 +30,7 @@ vi.mock("../offline/serviceWorkerRegistration", () => ({
 }));
 
 import App from "../App.vue";
+import { BRAND_ICON_URL } from "../shared/branding";
 
 const ButtonStub = defineComponent({
   emits: ["click"],
@@ -64,6 +65,17 @@ describe("App update notification", () => {
     await flushPromises();
 
     expect(wrapper.find(".app-update-banner").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("uses the shared SVG brand icon on the login page", async () => {
+    mocks.session.mockResolvedValue({ authenticated: false, username: null });
+    const wrapper = mountApp();
+    await flushPromises();
+
+    const brand = wrapper.get("img.brand-mark");
+    expect(brand.attributes("src")).toBe(BRAND_ICON_URL);
+    expect(brand.attributes("alt")).toBe("");
     wrapper.unmount();
   });
 
