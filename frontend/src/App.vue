@@ -98,7 +98,7 @@ function applyUpdate(): void {
     <router-view :username="username" @logout="logout" />
   </div>
   <div v-if="!online" class="app-status-banner" role="status">当前处于离线状态；已缓存内容仍可阅读，进度会在联网后同步。</div>
-  <div v-if="updateAvailable" class="app-update-banner" role="status">
+  <div v-if="ready && authenticated && updateAvailable" class="app-update-banner" role="status">
     <span>新版本已准备好。</span>
     <button type="button" @click="applyUpdate">刷新并更新</button>
   </div>

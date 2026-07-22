@@ -5,6 +5,7 @@ import { ElCard } from "element-plus/es/components/card/index";
 import { ElCollapse, ElCollapseItem } from "element-plus/es/components/collapse/index";
 import { provideGlobalConfig } from "element-plus/es/components/config-provider/index";
 import { ElDrawer } from "element-plus/es/components/drawer/index";
+import { ElDialog } from "element-plus/es/components/dialog/index";
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from "element-plus/es/components/dropdown/index";
 import { ElEmpty } from "element-plus/es/components/empty/index";
 import { ElForm, ElFormItem } from "element-plus/es/components/form/index";
@@ -36,6 +37,7 @@ const app = createApp(App).use(router);
   ElCollapse,
   ElCollapseItem,
   ElDrawer,
+  ElDialog,
   ElDropdown,
   ElDropdownItem,
   ElDropdownMenu,

@@ -185,8 +185,11 @@ describe("AdminDocumentDetailView", () => {
     await flushPromises();
 
     expect(wrapper.get(".document-metadata-card").text()).toContain("原始描述");
+    expect(wrapper.findAll('[data-testid="edit-document-metadata"]')).toHaveLength(1);
     await wrapper.get('[data-testid="edit-document-metadata"]').trigger("click");
     await flushPromises();
+    expect(wrapper.get('[data-testid="save-document-metadata"]').text()).toContain("保存并立即生效");
+    expect(wrapper.text()).toContain("取消");
     await wrapper.get('[data-testid="save-document-metadata"]').trigger("click");
     await flushPromises();
 
