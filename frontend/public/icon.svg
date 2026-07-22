@@ -1,5 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="24" fill="#0f766e"/>
-  <path d="M34 28h46a14 14 0 0 1 14 14v58H48a14 14 0 0 1-14-14V28Z" fill="#fbfcfd"/>
-  <path d="M48 48h31M48 63h31M48 78h22" stroke="#0f766e" stroke-width="8" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Interview Reader</title>
+  <defs>
+    <linearGradient id="surface" x1="20" y1="16" x2="108" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#149188"/>
+      <stop offset="0.55" stop-color="#0f827a"/>
+      <stop offset="1" stop-color="#08716b"/>
+    </linearGradient>
+    <radialGradient id="highlight" cx="0" cy="0" r="1" gradientTransform="translate(42 24) rotate(56) scale(80 92)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#43b5aa" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#43b5aa" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="24" fill="url(#surface)"/>
+  <rect x="7" y="7" width="114" height="114" rx="23" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="6" y="6" width="116" height="116" rx="24" fill="url(#highlight)"/>
+  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 96c-5-5-11-8-19-8H32V39c0-6 5-11 11-11h4c7 0 13 3 17 9v59Z"/>
+    <path d="M64 37c4-6 10-9 18-9h10"/>
+    <path d="M78 49h27M78 66h27M78 83h27"/>
+  </g>
 </svg>

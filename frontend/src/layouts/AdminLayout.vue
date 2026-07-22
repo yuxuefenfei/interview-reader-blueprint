@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 defineProps<{ username?: string | null }>();
 const emit = defineEmits<{ logout: [] }>();
 const router = useRouter();
+const brandIconUrl = "/icon.svg";
 const collapsedPreference = localStorage.getItem("admin.sidebar.collapsed");
 const collapsed = ref(collapsedPreference === null ? true : collapsedPreference === "true");
 
@@ -16,7 +17,7 @@ watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", Stri
   <div class="admin-layout" :class="{ 'sidebar-collapsed': collapsed }">
     <aside class="admin-sidebar">
       <button class="admin-brand" type="button" title="返回阅读器" @click="router.push('/reader')">
-        <span class="brand-mark" aria-hidden="true"></span>
+        <img class="brand-mark" :src="brandIconUrl" alt="" aria-hidden="true" />
         <span>Interview Reader</span>
       </button>
       <nav aria-label="管理菜单">

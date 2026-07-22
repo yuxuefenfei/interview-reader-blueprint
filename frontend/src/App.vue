@@ -6,6 +6,8 @@ import { readerApi } from "./api/reader";
 import { syncDeletedDocuments } from "./offline/deletionSync";
 import { activateServiceWorkerUpdate, SERVICE_WORKER_UPDATE_EVENT } from "./offline/serviceWorkerRegistration";
 
+const brandIconUrl = "/icon.svg";
+
 const router = useRouter();
 const ready = ref(false);
 const authenticated = ref(false);
@@ -87,7 +89,7 @@ function applyUpdate(): void {
   <section v-else-if="!authenticated" class="login-page">
     <form class="login-card login-card-enter" @submit.prevent="login">
       <div class="login-brand-row">
-        <div class="brand-mark" aria-hidden="true"></div>
+        <img class="brand-mark" :src="brandIconUrl" alt="" aria-hidden="true" />
         <div>
           <h1>Interview Reader</h1>
           <p>结构化面试讲义，随时从上次读到的地方继续。</p>
