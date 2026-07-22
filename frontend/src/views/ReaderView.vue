@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowLeft, ArrowRight, Close, Menu, Moon, Search, Sunny } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, Close, Menu, Search } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { readerApi } from "../api/reader";
@@ -11,6 +11,8 @@ import { enqueueReadingProgress, flushReadingProgressQueue, shouldQueueReadingPr
 import type { DocumentSummary, NodeContent, ReadingProgress, TocNode } from "../types/api";
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
 import { firstReadableNode, flattenToc, isQuestionNode } from "../utils/toc";
+
+type Theme = "light" | "dark" | "sepia";
 
 defineProps<{ username?: string | null }>();
 const emit = defineEmits<{ logout: [] }>();
@@ -30,7 +32,7 @@ const query = ref("");
 const searchHits = ref<Awaited<ReturnType<typeof readerApi.search>>>([]);
 const readingArea = ref<HTMLElement | null>(null);
 const chapterProgress = ref(0);
-const theme = ref(localStorage.getItem("reader.theme") || "light");
+const theme = ref<Theme>((localStorage.getItem("reader.theme") as Theme) || "light");
 const loadingMore = ref(false);
 const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
@@ -41,6 +43,7 @@ const activeIndex = computed(() => readable.value.findIndex((node) => node.id ==
 const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activeIndex.value - 1] : null);
 const nextNode = computed(() => activeIndex.value >= 0 && activeIndex.value < readable.value.length - 1 ? readable.value[activeIndex.value + 1] : null);
 const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
+const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 
 watch(theme, (value) => localStorage.setItem("reader.theme", value));
 watch(() => route.params.documentId, () => { void openFromRoute(); });
@@ -195,21 +198,61 @@ async function jump(hit: { documentId: string; nodeId: string }): Promise<void> 
   searchOpen.value = false;
 }
 
-function toggleTheme(): void { theme.value = theme.value === "dark" ? "light" : "dark"; }
+function setTheme(t: Theme): void { theme.value = t; }
 function message(value: unknown): string { return toUserMessage(value, "加载失败"); }
 </script>
 
 <template>
   <div class="reader-page" :class="`theme-${theme}`">
     <header class="reader-header">
-      <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true"><el-icon><Menu /></el-icon></button>
-      <div class="reader-heading"><strong>{{ activeNode?.title || selected?.title || "阅读器" }}</strong><span>{{ selected?.title }}</span></div>
-      <div class="reader-header-actions"><el-button circle :icon="theme === 'dark' ? Sunny : Moon" :aria-label="theme === 'dark' ? '浅色模式' : '深色模式'" :aria-pressed="theme === 'dark'" @click="toggleTheme" /><el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button><el-button text @click="emit('logout')">退出</el-button></div>
-      <div class="mobile-chapter-progress" aria-label="当前章节阅读进度"><span :style="mobileProgressStyle"></span></div>
+      <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true">
+        <el-icon><Menu /></el-icon>
+      </button>
+      <div class="reader-heading">
+        <strong>{{ activeNode?.title || selected?.title || "阅读器" }}</strong>
+        <span>{{ selected?.title }}</span>
+      </div>
+      <div class="reader-header-actions">
+        <!-- 搜索按钮（桌面可见） -->
+        <button
+          class="reader-header-search-btn"
+          type="button"
+          aria-label="搜索文档"
+          title="搜索文档"
+          @click="searchOpen = true"
+        >
+          <el-icon><Search /></el-icon>
+          <span>搜索</span>
+        </button>
+        <!-- 三档主题切换 -->
+        <div class="reader-theme-switch" role="group" aria-label="阅读主题">
+          <button type="button" :class="{ active: theme === 'light' }" :aria-pressed="theme === 'light'" @click="setTheme('light')">浅色</button>
+          <button type="button" :class="{ active: theme === 'sepia' }" :aria-pressed="theme === 'sepia'" @click="setTheme('sepia')">护眼</button>
+          <button type="button" :class="{ active: theme === 'dark' }" :aria-pressed="theme === 'dark'" @click="setTheme('dark')">深色</button>
+        </div>
+        <el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button>
+        <el-button text @click="emit('logout')">退出</el-button>
+      </div>
+      <!-- 桌面阅读进度条 -->
+      <div class="reader-header-progress" aria-hidden="true">
+        <span :style="desktopProgressStyle"></span>
+      </div>
+      <!-- 移动端章节进度条 -->
+      <div class="mobile-chapter-progress" aria-label="当前章节阅读进度">
+        <span :style="mobileProgressStyle"></span>
+      </div>
     </header>
 
     <aside class="reader-desktop-nav">
-      <div class="reader-documents"><button v-for="document in documents" :key="document.id" :class="{ active: document.id === selected?.id }" type="button" @click="selectDocument(document)">{{ document.title }}</button></div>
+      <div class="reader-documents">
+        <button
+          v-for="document in documents"
+          :key="document.id"
+          :class="{ active: document.id === selected?.id }"
+          type="button"
+          @click="selectDocument(document)"
+        >{{ document.title }}</button>
+      </div>
       <TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" />
     </aside>
 
@@ -217,15 +260,59 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <div v-if="loading" class="reader-state">正在加载章节</div>
       <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
       <template v-else-if="content">
-        <article class="reader-article"><h1>{{ content.node.title }}</h1><ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" /><div v-if="content.nextAfterSeq" class="reader-load-more"><el-button :loading="loadingMore" @click="loadMoreContent">加载更多内容</el-button></div></article>
-        <nav class="chapter-pagination" aria-label="章节翻页"><el-button :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button><el-button type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button></nav>
+        <article class="reader-article">
+          <h1>{{ content.node.title }}</h1>
+          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" />
+          <div v-if="content.nextAfterSeq" class="reader-load-more">
+            <el-button :loading="loadingMore" @click="loadMoreContent">加载更多内容</el-button>
+          </div>
+        </article>
+        <nav class="chapter-pagination" aria-label="章节翻页">
+          <el-button :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button>
+          <el-button type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
+        </nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
     </main>
 
-    <div class="reader-fab" :class="{ open: toolsOpen }"><button v-if="toolsOpen" class="reader-fab-action reader-fab-search" type="button" aria-label="搜索" @click="searchOpen = true; toolsOpen = false"><el-icon><Search /></el-icon></button><button v-if="toolsOpen" class="reader-fab-action reader-fab-toc" type="button" aria-label="目录" @click="drawer = true; toolsOpen = false"><el-icon><Menu /></el-icon></button><button class="reader-fab-main" type="button" :aria-label="toolsOpen ? '关闭工具箱' : '打开工具箱'" :aria-expanded="toolsOpen" @click="toolsOpen = !toolsOpen"><el-icon><Close v-if="toolsOpen" /><Menu v-else /></el-icon></button></div>
+    <!-- 移动端 FAB -->
+    <div class="reader-fab" :class="{ open: toolsOpen }">
+      <button v-if="toolsOpen" class="reader-fab-action reader-fab-search" type="button" aria-label="搜索" @click="searchOpen = true; toolsOpen = false"><el-icon><Search /></el-icon></button>
+      <button v-if="toolsOpen" class="reader-fab-action reader-fab-toc" type="button" aria-label="目录" @click="drawer = true; toolsOpen = false"><el-icon><Menu /></el-icon></button>
+      <button class="reader-fab-main" type="button" :aria-label="toolsOpen ? '关闭工具箱' : '打开工具箱'" :aria-expanded="toolsOpen" @click="toolsOpen = !toolsOpen">
+        <el-icon><Close v-if="toolsOpen" /><Menu v-else /></el-icon>
+      </button>
+    </div>
 
-    <el-drawer v-model="drawer" direction="ltr" size="min(88vw, 360px)" :with-header="false"><section class="reader-drawer"><header><strong>文档目录</strong><el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" /></header><div class="reader-drawer-documents"><button v-for="document in documents" :key="document.id" :class="{ active: document.id === selected?.id }" type="button" @click="selectDocument(document)">{{ document.title }}</button></div><TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" /></section></el-drawer>
-    <el-drawer v-model="searchOpen" direction="btt" size="min(68vh, 520px)" :with-header="false"><section class="reader-search-sheet"><header><strong>搜索当前文档</strong><el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" /></header><el-input v-model="query" aria-label="搜索标题或正文" placeholder="搜索标题或正文" clearable @keyup.enter="search"><template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template></el-input><button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)"><strong>{{ hit.title }}</strong><span>{{ hit.snippet }}</span></button></section></el-drawer>
+    <!-- 移动端目录抽屉 -->
+    <el-drawer v-model="drawer" direction="ltr" size="min(88vw, 360px)" :with-header="false">
+      <section class="reader-drawer">
+        <header>
+          <strong>文档目录</strong>
+          <el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" />
+        </header>
+        <div class="reader-drawer-documents">
+          <button v-for="document in documents" :key="document.id" :class="{ active: document.id === selected?.id }" type="button" @click="selectDocument(document)">{{ document.title }}</button>
+        </div>
+        <TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" />
+      </section>
+    </el-drawer>
+
+    <!-- 搜索面板 -->
+    <el-drawer v-model="searchOpen" direction="btt" size="min(68vh, 520px)" :with-header="false">
+      <section class="reader-search-sheet">
+        <header>
+          <strong>搜索当前文档</strong>
+          <el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" />
+        </header>
+        <el-input v-model="query" aria-label="搜索标题或正文" placeholder="搜索标题或正文" clearable @keyup.enter="search">
+          <template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template>
+        </el-input>
+        <button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)">
+          <strong>{{ hit.title }}</strong>
+          <span>{{ hit.snippet }}</span>
+        </button>
+      </section>
+    </el-drawer>
   </div>
 </template>

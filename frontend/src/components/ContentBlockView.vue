@@ -117,11 +117,11 @@ async function copyCode(block: ContentBlock): Promise<void> {
     </div>
 
     <figure v-else-if="block.blockType === 'table_snapshot'" class="table-snapshot">
-      <figcaption>table snapshot</figcaption>
+      <figcaption>表格快照</figcaption>
       <pre>{{ textFromPayload(block.payload, block.plainText) }}</pre>
     </figure>
 
-    <blockquote v-else-if="block.blockType === 'quote'">
+    <blockquote v-else-if="block.blockType === 'quote'" class="callout">
       {{ textFromPayload(block.payload, block.plainText) }}
     </blockquote>
 
@@ -134,8 +134,8 @@ async function copyCode(block: ContentBlock): Promise<void> {
       {{ typeof block.payload.latex === "string" ? block.payload.latex : block.plainText }}
     </p>
 
-    <figure v-else-if="block.blockType === 'image'" class="image-placeholder">
-      <span>{{ typeof block.payload.alt === "string" ? block.payload.alt : "Image" }}</span>
+    <figure v-else-if="block.blockType === 'image'" class="image-placeholder" :aria-label="typeof block.payload.alt === 'string' ? block.payload.alt : undefined">
+      <span>{{ typeof block.payload.alt === "string" && block.payload.alt ? block.payload.alt : "图片" }}</span>
     </figure>
 
     <hr v-else-if="block.blockType === 'divider'" />

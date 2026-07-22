@@ -18,6 +18,7 @@ const emit = defineEmits<{
         class="toc-node"
         type="button"
         :class="{ active: node.id === activeNodeId }"
+        :aria-current="node.id === activeNodeId ? 'location' : undefined"
         :style="{ paddingLeft: `${Math.max(0, node.level - 1) * 14 + 10}px` }"
         @click="emit('select', node)"
       >

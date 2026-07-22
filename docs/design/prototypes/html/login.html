@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>原型 · 登录 — Interview Reader</title>
+  <link rel="stylesheet" href="shared.css" />
+</head>
+<body class="page-login">
+  <main class="login-shell">
+    <form class="login-card" action="../html/reader.html" method="get" onsubmit="location.href='reader.html'; return false;">
+      <div class="brand-row">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Interview Reader</h1>
+          <p>结构化面试讲义，随时从上次读到的地方继续。</p>
+        </div>
+      </div>
+      <label>
+        <span>用户名</span>
+        <input type="text" name="username" value="reader" autocomplete="username" />
+      </label>
+      <label>
+        <span>密码</span>
+        <input type="password" name="password" value="••••••••" autocomplete="current-password" />
+      </label>
+      <button class="btn btn-primary btn-block" type="submit">进入阅读</button>
+    </form>
+  </main>
+  <p class="proto-note"><a href="../index.html">← 返回图册</a></p>
+</body>
+</html>

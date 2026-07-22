@@ -7,6 +7,7 @@
 | 分类 | 内容 | 入口 |
 |---|---|---|
 | 架构设计 | 系统目标、领域模型、导入流程、阅读器与实施路线 | [系统设计方案](architecture/system-design.md) |
+| 前端展示设计 | 产品主题、视觉系统、页面规格、原型图与落地优先级 | [前端展示设计](design/README.md) · [原型图册](design/prototypes/index.html) |
 | API 契约 | 前后端共同遵守的 OpenAPI 定义 | [OpenAPI 契约](api/openapi.yaml) |
 | 数据库 | 数据库权威迁移位置说明 | [数据库结构说明](database/schema-mysql.sql) |
 | 导入规范 | JSON Schema、示例包和 Excel 模板 | [导入资料](#导入资料) |
@@ -34,6 +35,6 @@ Markdown 与 PDF 文件按技术主题命名。Markdown 文件前的编号用于
 
 1. `docs/api/openapi.yaml` 是 API 契约的权威来源。
 2. 数据库可执行结构以 `src/main/resources/db/migration/` 下的 Flyway 脚本为准，文档目录不复制运行时 SQL。
-3. 设计决策放入 `architecture/`，实施计划放入 `planning/`，核查与评审结果放入 `quality/`。
+3. 系统设计决策放入 `architecture/`，前端展示与交互规格放入 `design/`，实施计划放入 `planning/`，核查与评审结果放入 `quality/`。
 4. 运维步骤必须放入 `operations/`，并在影响部署或恢复流程时同步更新。
 5. 导入格式变更必须同时检查 Schema、示例、模板、OpenAPI 和相关自动化测试。
