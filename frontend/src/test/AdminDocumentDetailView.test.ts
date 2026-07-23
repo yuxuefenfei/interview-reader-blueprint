@@ -223,7 +223,7 @@ describe("AdminDocumentDetailView", () => {
     const wrapper = mountView();
     await flushPromises();
 
-    await wrapper.get('[data-testid="delete-document"]').trigger("click");
+    wrapper.findAllComponents(DropdownStub)[0].vm.$emit("command", "delete-document");
     await flushPromises();
 
     expect(mocks.prompt).toHaveBeenCalledWith(

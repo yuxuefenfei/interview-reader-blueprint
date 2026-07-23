@@ -23,6 +23,11 @@ export const COLUMN_WIDTH_OPTIONS = [
 ] as const;
 
 const THEME_ORDER: ReaderTheme[] = ["light", "dark", "sepia"];
+const THEME_COLORS: Record<ReaderTheme, string> = {
+  light: "#f5f7f8",
+  sepia: "#f3efe6",
+  dark: "#101820",
+};
 
 function readNumber(key: string, fallback: number, min: number, max: number): number {
   const stored = localStorage.getItem(key);
@@ -49,6 +54,10 @@ export function persistReaderComfort(comfort: ReaderComfort): void {
 export function loadReaderTheme(): ReaderTheme {
   const value = localStorage.getItem("reader.theme");
   return value === "dark" || value === "sepia" ? value : "light";
+}
+
+export function readerThemeColor(theme: ReaderTheme): string {
+  return THEME_COLORS[theme];
 }
 
 export function nextReaderTheme(current: ReaderTheme): ReaderTheme {

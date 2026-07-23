@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowLeft, Delete, EditPen, FolderOpened, FullScreen, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
+import { Delete, EditPen, FolderOpened, FullScreen, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus/es/components/message/index";
@@ -14,11 +14,14 @@ import type { EditorBlock, EditorNode, EditorSnapshot, StructureNode } from "../
 import { editorTextPlaceholder, parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
 import { createSerializedSaveQueue } from "../utils/serializedSaveQueue";
 import { detachedPreviewChannelName, isDetachedPreviewMessage, type DetachedPreviewState } from "../utils/detachedPreviewChannel";
+import AdminPageHeader from "../components/AdminPageHeader.vue";
 
 type TreeNode = EditorNode & { children: TreeNode[] };
 type NodeForm = Pick<EditorNode, "title" | "nodeType" | "semanticRole" | "anchor">;
 type PreviewMode = "block" | "node";
 type SaveState = "saved" | "dirty" | "saving" | "error";
+type PreviewCommand = "embedded" | "detached";
+type EditorMoreCommand = "refresh" | "discard";
 interface BlockSaveSnapshot {
   blockId: string;
   blockType: EditorBlock["blockType"];
@@ -177,6 +180,21 @@ function showEmbeddedPreview(): void {
   detachedPreviewWindow = null;
   detachedPreviewActive.value = false;
   previewVisible.value = true;
+}
+
+function handlePreviewCommand(command: string | number | object): void {
+  if (command === ("embedded" satisfies PreviewCommand)) showEmbeddedPreview();
+  if (command === ("detached" satisfies PreviewCommand)) openDetachedPreview();
+}
+
+function handleEditorMoreCommand(command: string | number | object): void {
+  if (command === ("refresh" satisfies EditorMoreCommand)) void load();
+  if (command === ("discard" satisfies EditorMoreCommand)) void discard();
+}
+
+function backToDocument(): void {
+  const target = editor.value ? `/admin/documents/${editor.value.document.id}` : "/admin/documents";
+  void router.push(target);
 }
 
 async function load(): Promise<void> {
@@ -539,10 +557,26 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
 
 <template>
   <section class="admin-view editor-view" v-loading="loading">
-    <header class="admin-view-header editor-header">
-      <div><el-button text :icon="ArrowLeft" @click="router.push('/admin/documents')">返回文档管理</el-button><p class="eyebrow">版本修订</p><h1>{{ editor?.document.title || "草稿编辑器" }}</h1><span v-if="editor">v{{ editor.version.versionNo }} · {{ zh(editor.version.status) }} · 修订 {{ editor.version.draftRevision }}</span></div>
-      <div class="header-buttons editor-header-actions"><el-button-group class="editor-preview-switch" aria-label="预览方式"><el-button :type="previewVisible ? 'primary' : 'default'" :plain="!previewVisible" :icon="View" @click="showEmbeddedPreview">显示预览</el-button><el-button :type="detachedPreviewActive ? 'primary' : 'default'" :plain="!detachedPreviewActive" :icon="FullScreen" @click="openDetachedPreview">独立预览</el-button></el-button-group><div class="editor-document-actions"><el-button :icon="RefreshRight" @click="load">刷新</el-button><el-button type="danger" plain :icon="Delete" @click="discard">丢弃草稿</el-button></div></div>
-    </header>
+    <AdminPageHeader
+      eyebrow="版本修订"
+      :title="editor?.document.title || '草稿编辑器'"
+      :description="editor ? `v${editor.version.versionNo} · ${zh(editor.version.status)} · 修订 ${editor.version.draftRevision}` : '加载草稿版本信息'"
+      back-label="返回版本管理"
+      @back="backToDocument"
+    >
+      <template #status><span class="editor-save-state" :class="`is-${saveState}`"><i />{{ saveStateLabel }}</span></template>
+      <template #actions>
+        <el-button type="primary" :loading="saveState === 'saving'" :disabled="dirtyBlockCount === 0" @click="saveAllBlocks">保存</el-button>
+        <el-dropdown trigger="click" @command="handlePreviewCommand">
+          <el-button :icon="View">预览</el-button>
+          <template #dropdown><el-dropdown-menu><el-dropdown-item command="embedded" :icon="View">页面内预览</el-dropdown-item><el-dropdown-item command="detached" :icon="FullScreen">独立窗口预览</el-dropdown-item></el-dropdown-menu></template>
+        </el-dropdown>
+        <el-dropdown trigger="click" @command="handleEditorMoreCommand">
+          <el-button :icon="MoreFilled">更多</el-button>
+          <template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" :icon="RefreshRight">刷新草稿</el-dropdown-item><el-dropdown-item command="discard" :icon="Delete" divided class="danger-command">丢弃草稿</el-dropdown-item></el-dropdown-menu></template>
+        </el-dropdown>
+      </template>
+    </AdminPageHeader>
 
     <div v-if="editor" class="editor-workbench">
       <aside ref="treePanelRef" class="editor-tree-panel" v-loading="structureSaving">

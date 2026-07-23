@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowLeft, CircleCheckFilled, Delete, EditPen, MoreFilled, Plus, RefreshRight, UploadFilled } from "@element-plus/icons-vue";
+import { CircleCheckFilled, Delete, EditPen, MoreFilled, Plus, RefreshRight, Upload } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus/es/components/message/index";
@@ -8,9 +8,11 @@ import { ElMessageBox } from "element-plus/es/components/message-box/index";
 import { adminApi } from "../api/admin";
 import { formatTime, zh } from "../shared/presentation";
 import type { AdminDocumentSummary, DeletionJob, DocumentMetadata, VersionSummary } from "../types/api";
+import AdminPageHeader from "../components/AdminPageHeader.vue";
 
 type ActionKind = "create" | "publish" | "discard" | "take-down" | "restore" | "delete-document" | "retry-delete";
 type MoreCommand = "create" | "discard";
+type DocumentMoreCommand = "delete-document";
 
 const route = useRoute();
 const router = useRouter();
@@ -264,24 +266,31 @@ function handleMoreCommand(version: VersionSummary, command: string | number | o
   if (command === ("create" satisfies MoreCommand)) void createRevision(version);
   if (command === ("discard" satisfies MoreCommand)) void discard(version);
 }
+function handleDocumentMoreCommand(command: string | number | object): void {
+  if (command === ("delete-document" satisfies DocumentMoreCommand)) void permanentlyDelete();
+}
 function message(value: unknown): string { return toUserMessage(value, "操作失败，请稍后重试"); }
 </script>
 
 <template>
   <section class="admin-view document-detail-view" v-loading="loading" :aria-busy="loading || actionsLocked">
-    <header class="admin-view-header">
-      <div class="detail-heading">
-        <el-button text :icon="ArrowLeft" @click="router.push('/admin/documents')">返回文档管理</el-button>
-        <p class="eyebrow">版本管理</p>
-        <h1>{{ document?.title || '文档详情' }}</h1>
-        <span>{{ document?.code }} · 共 {{ document?.versionCount || 0 }} 个版本，{{ document?.draftCount || 0 }} 个草稿</span>
-      </div>
-      <div class="document-lifecycle-actions">
+    <AdminPageHeader
+      eyebrow="版本管理"
+      :title="document?.title || '文档详情'"
+      :description="document ? `${document.code} · 共 ${document.versionCount} 个版本，${document.draftCount} 个草稿` : '加载文档版本与生命周期信息'"
+      back-label="返回文档管理"
+      @back="router.push('/admin/documents')"
+    >
+      <template #status><el-tag v-if="document" :type="document.status === 'PUBLISHED' ? 'success' : document.status === 'DELETE_FAILED' ? 'danger' : 'info'" effect="plain">{{ zh(document.status) }}</el-tag></template>
+      <template #actions>
         <el-button v-if="document?.status === 'OFFLINE' && document.currentVersionId" type="success" :icon="RefreshRight" :loading="isActive(documentId, 'restore')" :disabled="actionsLocked && !isActive(documentId, 'restore')" data-testid="restore-document" @click="restore">重新上架</el-button>
-        <el-button v-if="canPermanentlyDelete" type="danger" plain :icon="Delete" :loading="isActive(documentId, 'delete-document')" :disabled="actionsLocked && !isActive(documentId, 'delete-document')" data-testid="delete-document" @click="permanentlyDelete">永久删除文档</el-button>
-        <el-button :icon="UploadFilled" :disabled="actionsLocked" @click="router.push({ path: '/admin/imports', query: { targetDocumentId: documentId } })">重新导入</el-button>
-      </div>
-    </header>
+        <el-button :icon="Upload" :disabled="actionsLocked" @click="router.push({ path: '/admin/imports', query: { targetDocumentId: documentId } })">重新导入</el-button>
+        <el-dropdown v-if="canPermanentlyDelete" trigger="click" :disabled="actionsLocked" @command="handleDocumentMoreCommand">
+          <el-button :icon="MoreFilled" :loading="isActive(documentId, 'delete-document')" :disabled="actionsLocked">更多</el-button>
+          <template #dropdown><el-dropdown-menu><el-dropdown-item command="delete-document" :icon="Delete" class="danger-command" data-testid="delete-document">永久删除文档</el-dropdown-item></el-dropdown-menu></template>
+        </el-dropdown>
+      </template>
+    </AdminPageHeader>
 
     <el-alert v-if="document?.status === 'DELETING'" :title="`永久删除进行中：${zh(document.deletionJob?.currentStage)}`" type="warning" :closable="false" show-icon description="任务开始后不可撤销；当前文档的全部管理操作已锁定。" />
     <el-alert v-if="document?.status === 'DELETE_FAILED'" title="永久删除失败" type="error" :closable="false" show-icon :description="document.deletionJob?.errorMessage || '已自动重试 3 次，请手动重试。'">

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowLeft, ArrowRight, Close, Menu, Reading, Search } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowLeft, ArrowRight, Close, Moon, Reading, Search, Sunny, Tickets } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { ElMessage } from "element-plus/es/components/message/index";
 import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import TocTree from "../components/TocTree.vue";
@@ -18,6 +19,7 @@ import {
   loadReaderComfort,
   loadReaderTheme,
   persistReaderComfort,
+  readerThemeColor,
   type ReaderTheme
 } from "../utils/readingComfort";
 import { firstReadableNode, flattenToc, isQuestionNode } from "../utils/toc";
@@ -36,9 +38,9 @@ const error = ref("");
 const drawer = ref(false);
 const searchOpen = ref(false);
 const comfortOpen = ref(false);
-const toolsOpen = ref(false);
 const query = ref("");
 const searchHits = ref<Awaited<ReturnType<typeof readerApi.search>>>([]);
+const searchInput = ref<{ focus: () => void } | null>(null);
 const readingArea = ref<HTMLElement | null>(null);
 const chapterProgress = ref(0);
 const theme = ref<ReaderTheme>(loadReaderTheme());
@@ -47,6 +49,13 @@ const loadingMore = ref(false);
 const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
 let contentRequestId = 0;
+const completedNodes = new Set<string>();
+
+const themeOptions = [
+  { value: "light" as const, label: "浅色", icon: Sunny },
+  { value: "sepia" as const, label: "护眼", icon: Reading },
+  { value: "dark" as const, label: "深色", icon: Moon },
+];
 
 const readable = computed(() => flattenToc(toc.value).filter((node) => isQuestionNode(node) || node.children.length === 0));
 const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));
@@ -56,12 +65,20 @@ const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgre
 const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const readerComfortStyle = computed(() => comfortStyle(comfort));
 const chapterPosition = computed(() => activeIndex.value >= 0 ? `${activeIndex.value + 1} / ${readable.value.length}` : `0 / ${readable.value.length}`);
+const progressPercent = computed(() => Math.round(chapterProgress.value * 100));
+const currentTheme = computed(() => themeOptions.find((option) => option.value === theme.value) ?? themeOptions[0]);
+const searchShortcut = navigator.platform.toLowerCase().includes("mac") ? "⌘ K" : "Ctrl K";
 
-watch(theme, (value) => localStorage.setItem("reader.theme", value));
+watch(theme, (value) => {
+  localStorage.setItem("reader.theme", value);
+  updateThemeColor(value);
+});
 watch(comfort, (value) => persistReaderComfort(value), { deep: true });
 watch(() => route.params.documentId, () => { void openFromRoute(); });
 onMounted(async () => {
   window.addEventListener("online", flushOfflineProgress);
+  window.addEventListener("keydown", handleGlobalShortcut);
+  updateThemeColor(theme.value);
   void flushOfflineProgress();
   await loadDocuments();
   await openFromRoute();
@@ -69,6 +86,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (saveTimer !== null) window.clearTimeout(saveTimer);
   window.removeEventListener("online", flushOfflineProgress);
+  window.removeEventListener("keydown", handleGlobalShortcut);
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", "#0f766e");
 });
 
 async function loadDocuments(): Promise<void> {
@@ -156,6 +175,11 @@ function onReadingScroll(): void {
   if (!area) return;
   const distance = Math.max(1, area.scrollHeight - area.clientHeight);
   chapterProgress.value = Math.min(1, Math.max(0, area.scrollTop / distance));
+  const nodeId = activeNode.value?.id;
+  if (nodeId && chapterProgress.value >= .995 && !completedNodes.has(nodeId)) {
+    completedNodes.add(nodeId);
+    ElMessage.success({ message: "本节已读完", duration: 1600, showClose: false });
+  }
   scheduleProgress();
 }
 
@@ -211,6 +235,26 @@ async function jump(hit: { documentId: string; nodeId: string }): Promise<void> 
   searchOpen.value = false;
 }
 
+function openSearch(): void {
+  searchOpen.value = true;
+  void nextTick(() => searchInput.value?.focus());
+}
+
+function handleGlobalShortcut(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    openSearch();
+  }
+}
+
+function updateThemeColor(value: ReaderTheme): void {
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", readerThemeColor(value));
+}
+
+function chooseTheme(command: string | number | object): void {
+  if (command === "light" || command === "sepia" || command === "dark") setTheme(command);
+}
+
 function setTheme(value: ReaderTheme): void { theme.value = value; }
 function resetComfort(): void {
   comfort.fontSize = 18;
@@ -224,23 +268,23 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
   <div class="reader-page" :class="`theme-${theme}`" :style="readerComfortStyle">
     <header class="reader-header">
       <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true">
-        <el-icon><Menu /></el-icon>
+        <el-icon><Tickets /></el-icon>
       </button>
       <div class="reader-heading">
-        <strong>{{ activeNode?.title || selected?.title || "阅读器" }}</strong>
-        <span>{{ selected?.title }}</span>
+        <strong :title="activeNode?.title || selected?.title || '阅读器'">{{ activeNode?.title || selected?.title || "阅读器" }}</strong>
+        <span :title="selected?.title">{{ selected?.title }}</span>
       </div>
       <div class="reader-header-actions">
-        <!-- 搜索按钮（桌面可见） -->
         <button
-          class="reader-header-search-btn"
+          class="reader-header-search-trigger"
           type="button"
-          aria-label="搜索文档"
-          title="搜索文档"
-          @click="searchOpen = true"
+          aria-label="搜索文档内容"
+          title="搜索文档内容"
+          @click="openSearch"
         >
+          <span class="reader-search-placeholder">搜索文档内容</span>
+          <kbd>{{ searchShortcut }}</kbd>
           <el-icon><Search /></el-icon>
-          <span>搜索</span>
         </button>
         <el-popover v-model:visible="comfortOpen" placement="bottom-end" :width="340" trigger="click" popper-class="reader-comfort-popper">
           <template #reference>
@@ -288,12 +332,20 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
             </fieldset>
           </section>
         </el-popover>
-        <!-- 三档主题切换 -->
-        <div class="reader-theme-switch" role="group" aria-label="阅读主题">
-          <button type="button" :class="{ active: theme === 'light' }" :aria-pressed="theme === 'light'" @click="setTheme('light')">浅色</button>
-          <button type="button" :class="{ active: theme === 'sepia' }" :aria-pressed="theme === 'sepia'" @click="setTheme('sepia')">护眼</button>
-          <button type="button" :class="{ active: theme === 'dark' }" :aria-pressed="theme === 'dark'" @click="setTheme('dark')">深色</button>
-        </div>
+        <el-dropdown trigger="click" placement="bottom-end" @command="chooseTheme">
+          <button class="reader-theme-trigger" type="button" aria-label="切换阅读主题" :title="`当前主题：${currentTheme.label}`">
+            <el-icon><component :is="currentTheme.icon" /></el-icon>
+            <span>{{ currentTheme.label }}</span>
+            <el-icon class="reader-theme-chevron"><ArrowDown /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="option in themeOptions" :key="option.value" :command="option.value" :class="{ 'is-active': theme === option.value }">
+                <el-icon><component :is="option.icon" /></el-icon>{{ option.label }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button>
         <el-button text @click="emit('logout')">退出</el-button>
       </div>
@@ -305,6 +357,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <div class="mobile-chapter-progress" aria-label="当前章节阅读进度">
         <span :style="mobileProgressStyle"></span>
       </div>
+      <output class="mobile-progress-label" aria-live="polite">{{ progressPercent }}%</output>
     </header>
 
     <aside class="reader-desktop-nav">
@@ -340,15 +393,6 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
     </main>
 
-    <!-- 移动端 FAB -->
-    <div class="reader-fab" :class="{ open: toolsOpen }">
-      <button v-if="toolsOpen" class="reader-fab-action reader-fab-search" type="button" aria-label="搜索" @click="searchOpen = true; toolsOpen = false"><el-icon><Search /></el-icon></button>
-      <button v-if="toolsOpen" class="reader-fab-action reader-fab-toc" type="button" aria-label="目录" @click="drawer = true; toolsOpen = false"><el-icon><Menu /></el-icon></button>
-      <button class="reader-fab-main" type="button" :aria-label="toolsOpen ? '关闭工具箱' : '打开工具箱'" :aria-expanded="toolsOpen" @click="toolsOpen = !toolsOpen">
-        <el-icon><Close v-if="toolsOpen" /><Menu v-else /></el-icon>
-      </button>
-    </div>
-
     <!-- 移动端目录抽屉 -->
     <el-drawer v-model="drawer" direction="ltr" size="min(88vw, 360px)" :with-header="false">
       <section class="reader-drawer">
@@ -370,7 +414,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           <strong>搜索当前文档</strong>
           <el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" />
         </header>
-        <el-input v-model="query" aria-label="搜索标题或正文" placeholder="搜索标题或正文" clearable @keyup.enter="search">
+        <el-input ref="searchInput" v-model="query" aria-label="搜索标题或正文" placeholder="搜索标题或正文" clearable @keyup.enter="search">
           <template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template>
         </el-input>
         <button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)">

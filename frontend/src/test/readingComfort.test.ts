@@ -4,6 +4,7 @@ import {
   loadReaderComfort,
   loadReaderTheme,
   persistReaderComfort,
+  readerThemeColor,
 } from "../utils/readingComfort";
 
 describe("reader comfort preferences", () => {
@@ -24,6 +25,9 @@ describe("reader comfort preferences", () => {
       columnWidth: 740,
     });
     expect(loadReaderTheme()).toBe("light");
+    expect(readerThemeColor("light")).toBe("#f5f7f8");
+    expect(readerThemeColor("sepia")).toBe("#f3efe6");
+    expect(readerThemeColor("dark")).toBe("#101820");
   });
 
   it("persists valid preferences and exposes reader CSS variables", () => {

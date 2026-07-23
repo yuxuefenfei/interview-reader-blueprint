@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, Document, UploadFilled, Reading, SwitchButton } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, Document, Upload, Reading, SwitchButton } from "@element-plus/icons-vue";
 import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { BRAND_ICON_URL } from "../shared/branding";
@@ -8,7 +8,7 @@ defineProps<{ username?: string | null }>();
 const emit = defineEmits<{ logout: [] }>();
 const router = useRouter();
 const collapsedPreference = localStorage.getItem("admin.sidebar.collapsed");
-const collapsed = ref(collapsedPreference === null ? true : collapsedPreference === "true");
+const collapsed = ref(collapsedPreference === null ? false : collapsedPreference === "true");
 
 watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", String(value)));
 </script>
@@ -29,7 +29,7 @@ watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", Stri
         </el-tooltip>
         <el-tooltip content="导入中心" placement="right" :disabled="!collapsed">
           <router-link to="/admin/imports" aria-label="导入中心" active-class="router-link-active" exact-active-class="router-link-active">
-            <el-icon><UploadFilled /></el-icon><span>导入中心</span>
+            <el-icon><Upload /></el-icon><span>导入中心</span>
           </router-link>
         </el-tooltip>
       </nav>
