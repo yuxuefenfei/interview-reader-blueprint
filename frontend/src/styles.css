@@ -154,13 +154,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   color: var(--admin-sidebar-text-strong); font-size: 15px; font-weight: 750;
   text-align: left; white-space: nowrap; cursor: pointer;
 }
-.admin-brand .brand-mark { width: 36px; height: 36px; flex: 0 0 auto; border-radius: var(--radius-md); }
+.admin-brand .brand-mark {
+  width: 36px; height: 36px; flex: 0 0 auto; border-radius: 0;
+  opacity: .82; transition: opacity 140ms ease;
+}
+.admin-brand:hover .brand-mark, .admin-brand:focus-visible .brand-mark { opacity: 1; }
+.admin-brand:active .brand-mark { opacity: .68; }
 .admin-sidebar nav { display: grid; gap: 6px; }
 .admin-nav-label {
   padding: 0 12px 2px; color: #6f879c;
   font-size: 11px; font-weight: 700; letter-spacing: .10em; white-space: nowrap;
 }
 .admin-sidebar nav a, .admin-sidebar-foot button {
+  position: relative;
   width: 100%; min-height: 48px;
   display: flex; align-items: center; gap: 13px;
   padding: 0 14px; border: 0; border-radius: 9px;
@@ -173,8 +179,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: var(--admin-sidebar-hover); color: var(--admin-sidebar-text-strong);
 }
 .admin-sidebar nav a.router-link-active {
-  background: linear-gradient(135deg, #0f8279, var(--admin-sidebar-active)); color: var(--admin-sidebar-text-strong);
-  box-shadow: inset 3px 0 0 #5eead4;
+  background: color-mix(in srgb, var(--admin-sidebar-active), transparent 68%);
+  color: var(--admin-sidebar-text-strong); box-shadow: none;
 }
 .admin-sidebar nav a:active, .admin-sidebar-foot button:active { transform: scale(.98); }
 .admin-sidebar-foot { margin-top: auto; display: grid; gap: 4px; padding-bottom: 12px; }
@@ -200,6 +206,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   width: 44px; min-height: 44px; justify-content: center;
   margin-right: auto; margin-left: auto; padding-right: 0; padding-left: 0;
 }
+.admin-layout.sidebar-collapsed .admin-sidebar nav a.router-link-active { background: transparent; }
+.admin-layout.sidebar-collapsed .admin-sidebar nav a.router-link-active::before {
+  content: "";
+  position: absolute; z-index: 0; top: 50%; left: 50%;
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--admin-sidebar-active), transparent 48%);
+  transform: translate(-50%, -50%);
+}
+.admin-layout.sidebar-collapsed .admin-sidebar nav a.router-link-active .el-icon { position: relative; z-index: 1; }
 .admin-main { min-width: 0; height: 100dvh; padding: 0; overflow: auto; overscroll-behavior: contain; }
 .admin-view { min-height: 100%; max-width: none; margin: 0; background: #f5f7fa; }
 .admin-view:not(.editor-view) { padding-bottom: 48px; }
@@ -356,9 +371,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 /* TOC tree */
 .toc-tree { margin: 0; padding: 10px 6px 24px; list-style: none; }
 .toc-tree li { list-style: none; }
+.toc-tree .toc-tree {
+  margin: 0 0 0 9px;
+  padding: 0 0 0 9px;
+  border-left: 1px solid color-mix(in srgb, var(--reader-line), transparent 20%);
+}
 .toc-node {
-  width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px; align-items: baseline; padding: 8px 10px;
+  width: 100%; display: grid; grid-template-columns: minmax(0, 1fr);
+  align-items: baseline; padding: 8px 10px;
   border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--reader-text); text-align: left;
   transition: background-color 120ms, color 120ms;
@@ -368,7 +388,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .theme-dark .toc-node:hover, .theme-dark .toc-node.active { background: #1b3c3d; color: #b4fff0; }
 .theme-sepia .toc-node:hover, .theme-sepia .toc-node.active { background: #e8f4ef; color: var(--brand-700); }
 .toc-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.toc-page { color: var(--reader-muted); font-size: 11px; }
+.toc-node.has-children .toc-title { font-weight: 700; }
 
 /* Content area */
 .reader-content { min-width: 0; overflow: auto; overscroll-behavior: contain; }

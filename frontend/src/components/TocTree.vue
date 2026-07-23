@@ -17,13 +17,11 @@ const emit = defineEmits<{
       <button
         class="toc-node"
         type="button"
-        :class="{ active: node.id === activeNodeId }"
+        :class="{ active: node.id === activeNodeId, 'has-children': node.children.length > 0 }"
         :aria-current="node.id === activeNodeId ? 'location' : undefined"
-        :style="{ paddingLeft: `${Math.max(0, node.level - 1) * 14 + 10}px` }"
         @click="emit('select', node)"
       >
         <span class="toc-title">{{ node.title }}</span>
-        <span v-if="node.sourcePageStart" class="toc-page">P{{ node.sourcePageStart }}</span>
       </button>
       <TocTree
         v-if="node.children.length"
