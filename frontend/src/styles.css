@@ -525,8 +525,43 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .paragraph, .heading-note, .content-block blockquote { margin-bottom: 17px; }
   .code-block { margin: 20px -2px; }
   .code-block pre, .table-snapshot pre { padding: 15px; font-size: 13px; }
-  .chapter-pagination { position: relative; padding: 18px 18px 54px; width: 100%; }
-  .chapter-pagination .el-button { min-height: 42px; }
+  .chapter-pagination {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 12px;
+    width: 100%;
+    padding: 20px max(18px, env(safe-area-inset-right)) calc(46px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  }
+  .chapter-pagination .chapter-nav-button {
+    min-width: 78px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 12px;
+    border-color: transparent;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--reader-muted);
+    opacity: .72;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 140ms ease, color 140ms ease, opacity 140ms ease;
+  }
+  .chapter-pagination .chapter-nav-button > span { white-space: nowrap; }
+  .chapter-pagination .chapter-nav-previous { justify-self: start; }
+  .chapter-pagination .chapter-nav-next { justify-self: end; }
+  .chapter-pagination .chapter-nav-button:not(.is-disabled):active,
+  .chapter-pagination .chapter-nav-button:not(.is-disabled):focus-visible {
+    background: color-mix(in srgb, var(--reader-accent), transparent 88%);
+    color: var(--reader-accent);
+    opacity: 1;
+  }
+  .chapter-pagination .chapter-nav-button:not(.is-disabled):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--reader-accent), transparent 48%);
+    outline-offset: 2px;
+  }
+  .chapter-pagination .chapter-nav-button.is-disabled { visibility: hidden; }
+  .chapter-pagination .chapter-position { justify-self: center; font-size: 12px; letter-spacing: .04em; opacity: .62; }
   .el-drawer { max-width: 100vw; }
   .el-drawer__body { padding: 18px; }
 }

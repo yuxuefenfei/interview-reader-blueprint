@@ -389,9 +389,9 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           </div>
         </article>
         <nav class="chapter-pagination" aria-label="章节翻页">
-          <el-button :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button>
+          <el-button class="chapter-nav-button chapter-nav-previous" :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button>
           <span class="chapter-position" aria-live="polite">{{ chapterPosition }}</span>
-          <el-button type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
+          <el-button class="chapter-nav-button chapter-nav-next" type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
         </nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
