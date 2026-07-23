@@ -51,6 +51,7 @@
 
 /* ── Base ───────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: rgba(15, 118, 110, .14); }
 html, body, #app { min-height: 100%; }
 body {
   margin: 0;
@@ -61,11 +62,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 button, input, textarea, select { font: inherit; }
+button, a { touch-action: manipulation; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
-.route-content:focus { outline: none; }
+.route-content:focus:not(:focus-visible) { outline: none; }
+.route-content:focus-visible { outline: 2px solid var(--brand-500); outline-offset: -2px; }
 
 /* ── Skip link ──────────────────────────────────────────────── */
 .skip-link {
@@ -77,7 +80,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   text-decoration: none;
   font-size: 14px;
 }
-.skip-link:focus { transform: translateY(0); }
+.skip-link:focus-visible { transform: translateY(0); }
 
 /* ── App-level banners ──────────────────────────────────────── */
 .app-status-banner, .app-update-banner {
@@ -435,7 +438,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .chapter-position { color: var(--reader-muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .reader-state { display: grid; min-height: 48vh; place-items: center; color: var(--reader-muted); }
 .reader-load-more { padding: 8px 0 24px; text-align: center; }
-.reader-drawer, .reader-search-sheet { display: grid; gap: 14px; color: var(--ink-900); }
+.reader-drawer, .reader-search-sheet { display: grid; gap: 14px; color: var(--ink-900); overscroll-behavior: contain; }
 .reader-drawer header, .reader-search-sheet header {
   display: flex; align-items: center; justify-content: space-between;
 }
@@ -699,6 +702,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .reader-page.theme-dark .reader-comfort-button:hover,
 .reader-page.theme-dark .reader-comfort-button[aria-expanded="true"],
 .reader-page.theme-dark .reader-theme-trigger:hover { background: #1b3c3d; color: #b4fff0; }
+.reader-page.theme-dark { color-scheme: dark; }
 .el-dropdown-menu__item.is-active { background: var(--brand-100); color: var(--brand-700); font-weight: 700; }
 .reader-comfort-panel { display: grid; gap: 18px; color: var(--ink-900); }
 .reader-comfort-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-bottom: 13px; border-bottom: 1px solid var(--line-100); }

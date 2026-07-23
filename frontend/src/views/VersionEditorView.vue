@@ -101,7 +101,7 @@ const nodePath = computed(() => {
   }
   return path.join(" / ");
 });
-const saveStateLabel = computed(() => ({ saved: "已保存", dirty: "有未保存修改", saving: "保存中", error: "保存失败" }[saveState.value]));
+const saveStateLabel = computed(() => ({ saved: "已保存", dirty: "有未保存修改", saving: "保存中…", error: "保存失败" }[saveState.value]));
 watch(nodeForm, () => { if (nodePropertiesOpen.value) publishDetachedPreview(); }, { deep: true });
 watch(nodePropertiesOpen, (open) => {
   if (open) return;
@@ -366,7 +366,7 @@ function isBlankBlock(block: EditorBlock): boolean {
 
 function blockSummary(block: EditorBlock): string {
   const firstLine = block.plainText.split(/\r?\n/).find((line) => line.trim())?.trim() || "待填写内容";
-  return firstLine.length > 44 ? `${firstLine.slice(0, 44)}...` : firstLine;
+  return firstLine.length > 44 ? `${firstLine.slice(0, 44)}…` : firstLine;
 }
 
 function centerInScrollContainer(container: HTMLElement | undefined, selector: string, smooth: boolean): void {
@@ -581,7 +581,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
     <div v-if="editor" class="editor-workbench">
       <aside ref="treePanelRef" class="editor-tree-panel" v-loading="structureSaving">
         <div class="panel-title"><div><strong>文档结构</strong><span>{{ editor.nodes.length }} 个节点</span></div><el-icon><FolderOpened /></el-icon></div>
-        <el-input v-model="treeFilter" class="tree-search" clearable placeholder="搜索节点" :prefix-icon="Search" />
+        <el-input v-model="treeFilter" class="tree-search" name="editor-node-search" autocomplete="off" clearable placeholder="搜索节点…" :prefix-icon="Search" />
         <el-tree :data="filteredTreeData" node-key="id" :props="{ label: 'title', children: 'children' }" highlight-current :default-expanded-keys="defaultExpandedKeys" :draggable="!treeFilter" expand-on-click-node :current-node-key="selectedId" :allow-drop="() => true" @node-click="selectNode" @node-drop="persistStructure">
           <template #default="{ data }"><span class="editor-tree-label" :data-node-id="data.id"><span>{{ data.title }}</span></span></template>
         </el-tree>
@@ -605,9 +605,9 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
               <el-empty v-if="!activeBlock" description="从左侧选择一个内容块开始编辑" :image-size="72" />
               <template v-else>
                 <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><div class="block-detail-actions"><el-button type="danger" plain :icon="Delete" :loading="deletingBlockId === activeBlock.id" @click="deleteActiveBlock">删除</el-button><el-button type="primary" :loading="savingBlockId === activeBlock.id" @click="saveBlock(activeBlock)">保存</el-button></div></header>
-                <div class="block-edit-controls"><el-select v-model="activeBlock.blockType" aria-label="内容块类型" @change="scheduleBlockSave"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="activeBlock.blockType === 'code'" v-model="activeBlock.language" clearable placeholder="代码语言" @input="scheduleBlockSave" /></div>
-                <el-input v-model="activeBlock.plainText" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
-                <el-collapse v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
+                <div class="block-edit-controls"><el-select v-model="activeBlock.blockType" aria-label="内容块类型" @change="scheduleBlockSave"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="activeBlock.blockType === 'code'" v-model="activeBlock.language" name="block-code-language" autocomplete="off" spellcheck="false" clearable placeholder="例如：Java…" @input="scheduleBlockSave" /></div>
+                <el-input v-model="activeBlock.plainText" :name="`block-content-${activeBlock.id}`" autocomplete="off" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
+                <el-collapse v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" :name="`block-payload-${activeBlock.id}`" autocomplete="off" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
               </template>
             </section>
           </div>
@@ -623,7 +623,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
       </main>
       <el-drawer v-model="nodePropertiesOpen" class="node-property-drawer" title="节点属性" direction="rtl" size="420px" append-to-body>
         <p class="drawer-description">修改节点名称、层级类型与阅读定位信息。</p>
-        <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" /></el-form-item></el-form>
+        <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" name="node-title" autocomplete="off" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色…"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" name="node-anchor" autocomplete="off" spellcheck="false" /></el-form-item></el-form>
         <template #footer><div class="drawer-footer"><el-button @click="nodePropertiesOpen = false">取消</el-button><el-button type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div></template>
       </el-drawer>
     </div>

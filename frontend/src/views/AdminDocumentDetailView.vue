@@ -339,10 +339,10 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
     </el-card>
     <el-dialog v-model="metadataDialogVisible" title="编辑文档资料" width="min(560px, 92vw)" :close-on-click-modal="false">
       <el-form label-position="top" @submit.prevent>
-        <el-form-item label="文档标题" required><el-input v-model="metadataForm.title" maxlength="500" show-word-limit /></el-form-item>
-        <el-form-item label="只读标识"><el-input :model-value="metadata?.code" disabled /></el-form-item>
-        <el-form-item label="描述"><el-input v-model="metadataForm.description" type="textarea" :rows="4" maxlength="5000" show-word-limit /></el-form-item>
-        <el-form-item label="标签"><el-select v-model="metadataForm.tags" multiple filterable allow-create default-first-option :multiple-limit="20" placeholder="输入标签后按回车"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select><span class="form-help">最多 20 个，单个标签最多 50 个字符；标签忽略大小写去重。</span></el-form-item>
+        <el-form-item label="文档标题" required><el-input v-model="metadataForm.title" name="document-title" autocomplete="off" maxlength="500" show-word-limit /></el-form-item>
+        <el-form-item label="只读标识"><el-input :model-value="metadata?.code" name="document-code" autocomplete="off" spellcheck="false" disabled /></el-form-item>
+        <el-form-item label="描述"><el-input v-model="metadataForm.description" name="document-description" autocomplete="off" type="textarea" :rows="4" maxlength="5000" show-word-limit /></el-form-item>
+        <el-form-item label="标签"><el-select v-model="metadataForm.tags" name="document-tags" multiple filterable allow-create default-first-option :multiple-limit="20" placeholder="输入标签后按回车…"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select><span class="form-help">最多 20 个，单个标签最多 50 个字符；标签忽略大小写去重。</span></el-form-item>
       </el-form>
       <template #footer><el-button :disabled="metadataSaving" @click="metadataDialogVisible = false">取消</el-button><el-button type="primary" :loading="metadataSaving" data-testid="save-document-metadata" @click="saveMetadata">保存并立即生效</el-button></template>
     </el-dialog>

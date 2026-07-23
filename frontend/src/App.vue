@@ -84,19 +84,19 @@ function applyUpdate(): void {
 
 <template>
   <a v-if="ready && authenticated" class="skip-link" href="#main-content">跳到正文</a>
-  <main v-if="!ready" class="boot-screen">正在初始化阅读器</main>
+  <main v-if="!ready" class="boot-screen">正在初始化阅读器…</main>
   <section v-else-if="!authenticated" class="login-page">
     <form class="login-card login-card-enter" @submit.prevent="login">
       <div class="login-brand-row">
-        <img class="brand-mark" :src="BRAND_ICON_URL" alt="" aria-hidden="true" />
+        <img class="brand-mark" :src="BRAND_ICON_URL" alt="" aria-hidden="true" width="34" height="34" fetchpriority="high" />
         <div>
           <h1>Interview Reader</h1>
           <p>结构化面试讲义，随时从上次读到的地方继续。</p>
         </div>
       </div>
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
-      <el-input v-model="form.username" aria-label="用户名" autocomplete="username" placeholder="用户名" size="large" />
-      <el-input v-model="form.password" aria-label="密码" type="password" autocomplete="current-password" placeholder="密码" show-password size="large" />
+      <el-input v-model="form.username" name="username" aria-label="用户名" autocomplete="username" spellcheck="false" placeholder="用户名…" size="large" />
+      <el-input v-model="form.password" name="password" aria-label="密码" type="password" autocomplete="current-password" placeholder="密码…" show-password size="large" />
       <el-button class="login-submit" native-type="submit" type="primary" size="large" :loading="submitting">进入阅读</el-button>
     </form>
   </section>

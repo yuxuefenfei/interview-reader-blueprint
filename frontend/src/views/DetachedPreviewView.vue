@@ -22,7 +22,7 @@ let channel: BroadcastChannel | null = null;
 let receivedLiveState = false;
 
 const activeBlock = computed(() => blocks.value.find((block) => block.id === activeBlockId.value) ?? null);
-const statusLabel = computed(() => connected.value ? "正在同步编辑器" : "显示已保存草稿");
+const statusLabel = computed(() => connected.value ? "正在同步编辑器…" : "显示已保存草稿");
 
 onMounted(() => {
   channel = new BroadcastChannel(detachedPreviewChannelName(versionId));

@@ -374,7 +374,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
     </aside>
 
     <main ref="readingArea" class="reader-content" @scroll.passive="onReadingScroll">
-      <div v-if="loading" class="reader-state">正在加载章节</div>
+      <div v-if="loading" class="reader-state">正在加载章节…</div>
       <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
       <template v-else-if="content">
         <article class="reader-article">
@@ -414,7 +414,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           <strong>搜索当前文档</strong>
           <el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" />
         </header>
-        <el-input ref="searchInput" v-model="query" aria-label="搜索标题或正文" placeholder="搜索标题或正文" clearable @keyup.enter="search">
+        <el-input ref="searchInput" v-model="query" name="reader-search" aria-label="搜索标题或正文" autocomplete="off" placeholder="搜索标题或正文…" clearable @keyup.enter="search">
           <template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template>
         </el-input>
         <button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)">

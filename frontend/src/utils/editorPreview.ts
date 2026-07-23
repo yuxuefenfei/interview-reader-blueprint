@@ -64,15 +64,15 @@ function switchPlaceholder(blockType: EditorBlock["blockType"]): string {
   switch (blockType) {
     case "unordered_list":
     case "ordered_list":
-      return "每行一个条目";
+      return "每行一个条目…";
     case "table":
-      return "表格正文；复杂表格可在扩展数据中调整";
+      return "表格正文；复杂表格可在扩展数据中调整…";
     case "formula":
-      return "LaTeX 公式";
+      return "LaTeX 公式…";
     case "image":
-      return "图片说明";
+      return "图片说明…";
     default:
-      return "输入内容";
+      return "输入内容…";
   }
 }
 

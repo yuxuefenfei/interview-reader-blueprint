@@ -17,7 +17,7 @@ watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", Stri
   <div class="admin-layout" :class="{ 'sidebar-collapsed': collapsed }">
     <aside class="admin-sidebar">
       <button class="admin-brand" type="button" title="返回阅读器" @click="router.push('/reader')">
-        <img class="brand-mark" :src="BRAND_ICON_URL" alt="" aria-hidden="true" />
+        <img class="brand-mark" :src="BRAND_ICON_URL" alt="" aria-hidden="true" width="36" height="36" />
         <span>Interview Reader</span>
       </button>
       <nav aria-label="管理菜单">
