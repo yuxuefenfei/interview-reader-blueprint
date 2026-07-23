@@ -60,7 +60,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         <el-table-column label="版本" width="88"><template #default="{ row }">{{ row.versionCount }}</template></el-table-column>
         <el-table-column label="草稿" width="88"><template #default="{ row }"><el-tag v-if="row.draftCount" type="warning" effect="plain">{{ row.draftCount }}</el-tag><span v-else>-</span></template></el-table-column>
         <el-table-column label="最近更新" width="190"><template #default="{ row }">{{ formatTime(row.updatedAt) }}</template></el-table-column>
-        <el-table-column label="操作" width="120" fixed="right"><template #default="{ row }"><el-button text type="primary" :icon="View" @click.stop="open(row)">查看详情</el-button></template></el-table-column>
+        <el-table-column label="操作" width="140" fixed="right"><template #default="{ row }"><el-button text type="primary" :icon="View" @click.stop="open(row)">查看详情</el-button></template></el-table-column>
       </el-table>
       <div class="table-pager"><span>第 {{ page }} 页</span><div><el-button :disabled="page === 1" @click="previous">上一页</el-button><el-button :disabled="!hasNext" @click="next">下一页</el-button></div></div>
     </el-card>

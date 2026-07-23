@@ -56,6 +56,6 @@ watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", Stri
         <span>{{ collapsed ? '展开导航' : '收起导航' }}</span>
       </button>
     </aside>
-    <main class="admin-main"><router-view /></main>
+    <main class="admin-main" aria-label="管理工作区"><router-view /></main>
   </div>
 </template>

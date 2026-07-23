@@ -15,7 +15,7 @@ import { ElLoading } from "element-plus/es/components/loading/index";
 import { ElOption, ElSelect } from "element-plus/es/components/select/index";
 import { ElPopover } from "element-plus/es/components/popover/index";
 import { ElProgress } from "element-plus/es/components/progress/index";
-import { ElRadioButton, ElRadioGroup } from "element-plus/es/components/radio/index";
+import { ElRadio } from "element-plus/es/components/radio/index";
 import { ElTable, ElTableColumn } from "element-plus/es/components/table/index";
 import { ElTag } from "element-plus/es/components/tag/index";
 import { ElTooltip } from "element-plus/es/components/tooltip/index";
@@ -50,8 +50,7 @@ const app = createApp(App).use(router);
   ElOption,
   ElPopover,
   ElProgress,
-  ElRadioButton,
-  ElRadioGroup,
+  ElRadio,
   ElSelect,
   ElTable,
   ElTableColumn,
