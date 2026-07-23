@@ -265,7 +265,11 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
 </script>
 
 <template>
-  <div class="reader-page" :class="`theme-${theme}`" :style="readerComfortStyle">
+  <div
+    class="reader-page"
+    :class="[`theme-${theme}`, { 'reader-overlay-open': drawer || searchOpen }]"
+    :style="readerComfortStyle"
+  >
     <header class="reader-header">
       <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true">
         <el-icon><Tickets /></el-icon>
@@ -394,7 +398,13 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
     </main>
 
     <!-- 移动端目录抽屉 -->
-    <el-drawer v-model="drawer" direction="ltr" size="min(88vw, 360px)" :with-header="false">
+    <el-drawer
+      v-model="drawer"
+      class="reader-overlay-drawer reader-toc-drawer"
+      direction="ltr"
+      size="min(88vw, 360px)"
+      :with-header="false"
+    >
       <section class="reader-drawer">
         <header>
           <strong>文档目录</strong>
@@ -408,7 +418,13 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
     </el-drawer>
 
     <!-- 搜索面板 -->
-    <el-drawer v-model="searchOpen" direction="btt" size="min(68vh, 520px)" :with-header="false">
+    <el-drawer
+      v-model="searchOpen"
+      class="reader-overlay-drawer reader-search-drawer"
+      direction="btt"
+      size="min(68vh, 520px)"
+      :with-header="false"
+    >
       <section class="reader-search-sheet">
         <header>
           <strong>搜索当前文档</strong>
