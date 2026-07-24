@@ -36,11 +36,11 @@ describe("DetachedPreviewView", () => {
     vi.clearAllMocks();
     mocks.editor.mockResolvedValue(snapshot);
     mocks.nodeBlocks.mockResolvedValue({ items: [], nextCursor: null });
-    const channels: Array<{ onmessage: ((event: MessageEvent<unknown>) => void) | null; postMessage: () => void; close: () => void }> = [];
+    const channels: Array<{ onmessage: ((event: MessageEvent<unknown>) => void) | null; postMessage: ReturnType<typeof vi.fn>; close: () => void }> = [];
     vi.stubGlobal("BroadcastChannel", class {
       onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
       constructor() { channels.push(this); }
-      postMessage() {}
+      postMessage = vi.fn();
       close() {}
       static get latest() { return channels.at(-1); }
     });
@@ -61,5 +61,17 @@ describe("DetachedPreviewView", () => {
     await flushPromises();
 
     expect(wrapper.get("img").attributes("src")).toBe("/api/admin/versions/version-1/editor/assets/new-image");
+  });
+
+  it("notifies the editor when the popup preview closes", async () => {
+    const wrapper = shallowMount(DetachedPreviewView, {
+      global: { directives: { loading: () => undefined }, stubs: { ElButton: ButtonStub, ContentBlockView: ImageBlockStub } }
+    });
+    await flushPromises();
+
+    const Channel = BroadcastChannel as unknown as { latest: { postMessage: ReturnType<typeof vi.fn> } };
+    wrapper.unmount();
+
+    expect(Channel.latest.postMessage).toHaveBeenCalledWith({ type: "preview-dismissed" });
   });
 });

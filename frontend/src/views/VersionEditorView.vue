@@ -20,8 +20,9 @@ type TreeNode = EditorNode & { children: TreeNode[] };
 type NodeForm = Pick<EditorNode, "title" | "nodeType" | "semanticRole" | "anchor">;
 type PreviewMode = "block" | "node";
 type SaveState = "saved" | "dirty" | "saving" | "error";
-type PreviewCommand = "embedded" | "detached";
+type PreviewCommand = "embedded" | "popout";
 type EditorMoreCommand = "refresh" | "discard";
+const DETACHED_PREVIEW_WINDOW_FEATURES = "popup=yes,width=430,height=932,resizable=yes,scrollbars=yes";
 interface BlockSaveSnapshot {
   blockId: string;
   blockType: EditorBlock["blockType"];
@@ -58,7 +59,6 @@ const activeBlockId = ref<string | null>(null);
 const expandedPayload = ref<string[]>([]);
 const previewMode = ref<PreviewMode>("block");
 const previewVisible = ref(true);
-const detachedPreviewActive = ref(false);
 const previewOffset = reactive({ x: 0, y: 0 });
 const saveState = ref<SaveState>("saved");
 const nodePropertiesOpen = ref(false);
@@ -72,6 +72,7 @@ let clearPreviewDrag: (() => void) | null = null;
 let detachedPreviewChannel: BroadcastChannel | null = null;
 let detachedPreviewPublishTimer: number | null = null;
 let detachedPreviewWindow: Window | null = null;
+let previewPopupCloseWatchTimer: number | null = null;
 const blockSaveQueue = createSerializedSaveQueue<BlockSaveTask>(700, ({ snapshot, quiet }) => persistBlockSnapshot(snapshot, quiet));
 
 const selectedNode = computed(() => editor.value?.nodes.find((node) => node.id === selectedId.value) ?? null);
@@ -143,7 +144,9 @@ const imageDecorative = computed({
 onMounted(() => {
   detachedPreviewChannel = new BroadcastChannel(detachedPreviewChannelName(versionId));
   detachedPreviewChannel.onmessage = (event: MessageEvent<unknown>) => {
-    if (isDetachedPreviewMessage(event.data) && event.data.type === "preview-state-request") publishDetachedPreview();
+    if (!isDetachedPreviewMessage(event.data)) return;
+    if (event.data.type === "preview-state-request") publishDetachedPreview();
+    if (event.data.type === "preview-dismissed") restoreEmbeddedPreview();
   };
   window.addEventListener("beforeunload", warnBeforeUnload);
   void load();
@@ -154,6 +157,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", warnBeforeUnload);
   if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
   detachedPreviewPublishTimer = null;
+  stopWatchingPreviewPopup();
   clearPreviewDrag?.();
   detachedPreviewChannel?.close();
   detachedPreviewChannel = null;
@@ -183,17 +187,24 @@ function publishDetachedPreview(): void {
   }
 }
 
-function openDetachedPreview(): void {
+function openPreviewPopup(): void {
   if (!editor.value || !selectedNode.value) return;
+  if (detachedPreviewWindow && !detachedPreviewWindow.closed) {
+    previewVisible.value = false;
+    detachedPreviewWindow.focus();
+    watchPreviewPopupClose();
+    publishDetachedPreview();
+    return;
+  }
   const href = router.resolve({ path: `/admin/versions/${versionId}/preview`, query: { nodeId: selectedNode.value.id } }).href;
-  const previewWindow = window.open(href, "interview-reader-editor-preview");
+  const previewWindow = window.open(href, "interview-reader-editor-preview", DETACHED_PREVIEW_WINDOW_FEATURES);
   if (!previewWindow) {
-    ElMessage.warning("浏览器阻止了独立预览窗口，请允许本站点打开新标签页。");
+    ElMessage.warning("浏览器阻止了弹出预览，请允许本站点打开弹窗。");
     return;
   }
   detachedPreviewWindow = previewWindow;
-  detachedPreviewActive.value = true;
   previewVisible.value = false;
+  watchPreviewPopupClose();
   previewWindow.focus();
   if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
   detachedPreviewPublishTimer = window.setTimeout(() => {
@@ -205,14 +216,31 @@ function openDetachedPreview(): void {
 function showEmbeddedPreview(): void {
   detachedPreviewChannel?.postMessage({ type: "preview-close" });
   if (detachedPreviewWindow && !detachedPreviewWindow.closed) detachedPreviewWindow.close();
+  restoreEmbeddedPreview();
+}
+
+function restoreEmbeddedPreview(): void {
+  stopWatchingPreviewPopup();
   detachedPreviewWindow = null;
-  detachedPreviewActive.value = false;
   previewVisible.value = true;
+}
+
+function watchPreviewPopupClose(): void {
+  stopWatchingPreviewPopup();
+  previewPopupCloseWatchTimer = window.setInterval(() => {
+    if (!detachedPreviewWindow || detachedPreviewWindow.closed) restoreEmbeddedPreview();
+  }, 500);
+}
+
+function stopWatchingPreviewPopup(): void {
+  if (previewPopupCloseWatchTimer === null) return;
+  window.clearInterval(previewPopupCloseWatchTimer);
+  previewPopupCloseWatchTimer = null;
 }
 
 function handlePreviewCommand(command: string | number | object): void {
   if (command === ("embedded" satisfies PreviewCommand)) showEmbeddedPreview();
-  if (command === ("detached" satisfies PreviewCommand)) openDetachedPreview();
+  if (command === ("popout" satisfies PreviewCommand)) openPreviewPopup();
 }
 
 function handleEditorMoreCommand(command: string | number | object): void {
@@ -649,7 +677,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         <el-button type="primary" :loading="saveState === 'saving'" :disabled="dirtyBlockCount === 0" @click="saveAllBlocks">保存</el-button>
         <el-dropdown trigger="click" @command="handlePreviewCommand">
           <el-button :icon="View">预览</el-button>
-          <template #dropdown><el-dropdown-menu><el-dropdown-item command="embedded" :icon="View">页面内预览</el-dropdown-item><el-dropdown-item command="detached" :icon="FullScreen">独立窗口预览</el-dropdown-item></el-dropdown-menu></template>
+          <template #dropdown><el-dropdown-menu><el-dropdown-item command="embedded" :icon="View">显示页内预览</el-dropdown-item><el-dropdown-item command="popout" :icon="FullScreen">弹出预览（可拖到第二屏）</el-dropdown-item></el-dropdown-menu></template>
         </el-dropdown>
         <el-dropdown trigger="click" @command="handleEditorMoreCommand">
           <el-button :icon="MoreFilled">更多</el-button>

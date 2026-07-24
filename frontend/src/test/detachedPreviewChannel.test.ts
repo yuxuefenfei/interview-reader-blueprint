@@ -11,6 +11,7 @@ describe("detached preview channel", () => {
     expect(isDetachedPreviewMessage({ type: "preview-state-request" })).toBe(true);
     expect(isDetachedPreviewMessage({ type: "preview-state", state: {} })).toBe(true);
     expect(isDetachedPreviewMessage({ type: "preview-close" })).toBe(true);
+    expect(isDetachedPreviewMessage({ type: "preview-dismissed" })).toBe(true);
     expect(isDetachedPreviewMessage({ type: "other" })).toBe(false);
     expect(isDetachedPreviewMessage(null)).toBe(false);
   });

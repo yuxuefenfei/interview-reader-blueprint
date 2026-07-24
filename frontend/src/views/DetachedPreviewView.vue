@@ -20,6 +20,7 @@ const error = ref("");
 const connected = ref(false);
 let channel: BroadcastChannel | null = null;
 let receivedLiveState = false;
+let closeNotified = false;
 
 const activeBlock = computed(() => blocks.value.find((block) => block.id === activeBlockId.value) ?? null);
 const statusLabel = computed(() => connected.value ? "正在同步编辑器…" : "显示已保存草稿");
@@ -41,10 +42,21 @@ onMounted(() => {
     applyState(event.data.state);
   };
   channel.postMessage({ type: "preview-state-request" });
+  window.addEventListener("pagehide", notifyPreviewClosed);
   void loadSavedPreview();
 });
 
-onBeforeUnmount(() => channel?.close());
+onBeforeUnmount(() => {
+  notifyPreviewClosed();
+  window.removeEventListener("pagehide", notifyPreviewClosed);
+  channel?.close();
+});
+
+function notifyPreviewClosed(): void {
+  if (closeNotified) return;
+  closeNotified = true;
+  channel?.postMessage({ type: "preview-dismissed" });
+}
 
 function applyState(state: DetachedPreviewState): void {
   if (state.versionId !== versionId) return;
@@ -88,7 +100,7 @@ async function loadSavedPreview(force = false): Promise<void> {
 <template>
   <main class="detached-preview-page">
     <header class="detached-preview-header">
-      <div><p class="eyebrow">独立预览</p><strong>{{ document?.title || "草稿预览" }}</strong></div>
+      <div><p class="eyebrow">弹出预览</p><strong>{{ document?.title || "草稿预览" }}</strong></div>
       <div class="detached-preview-actions"><span :class="{ live: connected }">{{ statusLabel }}</span><el-button circle :icon="RefreshRight" aria-label="刷新已保存草稿" title="刷新已保存草稿" @click="loadSavedPreview(true)" /></div>
     </header>
     <section class="detached-preview-content" v-loading="loading">

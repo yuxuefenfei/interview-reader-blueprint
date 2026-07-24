@@ -12,7 +12,8 @@ export interface DetachedPreviewState {
 export type DetachedPreviewMessage =
   | { type: "preview-state"; state: DetachedPreviewState }
   | { type: "preview-state-request" }
-  | { type: "preview-close" };
+  | { type: "preview-close" }
+  | { type: "preview-dismissed" };
 
 export function detachedPreviewChannelName(versionId: string): string {
   return `interview-reader:editor-preview:${versionId}`;
@@ -20,5 +21,8 @@ export function detachedPreviewChannelName(versionId: string): string {
 
 export function isDetachedPreviewMessage(value: unknown): value is DetachedPreviewMessage {
   if (!value || typeof value !== "object" || !("type" in value)) return false;
-  return value.type === "preview-state" || value.type === "preview-state-request" || value.type === "preview-close";
+  return value.type === "preview-state"
+    || value.type === "preview-state-request"
+    || value.type === "preview-close"
+    || value.type === "preview-dismissed";
 }
