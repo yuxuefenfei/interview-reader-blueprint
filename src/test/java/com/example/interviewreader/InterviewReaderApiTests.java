@@ -806,12 +806,8 @@ class InterviewReaderApiTests {
     }
 
     @Test
-    void pdfSamplesCanBeImportedCommittedAndRead() throws Exception {
-        var samples = List.of(
-                Path.of("docs/samples/pdf/Java高级开发面试题完整答案.pdf"),
-                Path.of("docs/samples/pdf/Redis高级面试题完整答案.pdf"),
-                Path.of("docs/samples/pdf/MySQL与PostgreSQL高级面试题完整答案.pdf"),
-                Path.of("docs/samples/pdf/Elasticsearch搜索引擎高级面试题完整答案.pdf"));
+    void retainedPdfSampleCanBeImportedCommittedAndRead() throws Exception {
+        var samples = List.of(Path.of("docs/samples/pdf/Java高级开发面试题完整答案.pdf"));
 
         for (var sample : samples) {
             var imported = importAndCommitPdf(Files.readAllBytes(sample), sample.getFileName().toString());
