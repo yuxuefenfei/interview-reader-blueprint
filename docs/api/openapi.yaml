@@ -530,6 +530,43 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/BlockMutationResult" }
         "409": { $ref: "#/components/responses/Problem" }
+  /admin/versions/{versionId}/editor/blocks/{blockId}/image:
+    post:
+      summary: Upload a verified image and atomically attach it to a draft image block
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - { name: blockId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, draftRevision]
+              properties:
+                file: { type: string, format: binary }
+                draftRevision: { type: integer, minimum: 0 }
+                alt: { type: string, maxLength: 300 }
+                decorative: { type: boolean, default: false }
+                caption: { type: string, maxLength: 1000 }
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "200":
+          description: Image attached to the block
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImageBlockUploadResult" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /admin/versions/{versionId}/editor/assets/{assetKey}:
+    get:
+      summary: Read one private image from a draft for editor preview
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - { name: assetKey, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "200": { description: Image bytes }
+        "404": { $ref: "#/components/responses/Problem" }
   /admin/versions/{versionId}/editor/blocks/cleanup-empty:
     post:
       summary: Delete empty blocks and resequence affected nodes
@@ -1168,6 +1205,12 @@ components:
       properties:
         draftRevision: { type: integer, minimum: 0 }
         removedCount: { type: integer, minimum: 0 }
+    ImageBlockUploadResult:
+      type: object
+      required: [block, draftRevision]
+      properties:
+        block: { $ref: "#/components/schemas/EditorBlock" }
+        draftRevision: { type: integer, minimum: 0 }
     DocumentInfo:
       type: object
       required: [documentKey, title, description, language, tags]

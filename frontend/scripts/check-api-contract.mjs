@@ -70,7 +70,7 @@ const interfaceSchemas = {
   VersionSummary: "VersionSummary", EditableVersion: "EditableVersion", AdminDocumentSummary: "AdminDocumentSummary",
   AdminDocumentPage: "AdminDocumentPage", EditorDocument: "EditorDocument", EditorNode: "EditorNode",
   EditorSnapshot: "EditorSnapshot", EditorBlock: "EditorBlock", NodeBlocksPage: "NodeBlocksPage",
-  StructureNode: "StructureNode", BlockMutationResult: "BlockMutationResult"
+  StructureNode: "StructureNode", BlockMutationResult: "BlockMutationResult", ImageBlockUploadResult: "ImageBlockUploadResult"
 };
 for (const [interfaceName, schemaName] of Object.entries(interfaceSchemas)) {
   const fields = readTsInterface(tsSource, interfaceName);

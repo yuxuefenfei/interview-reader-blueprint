@@ -6,11 +6,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 
 @Service
 public class StaticHtmlPackageService {
     public String write(DocumentPackage documentPackage) {
+        return write(documentPackage, assetKey -> assetKey);
+    }
+
+    public String write(DocumentPackage documentPackage, Function<String, String> assetUrl) {
         var body = new StringBuilder();
         body.append("<main class=\"reader-document\">\n");
         body.append("<h1>").append(escape(documentPackage.document().title())).append("</h1>\n");
@@ -34,7 +39,7 @@ public class StaticHtmlPackageService {
                     .append(escape(section.title()))
                     .append("</h").append(headingLevel).append(">\n");
             for (var block : blocksBySection.getOrDefault(section.sectionKey(), List.of())) {
-                appendBlock(body, block);
+                appendBlock(body, block, assetUrl);
             }
             body.append("</section>\n");
         }
@@ -60,7 +65,9 @@ public class StaticHtmlPackageService {
                     th { background: #f0f4f8; }
                     blockquote, .callout { padding: 12px 14px; border-left: 4px solid #0f766e; background: #d9f3ee; }
                     .description, .tags { color: #64748b; }
-                    .image-placeholder { min-height: 120px; display: grid; place-items: center; border: 1px dashed #d7dee8; color: #64748b; }
+                    figure { margin: 20px 0; }
+                    figure img { display: block; width: 100%%; height: auto; max-height: 720px; object-fit: contain; border: 1px solid #d7dee8; border-radius: 4px; }
+                    figcaption { margin-top: 8px; color: #64748b; font-size: 14px; }
                   </style>
                 </head>
                 <body>
@@ -72,7 +79,7 @@ public class StaticHtmlPackageService {
                 body);
     }
 
-    private void appendBlock(StringBuilder html, DocumentPackage.BlockInfo block) {
+    private void appendBlock(StringBuilder html, DocumentPackage.BlockInfo block, Function<String, String> assetUrl) {
         switch (block.blockType()) {
             case PARAGRAPH -> html.append("<p>").append(escape(text(block))).append("</p>\n");
             case HEADING_NOTE -> html.append("<p class=\"heading-note\"><strong>").append(escape(text(block))).append("</strong></p>\n");
@@ -83,7 +90,7 @@ public class StaticHtmlPackageService {
             case QUOTE -> html.append("<blockquote>").append(escape(text(block))).append("</blockquote>\n");
             case CALLOUT -> appendCallout(html, block);
             case FORMULA -> html.append("<p class=\"formula\"><code>").append(escape(payloadText(block.payload(), "latex", text(block)))).append("</code></p>\n");
-            case IMAGE -> appendImage(html, block);
+            case IMAGE -> appendImage(html, block, assetUrl);
             case DIVIDER -> html.append("<hr />\n");
             default -> html.append("<pre>").append(escape(text(block))).append("</pre>\n");
         }
@@ -146,14 +153,19 @@ public class StaticHtmlPackageService {
         html.append("<p>").append(escape(text(block))).append("</p></aside>\n");
     }
 
-    private void appendImage(StringBuilder html, DocumentPackage.BlockInfo block) {
+    private void appendImage(StringBuilder html, DocumentPackage.BlockInfo block, Function<String, String> assetUrl) {
         var alt = payloadText(block.payload(), "alt", text(block));
         var assetKey = payloadText(block.payload(), "assetKey", "");
-        html.append("<figure class=\"image-placeholder\" data-asset-key=\"")
-                .append(escapeAttribute(assetKey))
-                .append("\"><span>")
-                .append(escape(alt))
-                .append("</span></figure>\n");
+        var caption = payloadText(block.payload(), "caption", "");
+        html.append("<figure data-asset-key=\"").append(escapeAttribute(assetKey)).append("\">");
+        if (!assetKey.isBlank()) {
+            html.append("<img src=\"").append(escapeAttribute(assetUrl.apply(assetKey))).append("\" alt=\"")
+                    .append(escapeAttribute(alt)).append("\" />");
+        }
+        if (hasText(caption) || assetKey.isBlank()) {
+            html.append("<figcaption>").append(escape(hasText(caption) ? caption : alt)).append("</figcaption>");
+        }
+        html.append("</figure>\n");
     }
 
     private String text(DocumentPackage.BlockInfo block) {

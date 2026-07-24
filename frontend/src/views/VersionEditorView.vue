@@ -53,6 +53,7 @@ const savingBlockId = ref<string | null>(null);
 const creatingBlock = ref(false);
 const deletingBlockId = ref<string | null>(null);
 const cleaningEmptyBlocks = ref(false);
+const uploadingImage = ref(false);
 const activeBlockId = ref<string | null>(null);
 const expandedPayload = ref<string[]>([]);
 const previewMode = ref<PreviewMode>("block");
@@ -111,6 +112,24 @@ watch(nodePropertiesOpen, (open) => {
 const blockTypes = BLOCK_TYPES;
 const nodeTypes = NODE_TYPES.map((value) => ({ value, label: zh(value) }));
 const semanticRoles = SEMANTIC_ROLES.map((value) => ({ value, label: zh(value) }));
+const imageCaption = computed({
+  get: () => {
+    const block = activeBlock.value;
+    if (!block) return "";
+    const payload = parseEditorPayload(payloadTexts[block.id], block.payload) ?? block.payload;
+    return typeof payload.caption === "string" ? payload.caption : "";
+  },
+  set: (value: string) => updateActiveImagePayload({ caption: value })
+});
+const imageDecorative = computed({
+  get: () => {
+    const block = activeBlock.value;
+    if (!block) return false;
+    const payload = parseEditorPayload(payloadTexts[block.id], block.payload) ?? block.payload;
+    return payload.decorative === true;
+  },
+  set: (value: boolean) => updateActiveImagePayload({ decorative: value })
+});
 
 onMounted(() => {
   detachedPreviewChannel = new BroadcastChannel(detachedPreviewChannelName(versionId));
@@ -443,6 +462,58 @@ function scheduleBlockSave(): void {
   blockSaveQueue.schedule({ snapshot: captureBlockSave(block), quiet: true });
 }
 
+function updateActiveImagePayload(patch: Record<string, unknown>): void {
+  const block = activeBlock.value;
+  if (!block || block.blockType !== "image") return;
+  const payload = parseEditorPayload(payloadTexts[block.id], block.payload) ?? block.payload;
+  payloadTexts[block.id] = JSON.stringify({ ...payload, ...patch }, null, 2);
+  scheduleBlockSave();
+}
+
+function selectImage(file: { raw?: File }): void {
+  if (file.raw) void uploadActiveImage(file.raw);
+}
+
+async function uploadActiveImage(file: File): Promise<void> {
+  const block = activeBlock.value;
+  if (!editor.value || !block || block.blockType !== "image") return;
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    ElMessage.error("仅支持 PNG、JPEG 或 WebP 图片");
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.error("图片不能超过 10MB");
+    return;
+  }
+  if (!await flushPendingBlockSave()) return;
+  uploadingImage.value = true;
+  try {
+    const result = await adminApi.uploadBlockImage(
+      versionId,
+      block.id,
+      editor.value.version.draftRevision,
+      file,
+      imageDecorative.value ? "" : block.plainText,
+      imageDecorative.value,
+      imageCaption.value
+    );
+    editor.value.version.draftRevision = result.draftRevision;
+    const current = blocks.value.find((item) => item.id === block.id);
+    if (current) {
+      Object.assign(current, result.block);
+      payloadTexts[current.id] = JSON.stringify(result.block.payload ?? {}, null, 2);
+      savedBlockStates[current.id] = blockState(current);
+    }
+    saveState.value = "saved";
+    publishDetachedPreview();
+    ElMessage.success("图片已上传并保存到草稿");
+  } catch (caught) {
+    ElMessage.error(message(caught));
+  } finally {
+    uploadingImage.value = false;
+  }
+}
+
 async function flushPendingBlockSave(): Promise<boolean> {
   return blockSaveQueue.flush();
 }
@@ -606,8 +677,17 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
               <template v-else>
                 <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><div class="block-detail-actions"><el-button type="danger" plain :icon="Delete" :loading="deletingBlockId === activeBlock.id" @click="deleteActiveBlock">删除</el-button><el-button type="primary" :loading="savingBlockId === activeBlock.id" @click="saveBlock(activeBlock)">保存</el-button></div></header>
                 <div class="block-edit-controls"><el-select v-model="activeBlock.blockType" aria-label="内容块类型" @change="scheduleBlockSave"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="activeBlock.blockType === 'code'" v-model="activeBlock.language" name="block-code-language" autocomplete="off" spellcheck="false" clearable placeholder="例如：Java…" @input="scheduleBlockSave" /></div>
-                <el-input v-model="activeBlock.plainText" :name="`block-content-${activeBlock.id}`" autocomplete="off" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
-                <el-collapse v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" :name="`block-payload-${activeBlock.id}`" autocomplete="off" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
+                <template v-if="activeBlock.blockType === 'image'">
+                  <div class="image-block-editor">
+                    <el-upload accept="image/png,image/jpeg,image/webp" :auto-upload="false" :show-file-list="false" @change="selectImage"><el-button type="primary" :loading="uploadingImage">上传图片</el-button></el-upload>
+                    <span class="form-help">支持 PNG、JPEG、WebP，最大 10MB。上传后会立即绑定到此草稿图片块。</span>
+                    <el-input v-model="activeBlock.plainText" :name="`block-image-alt-${activeBlock.id}`" autocomplete="off" placeholder="图片替代文本（非装饰性图片必填）" :disabled="imageDecorative" @input="scheduleBlockSave" />
+                    <el-switch v-model="imageDecorative" active-text="装饰性图片" inactive-text="内容图片" />
+                    <el-input v-model="imageCaption" :name="`block-image-caption-${activeBlock.id}`" autocomplete="off" placeholder="图片说明（可选）" @input="scheduleBlockSave" />
+                  </div>
+                </template>
+                <el-input v-else v-model="activeBlock.plainText" :name="`block-content-${activeBlock.id}`" autocomplete="off" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
+                <el-collapse v-if="activeBlock.blockType !== 'image'" v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" :name="`block-payload-${activeBlock.id}`" autocomplete="off" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
               </template>
             </section>
           </div>
@@ -616,14 +696,14 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
           <aside v-show="previewVisible" ref="previewPanelRef" class="editor-preview-panel" role="region" aria-label="实时预览" :style="{ transform: `translate(${previewOffset.x}px, ${previewOffset.y}px)` }">
             <header><div><p class="eyebrow">实时预览</p><strong>{{ previewNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="RefreshRight" aria-label="还原实时预览位置" title="还原到右侧" @click="resetPreviewPosition" /><el-button circle :icon="Hide" aria-label="隐藏实时预览" title="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
             <div ref="previewScrollRef" class="editor-preview-scroll">
-              <article class="editor-preview-article"><div v-if="previewNode" class="preview-node-meta"><el-tag effect="plain">{{ zh(previewNode.nodeType) }}</el-tag><el-tag v-if="previewNode.semanticRole" type="success" effect="plain">{{ zh(previewNode.semanticRole) }}</el-tag></div><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
+              <article class="editor-preview-article"><div v-if="previewNode" class="preview-node-meta"><el-tag effect="plain">{{ zh(previewNode.nodeType) }}</el-tag><el-tag v-if="previewNode.semanticRole" type="success" effect="plain">{{ zh(previewNode.semanticRole) }}</el-tag></div><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" :asset-base-url="`/api/admin/versions/${versionId}/editor/assets`" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
             </div>
           </aside>
         </Teleport>
       </main>
       <el-drawer v-model="nodePropertiesOpen" class="node-property-drawer" title="节点属性" direction="rtl" size="420px" append-to-body>
         <p class="drawer-description">修改节点名称、层级类型与阅读定位信息。</p>
-        <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" name="node-title" autocomplete="off" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable allow-create default-first-option placeholder="选择或输入语义角色…"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" name="node-anchor" autocomplete="off" spellcheck="false" /></el-form-item></el-form>
+        <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" name="node-title" autocomplete="off" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable placeholder="搜索语义角色…"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" name="node-anchor" autocomplete="off" spellcheck="false" /></el-form-item></el-form>
         <template #footer><div class="drawer-footer"><el-button @click="nodePropertiesOpen = false">取消</el-button><el-button type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div></template>
       </el-drawer>
     </div>

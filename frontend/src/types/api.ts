@@ -68,3 +68,4 @@ export interface EditorBlock { id: string; blockKey: string; seq: number; blockT
 export interface NodeBlocksPage { items: EditorBlock[]; nextCursor: string | null; }
 export interface StructureNode { id: string; parentId: string | null; sortOrder: number; }
 export interface BlockMutationResult { draftRevision: number; removedCount: number; }
+export interface ImageBlockUploadResult { block: EditorBlock; draftRevision: number; }

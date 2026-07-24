@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import type { ContentBlock } from "../types/api";
 
 const copyLabel = ref("复制代码");
 let copyLabelTimer: number | null = null;
 
-defineProps<{
+const props = defineProps<{
   block: ContentBlock;
+  assetBaseUrl?: string;
 }>();
+
+const imageLoadFailed = ref(false);
+const imageAssetKey = computed(() => typeof props.block.payload.assetKey === "string" ? props.block.payload.assetKey.trim() : "");
+const imageAlt = computed(() => typeof props.block.payload.alt === "string" ? props.block.payload.alt : props.block.plainText);
+const imageCaption = computed(() => typeof props.block.payload.caption === "string" ? props.block.payload.caption : "");
+const imageDecorative = computed(() => props.block.payload.decorative === true);
+const imageUrl = computed(() => {
+  if (imageAssetKey.value && props.assetBaseUrl) return `${props.assetBaseUrl.replace(/\/$/, "")}/${encodeURIComponent(imageAssetKey.value)}`;
+  return typeof props.block.payload.src === "string" ? props.block.payload.src : typeof props.block.payload.url === "string" ? props.block.payload.url : "";
+});
 
 onBeforeUnmount(() => {
   if (copyLabelTimer !== null) {
@@ -134,8 +145,9 @@ async function copyCode(block: ContentBlock): Promise<void> {
       {{ typeof block.payload.latex === "string" ? block.payload.latex : block.plainText }}
     </p>
 
-    <figure v-else-if="block.blockType === 'image'" class="image-placeholder" :aria-label="typeof block.payload.alt === 'string' ? block.payload.alt : undefined">
-      <span>{{ typeof block.payload.alt === "string" && block.payload.alt ? block.payload.alt : "图片" }}</span>
+    <figure v-else-if="block.blockType === 'image'" class="image-block" :class="{ unavailable: !imageUrl || imageLoadFailed }">
+      <img v-if="imageUrl && !imageLoadFailed" :src="imageUrl" :alt="imageDecorative ? '' : imageAlt" @error="imageLoadFailed = true" />
+      <figcaption v-if="imageCaption || !imageUrl || imageLoadFailed">{{ imageCaption || imageAlt || "图片当前不可用；离线时请在联网后重试。" }}</figcaption>
     </figure>
 
     <hr v-else-if="block.blockType === 'divider'" />

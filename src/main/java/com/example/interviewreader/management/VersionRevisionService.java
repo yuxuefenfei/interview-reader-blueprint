@@ -2,6 +2,7 @@ package com.example.interviewreader.management;
 
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
+import com.example.interviewreader.config.UploadProperties;
 import com.example.interviewreader.document.DocumentQueryService;
 import com.example.interviewreader.document.DocumentVersionStatus;
 import com.example.interviewreader.document.BlockType;
@@ -12,6 +13,7 @@ import com.example.interviewreader.importpkg.DocumentPackageValidator;
 import com.example.interviewreader.importpkg.ImportIssueSeverity;
 import com.example.interviewreader.importpkg.ImportJobStatus;
 import com.example.interviewreader.importpkg.ImportStage;
+import com.example.interviewreader.importpkg.SourceFileStorage;
 import com.example.interviewreader.persistence.entity.*;
 import com.example.interviewreader.persistence.mapper.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -24,8 +26,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.security.MessageDigest;
 import java.util.*;
 
 import static com.example.interviewreader.persistence.entity.table.AssetEntityTableDef.ASSET_ENTITY;
@@ -51,6 +59,8 @@ public class VersionRevisionService {
     private final DocumentDeletionJobMapper deletionJobMapper;
     private final DocumentQueryService documentQueryService;
     private final ObjectMapper objectMapper;
+    private final SourceFileStorage storage;
+    private final UploadProperties uploadProperties;
 
     public ManagementDtos.AdminDocumentPage documents(Integer page, Integer size) {
         return documents(null, page, size);
@@ -159,10 +169,12 @@ public class VersionRevisionService {
     @Transactional
     public void deleteDraft(UUID versionId) {
         var version = requireDraft(versionId);
+        var removedObjectKeys = editorImageObjectKeys(version.getId());
         resetImportJobs(version.getId());
         deleteContent(version.getId());
         documentVersionMapper.deleteById(version.getId());
         touchDocument(version.getDocumentId());
+        deleteObjectsIfUnreferencedAfterCommit(removedObjectKeys);
     }
 
 
@@ -276,7 +288,75 @@ public class VersionRevisionService {
         contentBlockMapper.update(block);
         refreshNodeSearchText(version.getId(), block.getNodeId());
         advanceDraft(version);
+        cleanupUnusedEditorImages(version.getId());
         return editorBlock(block);
+    }
+
+    /**
+     * Stores a verified image and attaches it to one image block in the same draft-revision update.
+     * This avoids a temporary, unreferenced upload when a browser refreshes between two requests.
+     */
+    @Transactional
+    public ManagementDtos.ImageBlockUploadResult replaceBlockImage(
+            UUID versionId, UUID blockId, long draftRevision, MultipartFile file,
+            String alt, boolean decorative, String caption
+    ) {
+        var version = requireDraft(versionId);
+        requireRevision(version, draftRevision);
+        var block = requireBlock(version.getId(), blockId);
+        if (block.getBlockType() != BlockType.IMAGE) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_BLOCK_REQUIRED", "请先将内容块类型切换为图片。");
+        }
+        var image = readVerifiedImage(file);
+        var normalizedAlt = normalizeImageText(alt, "图片替代文本", 300);
+        var normalizedCaption = normalizeImageText(caption, "图片说明", 1_000);
+        if (!decorative && normalizedAlt.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_ALT_REQUIRED", "非装饰性图片必须填写替代文本。");
+        }
+        if (decorative && !normalizedAlt.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_ALT_DECORATIVE", "装饰性图片不能填写替代文本。");
+        }
+
+        var assetKey = "editor-image-" + UUID.randomUUID();
+        var objectKey = storage.save(image.bytes(), image.sha256(), assetKey + image.extension());
+        deleteObjectOnRollback(objectKey);
+
+        var asset = new AssetEntity();
+        asset.setId(UUID.randomUUID().toString());
+        asset.setVersionId(version.getId());
+        asset.setAssetKey(assetKey);
+        asset.setObjectKey(objectKey);
+        asset.setOriginalName(safeOriginalName(file.getOriginalFilename(), assetKey + image.extension()));
+        asset.setMimeType(image.mimeType());
+        asset.setSha256(image.sha256());
+        asset.setSizeBytes((long) image.bytes().length);
+        asset.setWidthPx(image.width());
+        asset.setHeightPx(image.height());
+        asset.setMetadata(json(Map.of("editorImage", true)));
+        assetMapper.insertSelective(asset);
+
+        var payload = objectMapper.createObjectNode();
+        payload.put("assetKey", assetKey);
+        payload.put("alt", normalizedAlt);
+        payload.put("decorative", decorative);
+        if (!normalizedCaption.isBlank()) {
+            payload.put("caption", normalizedCaption);
+        }
+        block.setPayload(json(payload));
+        block.setPlainText(normalizedAlt);
+        block.setLanguage(null);
+        contentBlockMapper.update(block);
+        refreshNodeSearchText(version.getId(), block.getNodeId());
+        advanceDraft(version);
+        cleanupUnusedEditorImages(version.getId());
+        return new ManagementDtos.ImageBlockUploadResult(editorBlock(block), version.getDraftRevision());
+    }
+
+    public StoredImage draftImage(UUID versionId, String assetKey) {
+        var version = requireDraft(versionId);
+        var asset = requireImageAsset(version.getId(), assetKey);
+        var source = storage.load(asset.getObjectKey());
+        return new StoredImage(asset.getMimeType(), asset.getSha256(), source.bytes());
     }
     @Transactional
     public ManagementDtos.EditorBlock createBlock(UUID versionId, UUID nodeId, ManagementDtos.CreateBlockRequest request) {
@@ -328,6 +408,7 @@ public class VersionRevisionService {
         resequenceBlocks(version.getId(), block.getNodeId());
         refreshNodeSearchText(version.getId(), block.getNodeId());
         advanceDraft(version);
+        cleanupUnusedEditorImages(version.getId());
         return new ManagementDtos.BlockMutationResult(version.getDraftRevision(), 1);
     }
 
@@ -358,6 +439,7 @@ public class VersionRevisionService {
                 refreshNodeSearchText(version.getId(), nodeId);
             });
             advanceDraft(version);
+            cleanupUnusedEditorImages(version.getId());
         }
         return new ManagementDtos.BlockMutationResult(version.getDraftRevision(), removedCount);
     }
@@ -388,6 +470,224 @@ public class VersionRevisionService {
             throw new ApiException(HttpStatus.NOT_FOUND, "NODE_NOT_FOUND", "节点不存在。");
         }
         return node;
+    }
+
+    private ContentBlockEntity requireBlock(String versionId, UUID blockId) {
+        var block = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
+                .and(CONTENT_BLOCK_ENTITY.ID.eq(id(blockId))));
+        if (block == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "内容块不存在。");
+        }
+        return block;
+    }
+
+    private AssetEntity requireImageAsset(String versionId, String assetKey) {
+        if (assetKey == null || assetKey.isBlank()) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "IMAGE_NOT_FOUND", "图片不存在。");
+        }
+        var asset = assetMapper.selectOneByQuery(QueryWrapper.create()
+                .select(ASSET_ENTITY.ALL_COLUMNS)
+                .from(ASSET_ENTITY)
+                .where(ASSET_ENTITY.VERSION_ID.eq(versionId))
+                .and(ASSET_ENTITY.ASSET_KEY.eq(assetKey)));
+        if (asset == null || asset.getMimeType() == null || !asset.getMimeType().startsWith("image/")) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "IMAGE_NOT_FOUND", "图片不存在。");
+        }
+        return asset;
+    }
+
+    private VerifiedImage readVerifiedImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_FILE_REQUIRED", "请选择 PNG、JPEG 或 WebP 图片。");
+        }
+        if (file.getSize() > uploadProperties.maxSize().toBytes()) {
+            throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "IMAGE_TOO_LARGE", "图片不能超过 " + uploadProperties.displayMaxSize() + "。");
+        }
+        final byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException exception) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_READ_FAILED", "无法读取上传的图片。");
+        }
+        var kind = imageKind(bytes);
+        if (kind == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_TYPE_INVALID", "仅支持内容有效的 PNG、JPEG 或 WebP 图片。");
+        }
+        var dimensions = imageDimensions(bytes, kind);
+        if (kind != ImageKind.WEBP && dimensions[0] == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_CONTENT_INVALID", "图片内容损坏或格式无效。");
+        }
+        return new VerifiedImage(bytes, sha256(bytes), kind.mimeType(), kind.extension(), dimensions[0], dimensions[1]);
+    }
+
+    private ImageKind imageKind(byte[] bytes) {
+        if (bytes.length >= 8
+                && bytes[0] == (byte) 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4e && bytes[3] == 0x47
+                && bytes[4] == 0x0d && bytes[5] == 0x0a && bytes[6] == 0x1a && bytes[7] == 0x0a) {
+            return ImageKind.PNG;
+        }
+        if (bytes.length >= 3 && bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xd8 && bytes[2] == (byte) 0xff) {
+            return ImageKind.JPEG;
+        }
+        if (bytes.length >= 20
+                && new String(bytes, 0, 4, StandardCharsets.US_ASCII).equals("RIFF")
+                && new String(bytes, 8, 4, StandardCharsets.US_ASCII).equals("WEBP")
+                && littleEndianUInt32(bytes, 4) == bytes.length - 8L
+                && Set.of("VP8 ", "VP8L", "VP8X").contains(new String(bytes, 12, 4, StandardCharsets.US_ASCII))) {
+            return ImageKind.WEBP;
+        }
+        return null;
+    }
+
+    private static long littleEndianUInt32(byte[] bytes, int offset) {
+        return ((long) bytes[offset] & 0xff)
+                | (((long) bytes[offset + 1] & 0xff) << 8)
+                | (((long) bytes[offset + 2] & 0xff) << 16)
+                | (((long) bytes[offset + 3] & 0xff) << 24);
+    }
+
+    private Integer[] imageDimensions(byte[] bytes, ImageKind kind) {
+        try (var input = new java.io.ByteArrayInputStream(bytes)) {
+            var image = javax.imageio.ImageIO.read(input);
+            if (image != null && image.getWidth() > 0 && image.getHeight() > 0) {
+                return new Integer[]{image.getWidth(), image.getHeight()};
+            }
+        } catch (IOException ignored) {
+            // Header validation above remains authoritative for WebP when no ImageIO WebP reader is installed.
+        }
+        return new Integer[]{null, null};
+    }
+
+    private List<String> editorImageObjectKeys(String versionId) {
+        return assetMapper.selectListByQuery(QueryWrapper.create()
+                        .select(ASSET_ENTITY.ALL_COLUMNS)
+                        .from(ASSET_ENTITY)
+                        .where(ASSET_ENTITY.VERSION_ID.eq(versionId)))
+                .stream()
+                .filter(this::isEditorImage)
+                .map(AssetEntity::getObjectKey)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    /** Removes assets created by this editor only after no image block in the draft references them. */
+    private void cleanupUnusedEditorImages(String versionId) {
+        var referencedKeys = contentBlockMapper.selectListByQuery(QueryWrapper.create()
+                        .select(CONTENT_BLOCK_ENTITY.PAYLOAD)
+                        .from(CONTENT_BLOCK_ENTITY)
+                        .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId)))
+                .stream()
+                .map(ContentBlockEntity::getPayload)
+                .map(this::treeOrNull)
+                .filter(Objects::nonNull)
+                .map(payload -> payload.path("assetKey").asText(""))
+                .filter(value -> !value.isBlank())
+                .collect(java.util.stream.Collectors.toSet());
+        var removedObjectKeys = new ArrayList<String>();
+        for (var asset : assetMapper.selectListByQuery(QueryWrapper.create()
+                .select(ASSET_ENTITY.ALL_COLUMNS)
+                .from(ASSET_ENTITY)
+                .where(ASSET_ENTITY.VERSION_ID.eq(versionId)))) {
+            if (!isEditorImage(asset) || referencedKeys.contains(asset.getAssetKey())) {
+                continue;
+            }
+            assetMapper.deleteById(asset.getId());
+            if (asset.getObjectKey() != null) {
+                removedObjectKeys.add(asset.getObjectKey());
+            }
+        }
+        deleteObjectsIfUnreferencedAfterCommit(removedObjectKeys);
+    }
+
+    private boolean isEditorImage(AssetEntity asset) {
+        var metadata = treeOrNull(asset.getMetadata());
+        return metadata != null && metadata.path("editorImage").asBoolean(false);
+    }
+
+    private void deleteObjectOnRollback(String objectKey) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    storage.deleteIfManaged(objectKey);
+                }
+            }
+        });
+    }
+
+    private void deleteObjectsIfUnreferencedAfterCommit(Collection<String> objectKeys) {
+        if (objectKeys == null || objectKeys.isEmpty()) {
+            return;
+        }
+        var keys = objectKeys.stream().filter(Objects::nonNull).filter(key -> !key.isBlank()).distinct().toList();
+        if (keys.isEmpty()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                for (var objectKey : keys) {
+                    if (!objectKeyReferenced(objectKey)) {
+                        storage.deleteIfManaged(objectKey);
+                    }
+                }
+            }
+        });
+    }
+
+    private boolean objectKeyReferenced(String objectKey) {
+        if (assetMapper.selectCountByQuery(QueryWrapper.create().from(ASSET_ENTITY)
+                .where(ASSET_ENTITY.OBJECT_KEY.eq(objectKey))) > 0) {
+            return true;
+        }
+        return importJobMapper.selectCountByQuery(QueryWrapper.create().from(IMPORT_JOB_ENTITY)
+                .where(IMPORT_JOB_ENTITY.SOURCE_OBJECT_KEY.eq(objectKey)
+                        .or(IMPORT_JOB_ENTITY.RAW_EXTRACTION_OBJECT_KEY.eq(objectKey))
+                        .or(IMPORT_JOB_ENTITY.NORMALIZED_OBJECT_KEY.eq(objectKey)))) > 0;
+    }
+
+    private static String normalizeImageText(String value, String field, int maxLength) {
+        var normalized = Objects.requireNonNullElse(value, "").trim();
+        if (normalized.length() > maxLength) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_TEXT_TOO_LONG", field + "不能超过 " + maxLength + " 个字符。");
+        }
+        return normalized;
+    }
+
+    private static String safeOriginalName(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        var normalized = value.replace('\\', '/');
+        var lastSlash = normalized.lastIndexOf('/');
+        return (lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized).substring(0,
+                Math.min(lastSlash >= 0 ? normalized.length() - lastSlash - 1 : normalized.length(), 255));
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    public record StoredImage(String mimeType, String sha256, byte[] bytes) {
+    }
+
+    private record VerifiedImage(byte[] bytes, String sha256, String mimeType, String extension, Integer width, Integer height) {
+    }
+
+    private enum ImageKind {
+        PNG("image/png", ".png"), JPEG("image/jpeg", ".jpg"), WEBP("image/webp", ".webp");
+        private final String mimeType;
+        private final String extension;
+        ImageKind(String mimeType, String extension) { this.mimeType = mimeType; this.extension = extension; }
+        String mimeType() { return mimeType; }
+        String extension() { return extension; }
     }
 
     private void resequenceBlocks(String versionId, String nodeId) {
@@ -593,7 +893,9 @@ public class VersionRevisionService {
             entity.setMimeType(asset.mimeType());
             entity.setSha256(asset.sha256());
             entity.setSizeBytes(0);
-            entity.setMetadata(json(Map.of("alt", Objects.requireNonNullElse(asset.alt(), ""))));
+            entity.setMetadata(json(Map.of(
+                    "alt", Objects.requireNonNullElse(asset.alt(), ""),
+                    "editorImage", asset.assetKey() != null && asset.assetKey().startsWith("editor-image-"))));
             assetMapper.insertSelective(entity);
         }
     }

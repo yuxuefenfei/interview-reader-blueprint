@@ -96,7 +96,7 @@ async function loadSavedPreview(): Promise<void> {
         <article class="detached-preview-article">
           <div class="preview-node-meta"><el-tag effect="plain">{{ zh(node.nodeType) }}</el-tag><el-tag v-if="node.semanticRole" type="success" effect="plain">{{ zh(node.semanticRole) }}</el-tag></div>
           <h1>{{ node.title }}</h1>
-          <div v-for="block in blocks" :key="block.id" class="detached-preview-block" :class="{ active: activeBlock?.id === block.id }"><ContentBlockView :block="block" /></div>
+          <div v-for="block in blocks" :key="block.id" class="detached-preview-block" :class="{ active: activeBlock?.id === block.id }"><ContentBlockView :block="block" :asset-base-url="`/api/admin/versions/${versionId}/editor/assets`" /></div>
           <el-empty v-if="!blocks.length" description="当前节点暂无内容" :image-size="72" />
         </article>
       </template>

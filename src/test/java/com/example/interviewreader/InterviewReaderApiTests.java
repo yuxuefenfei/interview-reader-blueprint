@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -41,6 +42,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -1510,6 +1512,54 @@ class InterviewReaderApiTests {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("Only draft versions can be edited"));
     }
+
+    @Test
+    void editorImageUploadIsRevisionSafePrivateUntilPublishAndRemovesUnusedAsset() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "editor-image-" + UUID.randomUUID());
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        var snapshot = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor", imported.versionId()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var nodeId = UUID.fromString(snapshot.get("nodes").get(1).get("id").asText());
+        var created = objectMapper.readTree(mockMvc.perform(post("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", imported.versionId(), nodeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"draftRevision\":0,\"blockType\":\"image\",\"payload\":{},\"plainText\":\"\",\"language\":null}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
+        var blockId = UUID.fromString(created.get("id").asText());
+        var pngOutput = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), "png", pngOutput);
+        var png = pngOutput.toByteArray();
+
+        var uploaded = objectMapper.readTree(mockMvc.perform(multipart("/api/admin/versions/{versionId}/editor/blocks/{blockId}/image", imported.versionId(), blockId)
+                        .file(new MockMultipartFile("file", "pixel.png", "image/png", png))
+                        .param("draftRevision", "1")
+                        .param("alt", "一个像素"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftRevision").value(2))
+                .andReturn().getResponse().getContentAsString());
+        var assetKey = uploaded.get("block").get("payload").get("assetKey").asText();
+        var objectKey = jdbc.queryForObject("SELECT object_key FROM asset WHERE version_id = ? AND asset_key = ?", String.class,
+                imported.versionId().toString(), assetKey);
+
+        mockMvc.perform(get("/api/admin/versions/{versionId}/editor/assets/{assetKey}", imported.versionId(), assetKey))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getContentType()).contains("image/png"));
+        mockMvc.perform(get("/assets/versions/{versionId}/{assetKey}", imported.versionId(), assetKey))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(multipart("/api/admin/versions/{versionId}/editor/blocks/{blockId}/image", imported.versionId(), blockId)
+                        .file(new MockMultipartFile("file", "bad.png", "image/png", new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47}))
+                        .param("draftRevision", "2")
+                        .param("alt", "损坏图片"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IMAGE_TYPE_INVALID"));
+
+        mockMvc.perform(delete("/api/admin/versions/{versionId}/editor/blocks/{blockId}", imported.versionId(), blockId)
+                        .param("draftRevision", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftRevision").value(3));
+        assertThat(Files.exists(Path.of("target/test-import-sources").toAbsolutePath().normalize().resolve(objectKey))).isFalse();
+    }
+
     private ImportResult importAndCommit(byte[] jsonPackage) throws Exception {
         var job = uploadJsonPackage(jsonPackage);
         return commitReadyJob(job, "CREATE_NEW");

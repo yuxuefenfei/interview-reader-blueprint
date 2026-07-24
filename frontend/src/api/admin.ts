@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { AdminDocumentPage, AdminDocumentSummary, BlockMutationResult, DeletionJob, DocumentMetadata, DocumentVersion, EditableVersion, EditorBlock, EditorSnapshot, ImportDocumentPreview, ImportIssue, ImportJob, ImportResolution, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
+import type { AdminDocumentPage, AdminDocumentSummary, BlockMutationResult, DeletionJob, DocumentMetadata, DocumentVersion, EditableVersion, EditorBlock, EditorSnapshot, ImageBlockUploadResult, ImportDocumentPreview, ImportIssue, ImportJob, ImportResolution, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
 
 export const adminApi = {
   documents: (query = "", page = 1, size = 20) => http.get<AdminDocumentPage>("/admin/documents", { params: { query: query || undefined, page, size } }).then(({ data }) => data),
@@ -21,6 +21,7 @@ export const adminApi = {
   updateNode: (versionId: string, nodeId: string, draftRevision: number, node: Pick<EditorSnapshot["nodes"][number], "title" | "nodeType" | "semanticRole" | "anchor">) => http.patch<EditorSnapshot>(`/admin/versions/${versionId}/editor/nodes/${nodeId}`, { draftRevision, ...node }).then(({ data }) => data),
   updateStructure: (versionId: string, draftRevision: number, nodes: StructureNode[]) => http.patch<EditorSnapshot>(`/admin/versions/${versionId}/editor/structure`, { draftRevision, nodes }).then(({ data }) => data),
   updateBlock: (versionId: string, blockId: string, draftRevision: number, block: Pick<EditorBlock, "blockType" | "payload" | "plainText" | "language">) => http.patch<EditorBlock>(`/admin/versions/${versionId}/editor/blocks/${blockId}`, { draftRevision, ...block }).then(({ data }) => data),
+  uploadBlockImage: (versionId: string, blockId: string, draftRevision: number, file: File, alt: string, decorative: boolean, caption: string) => { const body = new FormData(); body.set("file", file); body.set("draftRevision", String(draftRevision)); body.set("alt", alt); body.set("decorative", String(decorative)); if (caption.trim()) body.set("caption", caption.trim()); return http.post<ImageBlockUploadResult>(`/admin/versions/${versionId}/editor/blocks/${blockId}/image`, body).then(({ data }) => data); },
   deleteBlock: (versionId: string, blockId: string, draftRevision: number) => http.delete<BlockMutationResult>(`/admin/versions/${versionId}/editor/blocks/${blockId}`, { params: { draftRevision } }).then(({ data }) => data),
   cleanupEmptyBlocks: (versionId: string, draftRevision: number) => http.post<BlockMutationResult>(`/admin/versions/${versionId}/editor/blocks/cleanup-empty`, { draftRevision }).then(({ data }) => data),
   saveEditor: (versionId: string, draftRevision: number, documentPackage: EditableVersion["documentPackage"]) => http.put<EditableVersion>(`/admin/versions/${versionId}/editor`, { draftRevision, documentPackage }).then(({ data }) => data),

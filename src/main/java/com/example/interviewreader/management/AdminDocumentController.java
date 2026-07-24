@@ -2,8 +2,12 @@ package com.example.interviewreader.management;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -105,6 +109,29 @@ public class AdminDocumentController {
             @Valid @RequestBody ManagementDtos.UpdateBlockRequest request
     ) {
         return service.updateBlock(versionId, blockId, request);
+    }
+
+    @PostMapping("/versions/{versionId}/editor/blocks/{blockId}/image")
+    public ManagementDtos.ImageBlockUploadResult uploadBlockImage(
+            @PathVariable UUID versionId,
+            @PathVariable UUID blockId,
+            @RequestParam MultipartFile file,
+            @RequestParam long draftRevision,
+            @RequestParam(required = false) String alt,
+            @RequestParam(defaultValue = "false") boolean decorative,
+            @RequestParam(required = false) String caption
+    ) {
+        return service.replaceBlockImage(versionId, blockId, draftRevision, file, alt, decorative, caption);
+    }
+
+    @GetMapping("/versions/{versionId}/editor/assets/{assetKey}")
+    public ResponseEntity<byte[]> draftImage(@PathVariable UUID versionId, @PathVariable String assetKey) {
+        var image = service.draftImage(versionId, assetKey);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(image.mimeType()))
+                .cacheControl(CacheControl.noStore())
+                .eTag('"' + image.sha256() + '"')
+                .body(image.bytes());
     }
 
     @DeleteMapping("/versions/{versionId}/editor/blocks/{blockId}")

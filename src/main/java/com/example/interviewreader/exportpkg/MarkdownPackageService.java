@@ -6,11 +6,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MarkdownPackageService {
     public String write(DocumentPackage documentPackage) {
+        return write(documentPackage, assetKey -> assetKey);
+    }
+
+    public String write(DocumentPackage documentPackage, Function<String, String> assetUrl) {
         var markdown = new StringBuilder();
         appendHeading(markdown, 1, documentPackage.document().title());
         if (hasText(documentPackage.document().description())) {
@@ -27,13 +32,13 @@ public class MarkdownPackageService {
         for (var section : Objects.requireNonNullElse(documentPackage.sections(), List.<DocumentPackage.SectionInfo>of())) {
             appendHeading(markdown, Math.min(6, section.level() + 1), section.title());
             for (var block : blocksBySection.getOrDefault(section.sectionKey(), List.of())) {
-                appendBlock(markdown, block);
+                appendBlock(markdown, block, assetUrl);
             }
         }
         return markdown.toString().stripTrailing() + "\n";
     }
 
-    private void appendBlock(StringBuilder markdown, DocumentPackage.BlockInfo block) {
+    private void appendBlock(StringBuilder markdown, DocumentPackage.BlockInfo block, Function<String, String> assetUrl) {
         switch (block.blockType()) {
             case UNORDERED_LIST -> appendList(markdown, block, false);
             case ORDERED_LIST -> appendList(markdown, block, true);
@@ -42,7 +47,7 @@ public class MarkdownPackageService {
             case QUOTE -> appendQuote(markdown, block);
             case CALLOUT -> appendCallout(markdown, block);
             case FORMULA -> markdown.append("$$\n").append(payloadText(block.payload(), "latex", text(block))).append("\n$$\n\n");
-            case IMAGE -> appendImage(markdown, block);
+            case IMAGE -> appendImage(markdown, block, assetUrl);
             case DIVIDER -> markdown.append("---\n\n");
             default -> markdown.append(text(block)).append("\n\n");
         }
@@ -110,10 +115,10 @@ public class MarkdownPackageService {
         markdown.append('\n');
     }
 
-    private void appendImage(StringBuilder markdown, DocumentPackage.BlockInfo block) {
+    private void appendImage(StringBuilder markdown, DocumentPackage.BlockInfo block, Function<String, String> assetUrl) {
         var alt = payloadText(block.payload(), "alt", text(block));
         var assetKey = payloadText(block.payload(), "assetKey", "");
-        markdown.append("![").append(alt).append("](").append(assetKey).append(")\n\n");
+        markdown.append("![").append(alt).append("](").append(assetKey.isBlank() ? "" : assetUrl.apply(assetKey)).append(")\n\n");
     }
 
     private String text(DocumentPackage.BlockInfo block) {

@@ -23,6 +23,7 @@ public class ExportController {
     @PostMapping
     public ResponseEntity<?> export(@Valid @RequestBody ExportRequest request) {
         var documentPackage = exportService.exportJsonPackage(request.documentId(), request.versionId());
+        var assetUrl = (java.util.function.Function<String, String>) assetKey -> "/assets/versions/" + request.versionId() + "/" + assetKey;
         return switch (request.format()) {
             case JSON_PACKAGE -> ResponseEntity.ok(documentPackage);
             case EXCEL -> ResponseEntity.ok()
@@ -32,11 +33,11 @@ public class ExportController {
             case MARKDOWN -> ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType("text/markdown;charset=UTF-8"))
                     .header("Content-Disposition", "attachment; filename=\"interview-reader-export.md\"")
-                    .body(markdownPackageService.write(documentPackage));
+                    .body(markdownPackageService.write(documentPackage, assetUrl));
             case STATIC_HTML -> ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
                     .header("Content-Disposition", "attachment; filename=\"interview-reader-export.html\"")
-                    .body(staticHtmlPackageService.write(documentPackage));
+                    .body(staticHtmlPackageService.write(documentPackage, assetUrl));
         };
     }
 }

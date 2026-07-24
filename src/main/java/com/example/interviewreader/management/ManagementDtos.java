@@ -92,4 +92,8 @@ public final class ManagementDtos {
 
     public record BlockMutationResult(long draftRevision, int removedCount) {
     }
+
+    /** A successful image replacement updates both the block and the draft revision atomically. */
+    public record ImageBlockUploadResult(EditorBlock block, long draftRevision) {
+    }
 }

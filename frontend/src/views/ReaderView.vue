@@ -393,7 +393,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <template v-else-if="content">
         <article class="reader-article">
           <h1>{{ content.node.title }}</h1>
-          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" />
+          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :asset-base-url="selected ? `/assets/versions/${selected.currentVersionId}` : undefined" />
           <div v-if="content.nextAfterSeq" class="reader-load-more">
             <el-button :loading="loadingMore" @click="loadMoreContent">加载更多内容</el-button>
           </div>

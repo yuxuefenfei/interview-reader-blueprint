@@ -441,7 +441,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
-/* Formula & image placeholder */
+/* Formula & images */
 .formula {
   margin: 16px 0; padding: 12px 16px;
   border: 1px dashed var(--reader-line); border-radius: var(--radius-sm);
@@ -450,14 +450,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   color: var(--reader-muted);
 }
 .formula::before { content: "公式："; font-family: inherit; font-weight: 650; color: var(--reader-accent); }
-.image-placeholder {
-  display: flex; align-items: center; gap: 10px;
-  margin: 16px 0; padding: 14px 16px;
-  border: 1.5px dashed var(--reader-line); border-radius: var(--radius-sm);
-  background: var(--surface-2); color: var(--reader-muted);
-  font-size: 14px;
-}
-.image-placeholder::before { content: "图片："; font-weight: 650; color: var(--reader-accent); }
+.image-block { display: grid; gap: 8px; width: min(100%, var(--reader-column, 820px)); margin: 20px auto; }
+.image-block img { display: block; width: 100%; height: auto; max-height: min(72vh, 720px); object-fit: contain; border: 1px solid var(--reader-line); border-radius: var(--radius-sm); background: var(--surface-2); }
+.image-block figcaption { color: var(--reader-muted); font-size: 13px; line-height: 1.55; }
+.image-block.unavailable { min-height: 120px; align-content: center; padding: 14px 16px; border: 1.5px dashed var(--reader-line); border-radius: var(--radius-sm); background: var(--surface-2); }
 
 /* Pagination */
 .chapter-pagination {
@@ -697,6 +693,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .block-detail-panel .el-input, .block-detail-panel .el-select { min-width: 0; max-width: 100%; }
 .block-main-editor textarea { box-sizing: border-box; min-width: 0; max-width: 100%; min-height: 280px !important; line-height: 1.7; }
 .block-edit-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.image-block-editor { display: grid; gap: 10px; padding: 14px; border: 1px solid #dce5eb; border-radius: 6px; background: #f8fbfc; }
+.image-block-editor .el-upload { justify-self: start; }
+.image-block-editor .form-help { margin: -4px 0 2px; }
 .payload-collapse { border-top: 1px solid #edf1f3; border-bottom: 0; }
 .payload-collapse .el-collapse-item__header { height: 34px; color: #627083; font-size: 12px; border-bottom: 0; }
 .payload-collapse .el-collapse-item__wrap { border-bottom: 0; }
