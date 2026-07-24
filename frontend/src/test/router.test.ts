@@ -61,8 +61,7 @@ describe("responsive admin routing", () => {
     "/admin/documents",
     "/admin/documents/document-1",
     "/admin/imports",
-    "/admin/versions/version-1/edit",
-    "/admin/versions/version-1/preview"
+    "/admin/versions/version-1/edit"
   ])("redirects narrow viewports from %s to the reader", async (path) => {
     const { router } = await loadRouter(true);
 
@@ -96,5 +95,16 @@ describe("responsive admin routing", () => {
     media.setMatches(true);
 
     await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe("/reader"));
+  });
+
+  it("keeps the detached preview open when the viewport becomes narrow", async () => {
+    const { media, router } = await loadRouter(false);
+    const previewPath = "/admin/versions/version-1/preview";
+
+    await router.push(previewPath);
+    media.setMatches(true);
+    await Promise.resolve();
+
+    expect(router.currentRoute.value.fullPath).toBe(previewPath);
   });
 });

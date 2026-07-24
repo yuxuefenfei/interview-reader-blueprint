@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { ContentBlock } from "../types/api";
 
 const copyLabel = ref("复制代码");
@@ -18,6 +18,12 @@ const imageDecorative = computed(() => props.block.payload.decorative === true);
 const imageUrl = computed(() => {
   if (imageAssetKey.value && props.assetBaseUrl) return `${props.assetBaseUrl.replace(/\/$/, "")}/${encodeURIComponent(imageAssetKey.value)}`;
   return typeof props.block.payload.src === "string" ? props.block.payload.src : typeof props.block.payload.url === "string" ? props.block.payload.url : "";
+});
+
+// A block keeps its component instance while the editor broadcasts a new asset key.
+// Retry the image when that immutable resource URL changes instead of retaining an old load failure.
+watch(imageUrl, () => {
+  imageLoadFailed.value = false;
 });
 
 onBeforeUnmount(() => {

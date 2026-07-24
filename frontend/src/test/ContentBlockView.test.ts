@@ -65,4 +65,21 @@ describe("ContentBlockView", () => {
     expect(wrapper.find(".table-snapshot").exists()).toBe(true);
     expect(wrapper.find("pre").text()).toContain("HashMap   Race");
   });
+
+  it("retries an image after the editor broadcasts a new asset key", async () => {
+    const wrapper = mount(ContentBlockView, {
+      props: {
+        assetBaseUrl: "/api/admin/versions/v1/editor/assets",
+        block: block({ blockType: "image", payload: { assetKey: "old-image", alt: "旧图片" }, plainText: "旧图片" })
+      }
+    });
+
+    await wrapper.get("img").trigger("error");
+    expect(wrapper.find("img").exists()).toBe(false);
+
+    await wrapper.setProps({
+      block: block({ blockType: "image", payload: { assetKey: "new-image", alt: "新图片" }, plainText: "新图片" })
+    });
+    expect(wrapper.get("img").attributes("src")).toBe("/api/admin/versions/v1/editor/assets/new-image");
+  });
 });

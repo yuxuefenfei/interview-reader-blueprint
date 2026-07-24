@@ -29,14 +29,20 @@ const router = createRouter({
 
 const adminViewport = window.matchMedia(ADMIN_MOBILE_MEDIA_QUERY);
 const isAdminPath = (path: string): boolean => path === "/admin" || path.startsWith("/admin/");
+const isDetachedPreviewPath = (path: string): boolean =>
+  /^\/admin\/versions\/[^/]+\/preview$/.test(path);
+const requiresDesktopAdminViewport = (path: string): boolean =>
+  isAdminPath(path) && !isDetachedPreviewPath(path);
 
 router.beforeEach((to) => {
-  if (isAdminPath(to.path) && adminViewport.matches) return "/reader";
+  if (requiresDesktopAdminViewport(to.path) && adminViewport.matches) return "/reader";
   return true;
 });
 
 const handleAdminViewportChange = (event: MediaQueryListEvent): void => {
-  if (event.matches && isAdminPath(router.currentRoute.value.path)) void router.replace("/reader");
+  if (event.matches && requiresDesktopAdminViewport(router.currentRoute.value.path)) {
+    void router.replace("/reader");
+  }
 };
 
 adminViewport.addEventListener("change", handleAdminViewportChange);

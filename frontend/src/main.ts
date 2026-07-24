@@ -17,6 +17,7 @@ import { ElPopover } from "element-plus/es/components/popover/index";
 import { ElProgress } from "element-plus/es/components/progress/index";
 import { ElRadio } from "element-plus/es/components/radio/index";
 import { ElTable, ElTableColumn } from "element-plus/es/components/table/index";
+import { ElSwitch } from "element-plus/es/components/switch/index";
 import { ElTag } from "element-plus/es/components/tag/index";
 import { ElTooltip } from "element-plus/es/components/tooltip/index";
 import { ElTree } from "element-plus/es/components/tree/index";
@@ -52,6 +53,7 @@ const app = createApp(App).use(router);
   ElProgress,
   ElRadio,
   ElSelect,
+  ElSwitch,
   ElTable,
   ElTableColumn,
   ElTag,

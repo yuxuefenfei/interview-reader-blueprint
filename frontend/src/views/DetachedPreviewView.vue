@@ -58,7 +58,7 @@ function applyState(state: DetachedPreviewState): void {
   error.value = "";
 }
 
-async function loadSavedPreview(): Promise<void> {
+async function loadSavedPreview(force = false): Promise<void> {
   loading.value = true;
   error.value = "";
   try {
@@ -66,18 +66,19 @@ async function loadSavedPreview(): Promise<void> {
     const requestedNodeId = typeof route.query.nodeId === "string" ? route.query.nodeId : null;
     const fallbackNode = snapshot.nodes.find((item) => item.id === requestedNodeId) ?? snapshot.nodes[0] ?? null;
     if (!fallbackNode) {
-      if (!receivedLiveState) error.value = "草稿中没有可预览的节点。";
+      if (!receivedLiveState || force) error.value = "草稿中没有可预览的节点。";
       return;
     }
     const page = await adminApi.nodeBlocks(versionId, fallbackNode.id);
-    if (receivedLiveState) return;
+    // 初次打开时优先保留编辑器刚广播的实时状态；用户明确点击刷新时必须以服务端已保存数据为准。
+    if (receivedLiveState && !force) return;
     document.value = snapshot.document;
     node.value = fallbackNode;
     blocks.value = page.items;
     activeBlockId.value = page.items[0]?.id ?? null;
     connected.value = false;
   } catch (caught) {
-    if (!receivedLiveState) error.value = toUserMessage(caught, "预览加载失败");
+    if (!receivedLiveState || force) error.value = toUserMessage(caught, "预览加载失败");
   } finally {
     loading.value = false;
   }
@@ -88,7 +89,7 @@ async function loadSavedPreview(): Promise<void> {
   <main class="detached-preview-page">
     <header class="detached-preview-header">
       <div><p class="eyebrow">独立预览</p><strong>{{ document?.title || "草稿预览" }}</strong></div>
-      <div class="detached-preview-actions"><span :class="{ live: connected }">{{ statusLabel }}</span><el-button circle :icon="RefreshRight" aria-label="刷新已保存草稿" title="刷新已保存草稿" @click="loadSavedPreview" /></div>
+      <div class="detached-preview-actions"><span :class="{ live: connected }">{{ statusLabel }}</span><el-button circle :icon="RefreshRight" aria-label="刷新已保存草稿" title="刷新已保存草稿" @click="loadSavedPreview(true)" /></div>
     </header>
     <section class="detached-preview-content" v-loading="loading">
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
