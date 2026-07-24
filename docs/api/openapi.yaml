@@ -137,6 +137,17 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/SearchHit" }
+  /reader/reading-progress/latest-document:
+    get:
+      summary: Get the most recently read published document
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "200":
+          description: Most recently read document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentSummary" }
+        "204": { description: No reading position has been saved }
   /reader/reading-progress/{documentId}:
     get:
       summary: Get the latest reading position

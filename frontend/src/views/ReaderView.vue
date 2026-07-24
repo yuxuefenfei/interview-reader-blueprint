@@ -97,9 +97,19 @@ async function loadDocuments(): Promise<void> {
 }
 
 async function openFromRoute(): Promise<void> {
-  const documentId = typeof route.params.documentId === "string" ? route.params.documentId : documents.value[0]?.id;
+  let documentId = typeof route.params.documentId === "string" ? route.params.documentId : undefined;
+  let latestReadDocument: DocumentSummary | null = null;
+  if (!documentId) {
+    try {
+      latestReadDocument = await readerApi.latestReadDocument();
+      documentId = latestReadDocument?.id;
+    } catch {
+      documentId = undefined;
+    }
+  }
+  documentId ||= documents.value[0]?.id;
   if (!documentId) return;
-  const document = documents.value.find((item) => item.id === documentId) || await readerApi.document(documentId);
+  const document = documents.value.find((item) => item.id === documentId) || latestReadDocument || await readerApi.document(documentId);
   if (!document.currentVersionId) return;
   selected.value = document;
   loading.value = true;

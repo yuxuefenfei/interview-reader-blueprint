@@ -81,6 +81,32 @@ class InterviewReaderApiTests {
     }
 
     @Test
+    void latestReadDocumentResumesTheMostRecentlySavedProgress() throws Exception {
+        var firstSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
+        ((ObjectNode) firstSource.get("document")).put("documentKey", "resume-first-" + UUID.randomUUID());
+        var first = importAndCommit(objectMapper.writeValueAsBytes(firstSource));
+        publish(first);
+
+        var secondSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
+        ((ObjectNode) secondSource.get("document")).put("documentKey", "resume-second-" + UUID.randomUUID());
+        var second = importAndCommit(objectMapper.writeValueAsBytes(secondSource));
+        publish(second);
+
+        var firstPosition = firstChildFirstBlock(first.versionId());
+        var secondPosition = firstChildFirstBlock(second.versionId());
+        documentQueryService.upsertProgress(first.documentId(), new ReadingProgress(
+                first.versionId(), firstPosition.sectionId(), firstPosition.blockId(), 0, 0,
+                BigDecimal.ZERO, OffsetDateTime.parse("2099-07-20T10:00:00+08:00"), "resume-test", 0));
+        documentQueryService.upsertProgress(second.documentId(), new ReadingProgress(
+                second.versionId(), secondPosition.sectionId(), secondPosition.blockId(), 0, 0,
+                BigDecimal.ZERO, OffsetDateTime.parse("2099-07-20T11:00:00+08:00"), "resume-test", 0));
+
+        mockMvc.perform(get("/api/reader/reading-progress/latest-document"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(second.documentId().toString()));
+    }
+
+    @Test
     void pdfBoxFontCacheDefaultsToBuildDirectory() {
         var fontCache = System.getProperty("pdfbox.fontcache");
 

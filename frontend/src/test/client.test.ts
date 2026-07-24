@@ -16,6 +16,14 @@ describe("Axios API domains", () => {
     });
   });
 
+  it("loads the most recently read document", async () => {
+    const get = vi.spyOn(http, "get").mockResolvedValue({ status: 204, data: null } as never);
+
+    await expect(readerApi.latestReadDocument()).resolves.toBeNull();
+
+    expect(get).toHaveBeenCalledWith("/reader/reading-progress/latest-document");
+  });
+
   it("uses Axios multipart uploads and lets the server recognize source type", async () => {
     const post = vi.spyOn(http, "post").mockResolvedValue({ data: { id: "job-1" } } as never);
     const file = new File(["pdf"], "sample.pdf", { type: "application/pdf" });

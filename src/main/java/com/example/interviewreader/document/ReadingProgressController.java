@@ -15,6 +15,12 @@ public class ReadingProgressController {
     private final DocumentQueryService service;
 
 
+    @GetMapping("/latest-document")
+    public ResponseEntity<DocumentDtos.DocumentSummary> latestDocument() {
+        var document = service.latestReadDocument();
+        return document == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(document);
+    }
+
     @GetMapping("/{documentId}")
     public ResponseEntity<ReadingProgress> get(@PathVariable UUID documentId) {
         var progress = service.getProgress(documentId);

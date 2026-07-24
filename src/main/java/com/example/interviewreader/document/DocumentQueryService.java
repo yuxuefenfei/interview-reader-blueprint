@@ -81,6 +81,19 @@ public class DocumentQueryService {
         return mapDocumentSummary(document, progress(documentId));
     }
 
+    public DocumentSummary latestReadDocument() {
+        var progress = readingProgressMapper.selectOneByQuery(QueryWrapper.create()
+                .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
+                .from(READING_PROGRESS_ENTITY)
+                .innerJoin(DOCUMENT_ENTITY).on(READING_PROGRESS_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
+                .where(READING_PROGRESS_ENTITY.USER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
+                .orderBy(READING_PROGRESS_ENTITY.CLIENT_UPDATED_AT.desc(), READING_PROGRESS_ENTITY.UPDATED_AT.desc(), READING_PROGRESS_ENTITY.DOCUMENT_ID.asc())
+                .limit(1));
+        return progress == null ? null : getDocument(uuid(progress.getDocumentId()));
+    }
+
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
         var targetDocument = documentMapper.selectOneById(id(documentId));

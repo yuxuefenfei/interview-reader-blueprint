@@ -6,15 +6,9 @@
 
 | 分类 | 内容 | 入口 |
 |---|---|---|
-| 架构设计 | 系统目标、领域模型、导入流程、阅读器与实施路线 | [系统设计方案](architecture/system-design.md) |
-| 前端展示设计 | 产品主题、视觉系统、页面规格、原型图与落地优先级 | [前端展示设计](design/README.md) · [原型图册](design/prototypes/index.html) |
 | API 契约 | 前后端共同遵守的 OpenAPI 定义 | [OpenAPI 契约](api/openapi.yaml) |
 | 数据库 | 数据库权威迁移位置说明 | [数据库结构说明](database/schema-mysql.sql) |
-| 导入规范 | JSON Schema、示例包和 Excel 模板 | [导入资料](#导入资料) |
 | 运维 | 生产部署、备份恢复、监控和故障处理 | [生产运行手册](operations/runbook.md) |
-| 质量 | 项目事实核查、问题清单与优化结果 | [分析报告](quality/analysis-report.md) |
-| 计划 | 项目分阶段实施和验收计划 | [实施计划](planning/implementation-plan.md) |
-| 样例资料 | 用于导入、转换和回归测试的 Markdown/PDF 面试资料 | [样例资料](#样例资料) |
 
 ## 导入资料
 

@@ -120,6 +120,7 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - `GET /api/reader/versions/{versionId}/toc`
 - `GET /api/reader/versions/{versionId}/nodes/{nodeId}/content?afterSeq=...&limit=50`
 - `GET /api/reader/search?q=...&documentId=...&limit=20`
+- `GET /api/reader/reading-progress/latest-document`
 - `GET /api/reader/reading-progress/{documentId}`
 - `PUT /api/reader/reading-progress/{documentId}`
 - `POST /api/reader/bookmarks`

@@ -1,0 +1,1 @@
+CREATE INDEX idx_reading_progress_user_client_updated_at ON reading_progress(user_id, client_updated_at);
