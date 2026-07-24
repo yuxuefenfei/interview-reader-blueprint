@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EditorBlock } from "../types/api";
-import { parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
+import { editorText, parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
 
 function block(overrides: Partial<EditorBlock> = {}): EditorBlock {
   return {
@@ -44,6 +44,28 @@ describe("editor preview payload", () => {
     }), { columns: ["旧列"], rows: [["旧值"]] });
 
     expect(preview).toMatchObject({ columns: ["名称", "值"], rows: [["Redis", "快"]] });
+  });
+
+  it("removes Markdown inline-code markers from edited table cells", () => {
+    const preview = previewPayload(block({
+      blockType: "table",
+      plainText: "对象 | 说明\n`ServerSocketChannel` | 绑定 `OP_ACCEPT` 注册"
+    }), {});
+
+    expect(preview).toMatchObject({
+      columns: ["对象", "说明"],
+      rows: [["ServerSocketChannel", "绑定 OP_ACCEPT 注册"]]
+    });
+  });
+
+  it("makes a flattened imported table editable as pipe-delimited rows", () => {
+    const text = editorText(block({
+      blockType: "table",
+      plainText: "对象 说明 ServerSocketChannel 监听端口",
+      payload: { columns: ["对象", "说明"], rows: [["ServerSocketChannel", "监听端口"]] }
+    }), undefined);
+
+    expect(text).toBe("对象 | 说明\nServerSocketChannel | 监听端口");
   });
 
   it("refuses malformed advanced payload without breaking the preview", () => {

@@ -44,13 +44,17 @@ function itemsFromPayload(payload: Record<string, unknown>): string[] {
   return Array.isArray(payload.items) ? payload.items.map(String) : [];
 }
 
+function tableCellText(value: unknown): string {
+  return String(value).replace(/`([^`\r\n]+)`/g, "$1").trim();
+}
+
 function tableColumns(payload: Record<string, unknown>): string[] {
-  return Array.isArray(payload.columns) ? payload.columns.map(String) : [];
+  return Array.isArray(payload.columns) ? payload.columns.map(tableCellText) : [];
 }
 
 function tableRows(payload: Record<string, unknown>): string[][] {
   return Array.isArray(payload.rows)
-    ? payload.rows.map((row) => (Array.isArray(row) ? row.map(String) : [String(row)]))
+    ? payload.rows.map((row) => (Array.isArray(row) ? row.map(tableCellText) : [tableCellText(row)]))
     : [];
 }
 

@@ -11,7 +11,7 @@ import { zh } from "../shared/presentation";
 import { ADMIN_DESKTOP_MEDIA_QUERY } from "../shared/responsive";
 import { BLOCK_TYPES, NODE_TYPES, SEMANTIC_ROLES } from "../types/api";
 import type { EditorBlock, EditorNode, EditorSnapshot, StructureNode } from "../types/api";
-import { editorTextPlaceholder, parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
+import { editorText, editorTextPlaceholder, parseEditorPayload, previewBlock, previewPayload } from "../utils/editorPreview";
 import { createSerializedSaveQueue } from "../utils/serializedSaveQueue";
 import { detachedPreviewChannelName, isDetachedPreviewMessage, type DetachedPreviewState } from "../utils/detachedPreviewChannel";
 import AdminPageHeader from "../components/AdminPageHeader.vue";
@@ -80,6 +80,15 @@ const previewNode = computed<EditorNode | null>(() => {
   return node && nodePropertiesOpen.value ? { ...node, ...nodeForm } : node;
 });
 const activeBlock = computed(() => blocks.value.find((block) => block.id === activeBlockId.value) ?? null);
+const activeBlockText = computed({
+  get: () => {
+    const block = activeBlock.value;
+    return block ? editorText(block, payloadTexts[block.id]) : "";
+  },
+  set: (value: string) => {
+    if (activeBlock.value) activeBlock.value.plainText = value;
+  }
+});
 const selectedNodeHasChildren = computed(() => !!selectedId.value && editor.value?.nodes.some((node) => node.parentId === selectedId.value));
 const emptyBlockDescription = computed(() => selectedNodeHasChildren.value ? "该结构节点没有直接内容块。请选择子节点编辑正文，或在此新增内容。" : "该节点暂无内容块，可直接新增正文。");
 const previewBlocks = computed(() => blocks.value.map((block) => previewBlock(block, payloadTexts[block.id])));
@@ -686,7 +695,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
                     <el-input v-model="imageCaption" :name="`block-image-caption-${activeBlock.id}`" autocomplete="off" placeholder="图片说明（可选）" @input="scheduleBlockSave" />
                   </div>
                 </template>
-                <el-input v-else v-model="activeBlock.plainText" :name="`block-content-${activeBlock.id}`" autocomplete="off" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
+                <el-input v-else v-model="activeBlockText" :name="`block-content-${activeBlock.id}`" autocomplete="off" class="block-main-editor" type="textarea" :autosize="{ minRows: 12, maxRows: 28 }" resize="vertical" :placeholder="editorTextPlaceholder(activeBlock.blockType)" @input="scheduleBlockSave" />
                 <el-collapse v-if="activeBlock.blockType !== 'image'" v-model="expandedPayload" class="payload-collapse"><el-collapse-item :name="activeBlock.id"><template #title>高级数据 <el-icon class="payload-more"><MoreFilled /></el-icon><span v-if="payloadIsInvalid(activeBlock)" class="payload-invalid">JSON 格式待修正</span></template><el-input v-model="payloadTexts[activeBlock.id]" :name="`block-payload-${activeBlock.id}`" autocomplete="off" type="textarea" :rows="10" class="payload-editor" spellcheck="false" @input="scheduleBlockSave" /></el-collapse-item></el-collapse>
               </template>
             </section>

@@ -50,6 +50,22 @@ describe("ContentBlockView", () => {
     expect(wrapper.find("td").text()).toBe("HashMap");
   });
 
+  it("renders imported Markdown table cells without inline-code backticks", () => {
+    const wrapper = mount(ContentBlockView, {
+      props: {
+        block: block({
+          blockType: "table",
+          payload: { columns: ["对象"], rows: [["`ServerSocketChannel`", "绑定 `OP_ACCEPT` 注册"]] },
+          plainText: "对象 | 说明\n`ServerSocketChannel` | 绑定 `OP_ACCEPT` 注册"
+        })
+      }
+    });
+
+    expect(wrapper.text()).toContain("ServerSocketChannel");
+    expect(wrapper.text()).toContain("绑定 OP_ACCEPT 注册");
+    expect(wrapper.text()).not.toContain("`");
+  });
+
   it("renders table snapshots without collapsing aligned text", () => {
     const wrapper = mount(ContentBlockView, {
       props: {

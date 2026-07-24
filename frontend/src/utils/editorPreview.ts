@@ -18,6 +18,36 @@ function listItems(text: string): string[] {
   return text.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
 }
 
+function tableCellText(value: string): string {
+  return value.replace(/`([^`\r\n]+)`/g, "$1").trim();
+}
+
+function isDelimitedTableText(text: string): boolean {
+  return text.split(/\r?\n/).some((line) => line.includes("|") || line.includes("\t"));
+}
+
+function tableColumns(payload: Payload): string[] {
+  return Array.isArray(payload.columns) ? payload.columns.map(String) : [];
+}
+
+function tableRows(payload: Payload): string[][] {
+  return Array.isArray(payload.rows)
+    ? payload.rows.map((row) => Array.isArray(row) ? row.map(String) : [String(row)])
+    : [];
+}
+
+export function editorText(block: EditorBlock, serializedPayload: string | undefined): string {
+  if (block.blockType !== "table" || isDelimitedTableText(block.plainText)) {
+    return block.plainText;
+  }
+  const payload = parseEditorPayload(serializedPayload, block.payload) ?? block.payload;
+  const columns = tableColumns(payload);
+  if (!columns.length) {
+    return block.plainText;
+  }
+  return [columns, ...tableRows(payload)].map((row) => row.join(" | ")).join("\n");
+}
+
 function tablePayload(text: string, payload: Payload): Payload {
   const lines = listItems(text);
   if (lines.length === 0) {
@@ -27,7 +57,7 @@ function tablePayload(text: string, payload: Payload): Payload {
   if (delimiter === null) {
     return { ...payload, text };
   }
-  const rows = lines.map((line) => line.split(delimiter).map((cell) => cell.trim()).filter((cell) => cell.length > 0));
+  const rows = lines.map((line) => line.split(delimiter).map(tableCellText).filter((cell) => cell.length > 0));
   const [columns, ...body] = rows;
   return { ...payload, columns, rows: body };
 }
