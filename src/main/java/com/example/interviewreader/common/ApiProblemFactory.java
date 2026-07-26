@@ -1,7 +1,6 @@
 package com.example.interviewreader.common;
 
 import java.net.URI;
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
@@ -14,7 +13,7 @@ public class ApiProblemFactory {
         problem.setTitle(status.getReasonPhrase());
         problem.setProperty("code", code);
         problem.setProperty("error", detail);
-        problem.setProperty("traceId", UUID.randomUUID().toString());
+        problem.setProperty("traceId", RequestTrace.currentId());
         return problem;
     }
 }

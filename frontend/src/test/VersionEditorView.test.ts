@@ -101,6 +101,8 @@ describe("VersionEditorView autosave", () => {
     const wrapper = mountView();
     await flushPromises();
 
+    expect(wrapper.find('[name="node-anchor"]').exists()).toBe(false);
+
     await wrapper.get("textarea.block-main-editor").setValue("切换节点前必须保存");
     await wrapper.get('[data-testid="tree-node-2"]').trigger("click");
     await flushPromises();

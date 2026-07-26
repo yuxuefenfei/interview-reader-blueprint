@@ -38,6 +38,7 @@ class InterviewReaderAuthTests {
                 .andExpect(result -> assertThat(result.getResponse().getContentType()).startsWith("application/problem+json"))
                 .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(result -> assertThat(result.getResponse().getHeader("X-Trace-Id")).isNotBlank())
                 .andExpect(jsonPath("$.error").value("请先登录"));
     }
 
@@ -177,4 +178,3 @@ class InterviewReaderAuthTests {
                 .andExpect(status().isUnauthorized());
     }
 }
-

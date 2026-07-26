@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @RequiredArgsConstructor
 public class AuthFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_HEALTH_ENDPOINTS = Set.of(

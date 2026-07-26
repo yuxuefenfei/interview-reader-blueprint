@@ -157,11 +157,12 @@ public class VersionRevisionService {
         if (request.draftRevision() != version.getDraftRevision()) {
             throw new ApiException(HttpStatus.CONFLICT, "Draft was updated by another session");
         }
-        var issues = validator.validate(request.documentPackage());
+        var packageWithStableAnchors = withStableAnchors(version.getId(), request.documentPackage());
+        var issues = validator.validate(packageWithStableAnchors);
         if (issues.stream().anyMatch(issue -> issue.severity() == ImportIssueSeverity.BLOCKING)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Draft contains blocking structure errors");
         }
-        replaceContent(version.getId(), request.documentPackage());
+        replaceContent(version.getId(), packageWithStableAnchors);
         advanceDraft(version);
         return new ManagementDtos.EditableVersion(summary(version), packageFor(version));
     }
@@ -220,7 +221,6 @@ public class VersionRevisionService {
         node.setTitle(request.title().trim());
         node.setNodeType(requiredNodeType(request.nodeType()));
         node.setSemanticRole(request.semanticRole());
-        node.setAnchor(blankToNull(request.anchor()) == null ? slug(node.getNodeKey()) : request.anchor().trim());
         contentNodeMapper.update(node);
         refreshNodeSearchText(version.getId(), node.getId());
         advanceDraft(version);
@@ -852,7 +852,7 @@ public class VersionRevisionService {
             node.setSortOrder(section.sortOrder());
             var parentPath = section.parentSectionKey() == null ? null : paths.get(section.parentSectionKey());
             node.setPath(parentPath == null ? String.format("%06d", node.getSortOrder()) : parentPath + "." + String.format("%06d", node.getSortOrder()));
-            node.setAnchor(blankToNull(section.anchor()) == null ? slug(section.sectionKey()) : section.anchor());
+            node.setAnchor(blankToNull(section.anchor()) == null ? opaqueAnchor() : section.anchor());
             node.setSourcePageStart(section.sourcePageStart());
             node.setSourcePageEnd(section.sourcePageEnd());
             node.setSourceBbox(jsonOrNull(section.sourceBbox()));
@@ -1049,9 +1049,28 @@ public class VersionRevisionService {
         return value == null || value.isBlank() ? null : value;
     }
 
-    private static String slug(String value) {
-        var slug = (value == null ? "section" : value).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9\\u4e00-\\u9fa5]+", "-").replaceAll("(^-|-$)", "");
-        return slug.isBlank() ? "section" : slug;
+    private DocumentPackage withStableAnchors(String versionId, DocumentPackage documentPackage) {
+        if (documentPackage.sections() == null) {
+            return documentPackage;
+        }
+        var existingAnchors = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                        .select(CONTENT_NODE_ENTITY.NODE_KEY, CONTENT_NODE_ENTITY.ANCHOR)
+                        .from(CONTENT_NODE_ENTITY)
+                        .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId)))
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(ContentNodeEntity::getNodeKey, ContentNodeEntity::getAnchor));
+        var sections = documentPackage.sections().stream()
+                .map(section -> section == null ? null : new DocumentPackage.SectionInfo(
+                        section.sectionKey(), section.parentSectionKey(), section.level(), section.nodeType(), section.semanticRole(),
+                        section.title(), section.sortOrder(), existingAnchors.getOrDefault(section.sectionKey(), opaqueAnchor()),
+                        section.sourcePageStart(), section.sourcePageEnd(), section.sourceBbox(), section.contentHash()))
+                .toList();
+        return new DocumentPackage(documentPackage.schemaVersion(), documentPackage.document(), documentPackage.version(),
+                sections, documentPackage.blocks(), documentPackage.assets());
+    }
+
+    private static String opaqueAnchor() {
+        return "sec_" + UUID.randomUUID();
     }
 
     private static String id(UUID value) {

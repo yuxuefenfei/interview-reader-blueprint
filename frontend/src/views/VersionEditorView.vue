@@ -17,7 +17,7 @@ import { detachedPreviewChannelName, isDetachedPreviewMessage, type DetachedPrev
 import AdminPageHeader from "../components/AdminPageHeader.vue";
 
 type TreeNode = EditorNode & { children: TreeNode[] };
-type NodeForm = Pick<EditorNode, "title" | "nodeType" | "semanticRole" | "anchor">;
+type NodeForm = Pick<EditorNode, "title" | "nodeType" | "semanticRole">;
 type PreviewMode = "block" | "node";
 type SaveState = "saved" | "dirty" | "saving" | "error";
 type PreviewCommand = "embedded" | "popout";
@@ -41,7 +41,7 @@ const editor = ref<EditorSnapshot | null>(null);
 const treeData = ref<TreeNode[]>([]);
 const selectedId = ref<string | null>(null);
 const treeFilter = ref("");
-const nodeForm = reactive<NodeForm>({ title: "", nodeType: "SECTION", semanticRole: null, anchor: "" });
+const nodeForm = reactive<NodeForm>({ title: "", nodeType: "SECTION", semanticRole: null });
 const blocks = ref<EditorBlock[]>([]);
 const nextCursor = ref<string | null>(null);
 const payloadTexts = reactive<Record<string, string>>({});
@@ -312,7 +312,6 @@ function fillNodeForm(node: EditorNode): void {
   nodeForm.title = node.title;
   nodeForm.nodeType = node.nodeType;
   nodeForm.semanticRole = node.semanticRole;
-  nodeForm.anchor = node.anchor;
 }
 
 function resetNodeForm(): void {
@@ -739,8 +738,8 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         </Teleport>
       </main>
       <el-drawer v-model="nodePropertiesOpen" class="node-property-drawer" title="节点属性" direction="rtl" size="420px" append-to-body>
-        <p class="drawer-description">修改节点名称、层级类型与阅读定位信息。</p>
-        <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" name="node-title" autocomplete="off" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable placeholder="搜索语义角色…"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item><el-form-item label="阅读锚点"><el-input v-model="nodeForm.anchor" name="node-anchor" autocomplete="off" spellcheck="false" /></el-form-item></el-form>
+        <p class="drawer-description">修改节点名称、层级类型与语义角色。阅读定位 ID 由系统生成且保持不变。</p>
+        <el-form label-position="top" class="node-form"><el-form-item label="标题"><el-input v-model="nodeForm.title" name="node-title" autocomplete="off" /></el-form-item><el-form-item label="节点类型"><el-select v-model="nodeForm.nodeType"><el-option v-for="type in nodeTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item><el-form-item label="语义角色"><el-select v-model="nodeForm.semanticRole" clearable filterable placeholder="搜索语义角色…"><el-option v-for="role in semanticRoles" :key="role.value" :label="role.label" :value="role.value" /></el-select></el-form-item></el-form>
         <template #footer><div class="drawer-footer"><el-button @click="nodePropertiesOpen = false">取消</el-button><el-button type="primary" :icon="EditPen" :loading="nodeSaving" @click="saveNode">保存节点</el-button></div></template>
       </el-drawer>
     </div>

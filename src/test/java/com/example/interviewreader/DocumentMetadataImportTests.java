@@ -175,6 +175,56 @@ class DocumentMetadataImportTests {
                 .andExpect(jsonPath("$.title").value("展示标题"));
     }
 
+    @Test
+    void markdownWithRepeatedHeadingsUsesOpaqueAnchorsAndCommits() throws Exception {
+        var job = upload("""
+                # RocketMQ
+
+                ## 核心结论
+                第一段。
+
+                ## 核心结论
+                第二段。
+
+                ## 核心结论-2
+                第三段。
+                """.getBytes(StandardCharsets.UTF_8), "rocketmq.md", null);
+
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/normalized-package", job))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[0].anchor").value(org.hamcrest.Matchers.matchesPattern("sec_[0-9a-f-]{36}")))
+                .andExpect(jsonPath("$.sections[1].anchor").value(org.hamcrest.Matchers.matchesPattern("sec_[0-9a-f-]{36}")))
+                .andExpect(jsonPath("$.sections[2].anchor").value(org.hamcrest.Matchers.matchesPattern("sec_[0-9a-f-]{36}")))
+                .andExpect(jsonPath("$.sections[3].anchor").value(org.hamcrest.Matchers.matchesPattern("sec_[0-9a-f-]{36}")));
+
+        mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", job))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void importedJsonAnchorsAreReplacedAndStagedAnchorEditsAreIgnored() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(packageBytes(unique("opaque-anchor"), "标题", "正文", "Java"));
+        ((ObjectNode) source.get("sections").get(0)).put("anchor", "caller-chosen-anchor");
+        ((ObjectNode) source.get("sections").get(1)).put("anchor", "caller-chosen-anchor");
+        var job = upload(objectMapper.writeValueAsBytes(source), "anchors.json", null);
+
+        mockMvc.perform(get("/api/admin/import-jobs/{jobId}/issues", job))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].severity").value("WARNING"))
+                .andExpect(jsonPath("$[0].issueCode").value("SECTION_ANCHORS_REGENERATED"));
+        var normalized = json(mockMvc.perform(get("/api/admin/import-jobs/{jobId}/normalized-package", job))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var anchor = normalized.get("sections").get(0).get("anchor").asText();
+        assertThat(anchor).matches("sec_[0-9a-f-]{36}");
+
+        mockMvc.perform(patch("/api/admin/import-jobs/{jobId}/normalized-package/sections/{sectionKey}", job, "q1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"anchor\":\"manual-change\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[0].anchor").value(anchor));
+    }
+
     private ImportResult importAndCommit(byte[] bytes) throws Exception {
         var jobId = upload(bytes, "document.json", null);
         var committed = json(mockMvc.perform(post("/api/admin/import-jobs/{jobId}/commit", jobId))

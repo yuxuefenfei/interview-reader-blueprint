@@ -1063,7 +1063,7 @@ class InterviewReaderApiTests {
         assertThat(html)
                 .contains("<!doctype html>")
                 .contains("<h1>Java 高级开发面试题完整答案</h1>")
-                .contains("<section id=\"hashmap-thread-safety-conclusion\">")
+                .containsPattern("<section id=\"sec_[0-9a-f-]{36}\">")
                 .contains("安全文本 &lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;")
                 .doesNotContain("<script>alert")
                 .contains("<code class=\"language-java\">if (a &lt; b) {\n    return a;\n}</code>")
@@ -1460,6 +1460,7 @@ class InterviewReaderApiTests {
                 .andExpect(jsonPath("$.nodes.length()").value(2))
                 .andReturn().getResponse().getContentAsString());
         var childId = UUID.fromString(snapshot.get("nodes").get(1).get("id").asText());
+        var originalAnchor = snapshot.get("nodes").get(1).get("anchor").asText();
 
         var blockPage = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", versionId, childId))
                 .andExpect(status().isOk())
@@ -1474,7 +1475,8 @@ class InterviewReaderApiTests {
                         .contentType(MediaType.APPLICATION_JSON).content(nodeUpdate))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version.draftRevision").value(1))
-                .andExpect(jsonPath("$.nodes[1].title").value("已修订的结论"));
+                .andExpect(jsonPath("$.nodes[1].title").value("已修订的结论"))
+                .andExpect(jsonPath("$.nodes[1].anchor").value(originalAnchor));
 
         var staleBlockUpdate = """
                 { "draftRevision": 0, "blockType": "paragraph", "payload": { "text": "过期写入" }, "plainText": "过期写入", "language": null }

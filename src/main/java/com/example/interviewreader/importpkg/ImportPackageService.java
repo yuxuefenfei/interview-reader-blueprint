@@ -47,6 +47,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -65,6 +67,8 @@ import static com.example.interviewreader.persistence.entity.table.TagEntityTabl
 @Service
 public class ImportPackageService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
+    private static final String SECTION_ANCHORS_REGENERATED = "SECTION_ANCHORS_REGENERATED";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ImportPackageService.class);
 
     private final ObjectMapper objectMapper;
     private final DocumentPackageValidator validator;
@@ -195,7 +199,7 @@ public class ImportPackageService {
             updateImportStage(jobId, ImportStage.EXTRACTING, 35, baseStatistics);
             var parsed = parseSource(sourceType, fileBytes, sourceFileName, sourceSha256);
             updateImportStage(jobId, ImportStage.NORMALIZING, 55, baseStatistics);
-            var normalization = normalizer.normalize(parsed.documentPackage());
+            var normalization = normalizer.normalize(parsed.documentPackage(), sourceType);
             var documentPackage = normalization.documentPackage();
             var issues = new ArrayList<>(parsed.issues());
             issues.addAll(normalization.issues());
@@ -231,6 +235,7 @@ public class ImportPackageService {
             importJobMapper.update(job);
         } catch (ImportCanceledException ignored) {
         } catch (RuntimeException exception) {
+            LOGGER.error("Import job processing failed jobId={} sourceType={}", jobId, sourceType, exception);
             var job = job(jobId);
             if (job != null && job.getStatus() != ImportJobStatus.CANCELED) {
                 job.setStatus(ImportJobStatus.FAILED);
@@ -374,7 +379,12 @@ public class ImportPackageService {
             throw new ApiException(HttpStatus.CONFLICT, "IMPORT_NOT_READY", "只有待提交的导入任务才能生成草稿。");
         }
 
-        var documentPackage = readPackage(job.getNormalizedObjectKey());
+        var anchorUpgrade = normalizer.upgradeLegacyAnchors(readPackage(job.getNormalizedObjectKey()));
+        var documentPackage = anchorUpgrade.documentPackage();
+        if (!anchorUpgrade.issues().isEmpty()) {
+            job.setNormalizedObjectKey(toJson(documentPackage));
+            anchorUpgrade.issues().forEach(issue -> insertIssue(jobId, issue));
+        }
         var issues = validator.validate(documentPackage);
         if (!issues.isEmpty()) {
             issues.forEach(issue -> insertIssue(jobId, issue));
@@ -476,7 +486,7 @@ public class ImportPackageService {
             var parentPath = isBlank(section.parentSectionKey()) ? null : paths.get(section.parentSectionKey());
             var pathPart = String.format("%06d", section.sortOrder());
             var path = parentPath == null ? pathPart : parentPath + "." + pathPart;
-            var anchor = isBlank(section.anchor()) ? slug(section.sectionKey()) : section.anchor();
+            var anchor = isBlank(section.anchor()) ? opaqueAnchor() : section.anchor();
             var searchText = section.title() + "\n" + String.join("\n", blockTextBySection.getOrDefault(section.sectionKey(), List.of()));
 
             var node = new ContentNodeEntity();
@@ -728,7 +738,12 @@ public class ImportPackageService {
         }
 
         var targetNode = target;
-        patch.fields().forEachRemaining(entry -> targetNode.set(entry.getKey(), entry.getValue()));
+        patch.fields().forEachRemaining(entry -> {
+            if ("sections".equals(arrayName) && "anchor".equals(entry.getKey())) {
+                return;
+            }
+            targetNode.set(entry.getKey(), entry.getValue());
+        });
         var documentPackage = readPackage(root.toString());
         var issues = validator.validate(documentPackage);
         replaceIssues(jobId, issues);
@@ -747,7 +762,9 @@ public class ImportPackageService {
                 .select(IMPORT_ISSUE_ENTITY.ALL_COLUMNS)
                 .from(IMPORT_ISSUE_ENTITY)
                 .where(IMPORT_ISSUE_ENTITY.JOB_ID.eq(id(jobId))))) {
-            importIssueMapper.deleteById(issue.getId());
+            if (!SECTION_ANCHORS_REGENERATED.equals(issue.getIssueCode())) {
+                importIssueMapper.deleteById(issue.getId());
+            }
         }
         for (var issue : issues) {
             insertIssue(jobId, issue);
@@ -980,8 +997,8 @@ public class ImportPackageService {
         return value == null || value.isBlank();
     }
 
-    private static String slug(String value) {
-        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9\\u4e00-\\u9fa5]+", "-").replaceAll("(^-|-$)", "");
+    private static String opaqueAnchor() {
+        return "sec_" + UUID.randomUUID();
     }
 
     private static String normalizedFileName(String fileName, String fallback) {

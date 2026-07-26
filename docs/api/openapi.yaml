@@ -1242,7 +1242,9 @@ components:
           anyOf: [{ $ref: "#/components/schemas/SemanticRole" }, { type: "null" }]
         title: { type: string }
         sortOrder: { type: integer }
-        anchor: { type: string }
+        anchor:
+          type: string
+          description: Server-generated stable internal identifier. Supplied values are ignored during import.
         sourcePageStart: { type: [integer, "null"] }
         sourcePageEnd: { type: [integer, "null"] }
         sourceBbox:
@@ -1370,14 +1372,13 @@ components:
         schemaVersion: { type: string }
     UpdateNodeRequest:
       type: object
-      required: [draftRevision, title, nodeType, semanticRole, anchor]
+      required: [draftRevision, title, nodeType, semanticRole]
       properties:
         draftRevision: { type: integer, minimum: 0 }
         title: { type: string, minLength: 1 }
         nodeType: { $ref: "#/components/schemas/NodeType" }
         semanticRole:
           anyOf: [{ $ref: "#/components/schemas/SemanticRole" }, { type: "null" }]
-        anchor: { type: [string, "null"] }
     StructureNode:
       type: object
       required: [id, parentId, sortOrder]

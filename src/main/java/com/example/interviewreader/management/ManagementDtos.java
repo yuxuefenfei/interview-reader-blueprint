@@ -72,7 +72,7 @@ public final class ManagementDtos {
     ) {
     }
 
-    public record UpdateNodeRequest(long draftRevision, String title, NodeType nodeType, SemanticRole semanticRole, String anchor) {
+    public record UpdateNodeRequest(long draftRevision, String title, NodeType nodeType, SemanticRole semanticRole) {
     }
 
     public record StructureUpdateRequest(long draftRevision, List<StructureNode> nodes) {

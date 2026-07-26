@@ -29,7 +29,6 @@
       "semanticRole": "QUESTION",
       "title": "1. HashMap 为什么线程不安全？",
       "sortOrder": 10,
-      "anchor": "hashmap-thread-safety",
       "sourcePageStart": 4,
       "sourcePageEnd": 6
     },
@@ -41,7 +40,6 @@
       "semanticRole": "CONCLUSION",
       "title": "1.1 结论先行",
       "sortOrder": 10,
-      "anchor": "hashmap-thread-safety-conclusion",
       "sourcePageStart": 4,
       "sourcePageEnd": 4
     }

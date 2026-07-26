@@ -72,7 +72,9 @@ public class ApiExceptionHandler {
     }
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleIntegrityViolation(DataIntegrityViolationException exception) {
-        return problemFactory.create(HttpStatus.CONFLICT, "DATA_CONFLICT", "当前操作与已有数据关联冲突，请刷新后重试。");
+        var problem = problemFactory.create(HttpStatus.CONFLICT, "DATA_CONFLICT", "当前操作与已有数据关联冲突，请刷新后重试。");
+        LOGGER.error("Database constraint violation traceId={} status={} code={}", traceId(problem), HttpStatus.CONFLICT.value(), "DATA_CONFLICT", exception);
+        return problem;
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -83,9 +85,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception) {
         var problem = problemFactory.create(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "服务器暂时无法处理该请求。");
-        if (problem.getProperties() != null) {
-            LOGGER.error("Unhandled request failure traceId={}", problem.getProperties().get("traceId"), exception);
-        }
+        LOGGER.error("Unhandled request failure traceId={}", traceId(problem), exception);
         return problem;
+    }
+
+    private static Object traceId(ProblemDetail problem) {
+        return problem.getProperties() == null ? "unknown" : problem.getProperties().get("traceId");
     }
 }

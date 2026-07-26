@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
@@ -153,6 +154,7 @@ public class DocumentPackageValidator {
             return;
         }
         var assetKeys = new HashSet<String>();
+        var assetSha256s = new HashSet<String>();
         for (var asset : assets) {
             if (asset == null || isBlank(asset.assetKey())) {
                 issues.add(blocking("ASSET_KEY_REQUIRED", "assetKey is required", null, null));
@@ -169,6 +171,8 @@ public class DocumentPackageValidator {
             }
             if (isBlank(asset.sha256()) || !SHA256.matcher(asset.sha256()).matches()) {
                 issues.add(blocking("ASSET_SHA256_INVALID", "asset.sha256 must be a SHA-256 hex string", null, null));
+            } else if (!assetSha256s.add(asset.sha256().toLowerCase(Locale.ROOT))) {
+                issues.add(blocking("ASSET_SHA256_DUPLICATE", "Duplicate asset SHA-256: " + asset.sha256(), null, null));
             }
         }
     }

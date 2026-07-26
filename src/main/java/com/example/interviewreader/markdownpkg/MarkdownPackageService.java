@@ -142,14 +142,6 @@ public class MarkdownPackageService {
         return Stream.of(trimmed.split("\\|", -1)).map(String::trim).toList();
     }
 
-    private String slug(String value, String fallback) {
-        var slug = Objects.requireNonNullElse(value, "")
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9\\u4e00-\\u9fa5]+", "-")
-                .replaceAll("(^-|-$)", "");
-        return slug.isBlank() ? fallback : slug;
-    }
-
     private final class ParseState {
         private final String sourceFileName;
         private final String sourceSha256;
@@ -189,7 +181,7 @@ public class MarkdownPackageService {
                     guessSemanticRole(title),
                     title,
                     sectionIndex * 10,
-                    slug(title, sectionKey),
+                    null,
                     null,
                     null,
                     null,

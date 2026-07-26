@@ -132,7 +132,8 @@
             "type": "integer"
           },
           "anchor": {
-            "type": "string"
+            "type": ["string", "null"],
+            "description": "Ignored on import. The service generates a stable internal anchor."
           },
           "sourcePageStart": {
             "type": [
