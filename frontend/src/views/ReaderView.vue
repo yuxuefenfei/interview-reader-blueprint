@@ -51,12 +51,16 @@ const chapterProgress = ref(0);
 const theme = ref<ReaderTheme>(loadReaderTheme());
 const comfort = reactive(loadReaderComfort());
 const viewportHeight = ref(currentViewportHeight());
+const chapterLoading = ref(false);
+const pendingNodeId = ref<string | null>(null);
 const loadingMore = ref(false);
 const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
 let documentRequestId = 0;
 let contentRequestId = 0;
 let loadMoreRequestId = 0;
+let contentAbortController: AbortController | null = null;
+let loadMoreAbortController: AbortController | null = null;
 const completedNodes = new Set<string>();
 
 const themeOptions = [
@@ -100,6 +104,8 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   if (saveTimer !== null) window.clearTimeout(saveTimer);
+  contentAbortController?.abort();
+  loadMoreAbortController?.abort();
   window.removeEventListener("online", flushOfflineProgress);
   window.removeEventListener("keydown", handleGlobalShortcut);
   window.removeEventListener("resize", syncViewportHeight);
@@ -179,23 +185,34 @@ async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
   const documentId = selected.value?.id;
   const versionId = selected.value?.currentVersionId;
   if (!documentId || !versionId) return;
+  if (chapterLoading.value && pendingNodeId.value === node.id) return;
+  contentAbortController?.abort();
+  cancelLoadMore();
+  const abortController = new AbortController();
+  contentAbortController = abortController;
   const requestId = ++contentRequestId;
-  activeNode.value = node;
+  chapterLoading.value = true;
+  pendingNodeId.value = node.id;
   error.value = "";
   try {
     let nextContent: NodeContent;
     try {
-      nextContent = await readerApi.content(versionId, node.id);
+      nextContent = await readerApi.content(versionId, node.id, undefined, abortController.signal);
       void cacheNodeContent(documentId, versionId, node.id, 100, nextContent).catch(() => undefined);
     } catch (caught) {
+      if (abortController.signal.aborted) return;
       const cached = await getCachedNodeContent(versionId, node.id, 100);
       if (!cached) throw caught;
       nextContent = cached;
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
+    activeNode.value = node;
     content.value = nextContent;
     drawer.value = false;
-    if (shouldScroll) await nextTick(() => readingArea.value?.scrollTo({ top: 0, behavior: "smooth" }));
+    if (shouldScroll) {
+      await nextTick();
+      readingArea.value?.scrollTo({ top: 0, behavior: "auto" });
+    }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
     chapterProgress.value = 0;
     scheduleProgress();
@@ -203,6 +220,12 @@ async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
     if (isCurrentContentRequest(requestId, documentId, versionId)) {
       content.value = null;
       error.value = message(caught);
+    }
+  } finally {
+    if (requestId === contentRequestId) {
+      chapterLoading.value = false;
+      pendingNodeId.value = null;
+      if (contentAbortController === abortController) contentAbortController = null;
     }
   }
 }
@@ -213,10 +236,13 @@ async function loadMoreContent(): Promise<void> {
   const node = activeNode.value;
   const current = content.value;
   if (!documentId || !versionId || !node || !current?.nextAfterSeq || loadingMore.value) return;
+  loadMoreAbortController?.abort();
+  const abortController = new AbortController();
+  loadMoreAbortController = abortController;
   const requestId = ++loadMoreRequestId;
   loadingMore.value = true;
   try {
-    const page = await readerApi.content(versionId, node.id, current.nextAfterSeq);
+    const page = await readerApi.content(versionId, node.id, current.nextAfterSeq, abortController.signal);
     if (requestId !== loadMoreRequestId
         || !isCurrentDocumentVersion(documentId, versionId)
         || activeNode.value?.id !== node.id
@@ -228,11 +254,16 @@ async function loadMoreContent(): Promise<void> {
     };
     void cacheNodeContent(documentId, versionId, node.id, 100, content.value).catch(() => undefined);
   } catch (caught) {
-    if (requestId === loadMoreRequestId && isCurrentDocumentVersion(documentId, versionId)) {
+    if (!abortController.signal.aborted
+        && requestId === loadMoreRequestId
+        && isCurrentDocumentVersion(documentId, versionId)) {
       error.value = message(caught);
     }
   } finally {
-    if (requestId === loadMoreRequestId) loadingMore.value = false;
+    if (requestId === loadMoreRequestId) {
+      loadingMore.value = false;
+      if (loadMoreAbortController === abortController) loadMoreAbortController = null;
+    }
   }
 }
 
@@ -295,9 +326,12 @@ async function saveProgressOfflineAware(documentId: string, progress: ReadingPro
 }
 
 function invalidateReadingContext(): void {
+  contentAbortController?.abort();
+  contentAbortController = null;
+  chapterLoading.value = false;
+  pendingNodeId.value = null;
   contentRequestId += 1;
-  loadMoreRequestId += 1;
-  loadingMore.value = false;
+  cancelLoadMore();
   if (saveTimer !== null) {
     window.clearTimeout(saveTimer);
     saveTimer = null;
@@ -306,6 +340,13 @@ function invalidateReadingContext(): void {
   activeNode.value = null;
   content.value = null;
   chapterProgress.value = 0;
+}
+
+function cancelLoadMore(): void {
+  loadMoreAbortController?.abort();
+  loadMoreAbortController = null;
+  loadMoreRequestId += 1;
+  loadingMore.value = false;
 }
 
 function isCurrentDocumentVersion(documentId: string, versionId: string): boolean {
@@ -475,11 +516,19 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" />
     </aside>
 
-    <main ref="readingArea" class="reader-content" :style="readerSurfaceStyle" @scroll.passive="onReadingScroll">
+    <main
+      ref="readingArea"
+      class="reader-content"
+      :class="{ 'chapter-transitioning': chapterLoading && !!content }"
+      :style="readerSurfaceStyle"
+      :aria-busy="chapterLoading"
+      @scroll.passive="onReadingScroll"
+    >
+      <div v-if="chapterLoading && content" class="chapter-transition-status" role="status" aria-live="polite">正在加载章节…</div>
       <div v-if="loading" class="reader-state">正在加载章节…</div>
       <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
       <template v-else-if="content">
-        <article class="reader-article">
+        <article :key="content.node.id" class="reader-article" :data-node-id="content.node.id">
           <h1>{{ content.node.title }}</h1>
           <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :asset-base-url="selected ? `/assets/versions/${selected.currentVersionId}` : undefined" />
           <div v-if="content.nextAfterSeq" class="reader-load-more">
@@ -487,9 +536,9 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           </div>
         </article>
         <nav class="chapter-pagination" aria-label="章节翻页">
-          <el-button class="chapter-nav-button chapter-nav-previous" :disabled="!previousNode" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button>
+          <el-button class="chapter-nav-button chapter-nav-previous" :disabled="!previousNode || chapterLoading" :loading="pendingNodeId === previousNode?.id" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button>
           <span class="chapter-position" aria-live="polite">{{ chapterPosition }}</span>
-          <el-button class="chapter-nav-button chapter-nav-next" type="primary" :disabled="!nextNode" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
+          <el-button class="chapter-nav-button chapter-nav-next" type="primary" :disabled="!nextNode || chapterLoading" :loading="pendingNodeId === nextNode?.id" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
         </nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>

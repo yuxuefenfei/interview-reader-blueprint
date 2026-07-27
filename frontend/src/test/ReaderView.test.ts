@@ -37,7 +37,10 @@ vi.mock("../offline/progressQueue", () => ({
 vi.mock("../utils/readingDevice", () => ({ getOrCreateReadingDeviceId: () => "test-device" }));
 vi.mock("element-plus/es/components/message/index", () => ({ ElMessage: { success: vi.fn() } }));
 vi.mock("../components/ContentBlockView.vue", () => ({
-  default: defineComponent({ template: "<div />" }),
+  default: defineComponent({
+    props: { block: { type: Object, required: true } },
+    template: '<div class="mock-content">{{ block.plainText }}</div>',
+  }),
 }));
 vi.mock("../components/TocTree.vue", () => ({
   default: defineComponent({ template: "<div />" }),
@@ -85,6 +88,22 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve };
 }
 
+const ButtonStub = defineComponent({
+  inheritAttrs: false,
+  props: { disabled: Boolean, loading: Boolean },
+  emits: ["click"],
+  template: '<button v-bind="$attrs" :disabled="disabled" :data-loading="loading" @click="$emit(\'click\')"><slot /></button>',
+});
+
+function mountReader() {
+  return mount(ReaderView, {
+    global: {
+      config: { warnHandler: () => undefined },
+      stubs: { ElButton: ButtonStub },
+    },
+  });
+}
+
 describe("ReaderView request coordination", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -95,6 +114,10 @@ describe("ReaderView request coordination", () => {
       setItem: (key: string, value: string) => values.set(key, value),
       removeItem: (key: string) => values.delete(key),
       clear: () => values.clear(),
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: vi.fn(),
     });
     routing.route = reactive({ params: { documentId: "document-a" } });
     routing.push.mockResolvedValue(undefined);
@@ -118,13 +141,9 @@ describe("ReaderView request coordination", () => {
       versionId === "version-a" ? delayedA.promise : Promise.resolve(content(nodeB, "block-b")));
     api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
 
-    const wrapper = mount(ReaderView, {
-      global: {
-        config: { warnHandler: () => undefined },
-      },
-    });
+    const wrapper = mountReader();
     await flushPromises();
-    expect(api.content).toHaveBeenCalledWith("version-a", "node-a");
+    expect(api.content).toHaveBeenCalledWith("version-a", "node-a", undefined, expect.any(AbortSignal));
 
     routing.route!.params.documentId = "document-b";
     await nextTick();
@@ -143,6 +162,43 @@ describe("ReaderView request coordination", () => {
       })
     );
     expect(wrapper.text()).not.toContain("阅读章节不属于目标版本");
+    wrapper.unmount();
+  });
+
+  it("keeps the current chapter visible and locks pagination until the next chapter is ready", async () => {
+    const currentDocument = document("document-a", "version-a");
+    const nodeA = node("node-a");
+    const nodeB = node("node-b");
+    const delayedB = deferred<NodeContent>();
+    api.documents.mockResolvedValue({ items: [currentDocument], nextCursor: null });
+    api.toc.mockResolvedValue([nodeA, nodeB]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockImplementation((_versionId: string, nodeId: string) =>
+      nodeId === nodeA.id ? Promise.resolve(content(nodeA, "block-a")) : delayedB.promise);
+    api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+    const wrapper = mountReader();
+    await flushPromises();
+    expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-a");
+    expect(wrapper.get(".mock-content").text()).toBe("block-a");
+
+    await wrapper.get(".chapter-nav-next").trigger("click");
+    await nextTick();
+    expect(wrapper.get(".chapter-nav-next").attributes("disabled")).toBeDefined();
+    expect(wrapper.get(".chapter-nav-next").attributes("data-loading")).toBe("true");
+    expect(wrapper.get(".reader-content").attributes("aria-busy")).toBe("true");
+    expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-a");
+    expect(wrapper.get(".mock-content").text()).toBe("block-a");
+
+    await wrapper.get(".chapter-nav-next").trigger("click");
+    expect(api.content.mock.calls.filter((call) => call[1] === "node-b")).toHaveLength(1);
+
+    delayedB.resolve(content(nodeB, "block-b"));
+    await flushPromises();
+    expect(wrapper.get(".reader-content").attributes("aria-busy")).toBe("false");
+    expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-b");
+    expect(wrapper.get(".mock-content").text()).toBe("block-b");
+    expect(HTMLElement.prototype.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
     wrapper.unmount();
   });
 });

@@ -38,7 +38,20 @@ describe("Axios API domains", () => {
     const get = vi.spyOn(http, "get").mockResolvedValue({ data: { node: {}, blocks: [], nextAfterSeq: null } } as never);
     await readerApi.content("version-1", "node-1", 100);
     expect(get).toHaveBeenCalledWith("/reader/versions/version-1/nodes/node-1/content", {
-      params: { afterSeq: 100, limit: 100 }
+      params: { afterSeq: 100, limit: 100 },
+      signal: undefined
+    });
+  });
+
+  it("forwards cancellation to chapter content requests", async () => {
+    const get = vi.spyOn(http, "get").mockResolvedValue({ data: { node: {}, blocks: [], nextAfterSeq: null } } as never);
+    const controller = new AbortController();
+
+    await readerApi.content("version-1", "node-1", undefined, controller.signal);
+
+    expect(get).toHaveBeenCalledWith("/reader/versions/version-1/nodes/node-1/content", {
+      params: { afterSeq: undefined, limit: 100 },
+      signal: controller.signal
     });
   });
 

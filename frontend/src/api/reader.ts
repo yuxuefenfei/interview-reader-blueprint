@@ -9,7 +9,7 @@ export const readerApi = {
   documents: (query = "", cursor: string | null = null, limit = 16) => http.get<DocumentListResponse>("/reader/documents", { params: { query: query || undefined, cursor: cursor || undefined, limit } }).then(({ data }) => data),
   document: (documentId: string) => http.get<DocumentSummary>(`/reader/documents/${documentId}`).then(({ data }) => data),
   toc: (versionId: string) => http.get<TocNode[]>(`/reader/versions/${versionId}/toc`).then(({ data }) => data),
-  content: (versionId: string, nodeId: string, afterSeq?: number) => http.get<NodeContent>(`/reader/versions/${versionId}/nodes/${nodeId}/content`, { params: { afterSeq, limit: 100 } }).then(({ data }) => data),
+  content: (versionId: string, nodeId: string, afterSeq?: number, signal?: AbortSignal) => http.get<NodeContent>(`/reader/versions/${versionId}/nodes/${nodeId}/content`, { params: { afterSeq, limit: 100 }, signal }).then(({ data }) => data),
   search: (q: string, documentId?: string) => http.get<SearchHit[]>("/reader/search", { params: { q, documentId, limit: 12 } }).then(({ data }) => data),
   latestReadDocument: () => http.get<DocumentSummary>("/reader/reading-progress/latest-document").then(({ status, data }) => status === 204 ? null : data),
   progress: (documentId: string) => http.get<ReadingProgress>(`/reader/reading-progress/${documentId}`).then(({ status, data }) => status === 204 ? null : data),
