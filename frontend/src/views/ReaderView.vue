@@ -45,6 +45,7 @@ const readingArea = ref<HTMLElement | null>(null);
 const chapterProgress = ref(0);
 const theme = ref<ReaderTheme>(loadReaderTheme());
 const comfort = reactive(loadReaderComfort());
+const viewportHeight = ref(currentViewportHeight());
 const loadingMore = ref(false);
 const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
@@ -63,7 +64,11 @@ const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activ
 const nextNode = computed(() => activeIndex.value >= 0 && activeIndex.value < readable.value.length - 1 ? readable.value[activeIndex.value + 1] : null);
 const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
-const readerComfortStyle = computed(() => comfortStyle(comfort));
+const readerPageStyle = computed(() => ({
+  ...comfortStyle(comfort),
+  "--reader-viewport-height": `${viewportHeight.value}px`,
+}));
+const readerSurfaceStyle = computed(() => ({ backgroundColor: readerThemeColor(theme.value) }));
 const chapterPosition = computed(() => activeIndex.value >= 0 ? `${activeIndex.value + 1} / ${readable.value.length}` : `0 / ${readable.value.length}`);
 const progressPercent = computed(() => Math.round(chapterProgress.value * 100));
 const currentTheme = computed(() => themeOptions.find((option) => option.value === theme.value) ?? themeOptions[0]);
@@ -78,6 +83,9 @@ watch(() => route.params.documentId, () => { void openFromRoute(); });
 onMounted(async () => {
   window.addEventListener("online", flushOfflineProgress);
   window.addEventListener("keydown", handleGlobalShortcut);
+  window.addEventListener("resize", syncViewportHeight);
+  window.visualViewport?.addEventListener("resize", syncViewportHeight);
+  syncViewportHeight();
   updateThemeColor(theme.value);
   void flushOfflineProgress();
   await loadDocuments();
@@ -87,8 +95,18 @@ onBeforeUnmount(() => {
   if (saveTimer !== null) window.clearTimeout(saveTimer);
   window.removeEventListener("online", flushOfflineProgress);
   window.removeEventListener("keydown", handleGlobalShortcut);
+  window.removeEventListener("resize", syncViewportHeight);
+  window.visualViewport?.removeEventListener("resize", syncViewportHeight);
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", "#0f766e");
 });
+
+function currentViewportHeight(): number {
+  return Math.max(1, Math.round(window.visualViewport?.height ?? window.innerHeight));
+}
+
+function syncViewportHeight(): void {
+  viewportHeight.value = currentViewportHeight();
+}
 
 async function loadDocuments(): Promise<void> {
   try {
@@ -278,7 +296,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
   <div
     class="reader-page"
     :class="[`theme-${theme}`, { 'reader-overlay-open': drawer || searchOpen }]"
-    :style="readerComfortStyle"
+    :style="readerPageStyle"
   >
     <header class="reader-header">
       <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true">
@@ -387,7 +405,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <TocTree :nodes="toc" :active-node-id="activeNode?.id || null" @select="selectNode" />
     </aside>
 
-    <main ref="readingArea" class="reader-content" @scroll.passive="onReadingScroll">
+    <main ref="readingArea" class="reader-content" :style="readerSurfaceStyle" @scroll.passive="onReadingScroll">
       <div v-if="loading" class="reader-state">正在加载章节…</div>
       <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
       <template v-else-if="content">
