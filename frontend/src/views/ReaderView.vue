@@ -8,7 +8,12 @@ import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import TocTree from "../components/TocTree.vue";
 import { cacheNodeContent, getCachedNodeContent } from "../offline/contentCache";
-import { enqueueReadingProgress, flushReadingProgressQueue, shouldQueueReadingProgress } from "../offline/progressQueue";
+import {
+  enqueueReadingProgress,
+  flushReadingProgressQueue,
+  shouldDiscardReadingProgress,
+  shouldQueueReadingProgress
+} from "../offline/progressQueue";
 import type { DocumentSummary, NodeContent, ReadingProgress, TocNode } from "../types/api";
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
 import {
@@ -49,7 +54,9 @@ const viewportHeight = ref(currentViewportHeight());
 const loadingMore = ref(false);
 const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
+let documentRequestId = 0;
 let contentRequestId = 0;
+let loadMoreRequestId = 0;
 const completedNodes = new Set<string>();
 
 const themeOptions = [
@@ -114,31 +121,53 @@ async function loadDocuments(): Promise<void> {
   } catch (caught) { error.value = message(caught); }
 }
 
-async function openFromRoute(): Promise<void> {
+async function openFromRoute(forceRefresh = false): Promise<void> {
+  const requestId = ++documentRequestId;
+  invalidateReadingContext();
+  loading.value = true;
+  error.value = "";
   let documentId = typeof route.params.documentId === "string" ? route.params.documentId : undefined;
   let latestReadDocument: DocumentSummary | null = null;
   if (!documentId) {
     try {
       latestReadDocument = await readerApi.latestReadDocument();
+      if (requestId !== documentRequestId) return;
       documentId = latestReadDocument?.id;
     } catch {
+      if (requestId !== documentRequestId) return;
       documentId = undefined;
     }
   }
   documentId ||= documents.value[0]?.id;
-  if (!documentId) return;
-  const document = documents.value.find((item) => item.id === documentId) || latestReadDocument || await readerApi.document(documentId);
-  if (!document.currentVersionId) return;
-  selected.value = document;
-  loading.value = true;
-  error.value = "";
+  if (!documentId) {
+    if (requestId === documentRequestId) loading.value = false;
+    return;
+  }
   try {
-    toc.value = await readerApi.toc(document.currentVersionId);
-    const saved = await readerApi.progress(document.id);
-    const initial = flattenToc(toc.value).find((node) => node.id === saved?.sectionId) || firstReadableNode(toc.value);
+    let document = forceRefresh
+      ? null
+      : documents.value.find((item) => item.id === documentId) || latestReadDocument;
+    document ||= await readerApi.document(documentId);
+    if (requestId !== documentRequestId) return;
+    if (forceRefresh) {
+      documents.value = documents.value.map((item) => item.id === document.id ? document : item);
+    }
+    selected.value = document;
+    if (!document.currentVersionId) return;
+    const versionId = document.currentVersionId;
+    const [nextToc, saved] = await Promise.all([
+      readerApi.toc(versionId),
+      readerApi.progress(document.id),
+    ]);
+    if (requestId !== documentRequestId || !isCurrentDocumentVersion(document.id, versionId)) return;
+    toc.value = nextToc;
+    const initial = flattenToc(nextToc).find((node) => node.id === saved?.sectionId) || firstReadableNode(nextToc);
     if (initial) await selectNode(initial, false);
-  } catch (caught) { error.value = message(caught); }
-  finally { loading.value = false; }
+  } catch (caught) {
+    if (requestId === documentRequestId) error.value = message(caught);
+  } finally {
+    if (requestId === documentRequestId) loading.value = false;
+  }
 }
 
 async function selectDocument(document: DocumentSummary): Promise<void> {
@@ -147,8 +176,9 @@ async function selectDocument(document: DocumentSummary): Promise<void> {
 }
 
 async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
+  const documentId = selected.value?.id;
   const versionId = selected.value?.currentVersionId;
-  if (!versionId) return;
+  if (!documentId || !versionId) return;
   const requestId = ++contentRequestId;
   activeNode.value = node;
   error.value = "";
@@ -156,20 +186,21 @@ async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
     let nextContent: NodeContent;
     try {
       nextContent = await readerApi.content(versionId, node.id);
-      void cacheNodeContent(selected.value!.id, versionId, node.id, 100, nextContent).catch(() => undefined);
+      void cacheNodeContent(documentId, versionId, node.id, 100, nextContent).catch(() => undefined);
     } catch (caught) {
       const cached = await getCachedNodeContent(versionId, node.id, 100);
       if (!cached) throw caught;
       nextContent = cached;
     }
-    if (requestId !== contentRequestId) return;
+    if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
     content.value = nextContent;
     drawer.value = false;
     if (shouldScroll) await nextTick(() => readingArea.value?.scrollTo({ top: 0, behavior: "smooth" }));
+    if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
     chapterProgress.value = 0;
     scheduleProgress();
   } catch (caught) {
-    if (requestId === contentRequestId) {
+    if (isCurrentContentRequest(requestId, documentId, versionId)) {
       content.value = null;
       error.value = message(caught);
     }
@@ -177,24 +208,31 @@ async function selectNode(node: TocNode, shouldScroll = true): Promise<void> {
 }
 
 async function loadMoreContent(): Promise<void> {
+  const documentId = selected.value?.id;
   const versionId = selected.value?.currentVersionId;
   const node = activeNode.value;
   const current = content.value;
-  if (!versionId || !node || !current?.nextAfterSeq || loadingMore.value) return;
+  if (!documentId || !versionId || !node || !current?.nextAfterSeq || loadingMore.value) return;
+  const requestId = ++loadMoreRequestId;
   loadingMore.value = true;
   try {
     const page = await readerApi.content(versionId, node.id, current.nextAfterSeq);
-    if (activeNode.value?.id !== node.id || content.value !== current) return;
+    if (requestId !== loadMoreRequestId
+        || !isCurrentDocumentVersion(documentId, versionId)
+        || activeNode.value?.id !== node.id
+        || content.value !== current) return;
     content.value = {
       node: current.node,
       blocks: [...current.blocks, ...page.blocks],
       nextAfterSeq: page.nextAfterSeq
     };
-    void cacheNodeContent(selected.value!.id, versionId, node.id, 100, content.value).catch(() => undefined);
+    void cacheNodeContent(documentId, versionId, node.id, 100, content.value).catch(() => undefined);
   } catch (caught) {
-    error.value = message(caught);
+    if (requestId === loadMoreRequestId && isCurrentDocumentVersion(documentId, versionId)) {
+      error.value = message(caught);
+    }
   } finally {
-    loadingMore.value = false;
+    if (requestId === loadMoreRequestId) loadingMore.value = false;
   }
 }
 
@@ -212,23 +250,26 @@ function onReadingScroll(): void {
 }
 
 function scheduleProgress(): void {
-  if (!selected.value || !activeNode.value || !selected.value.currentVersionId) return;
+  const document = selected.value;
+  const node = activeNode.value;
+  const currentContent = content.value;
+  if (!document || !node || !document.currentVersionId || currentContent?.node.id !== node.id) return;
   if (saveTimer !== null) window.clearTimeout(saveTimer);
+  const firstBlock = currentContent.blocks[0] ?? null;
+  const progress: ReadingProgress = {
+    versionId: document.currentVersionId,
+    sectionId: node.id,
+    blockId: firstBlock?.id ?? null,
+    charOffset: 0,
+    blockViewportOffset: 0,
+    progressRatio: chapterProgress.value,
+    clientUpdatedAt: new Date().toISOString(),
+    deviceId,
+    revision: 0
+  };
   saveTimer = window.setTimeout(() => {
-    if (!selected.value || !activeNode.value || !selected.value.currentVersionId) return;
-    const firstBlock = content.value?.blocks[0] ?? null;
-    const progress: ReadingProgress = {
-      versionId: selected.value.currentVersionId,
-      sectionId: activeNode.value.id,
-      blockId: firstBlock?.id ?? null,
-      charOffset: 0,
-      blockViewportOffset: 0,
-      progressRatio: chapterProgress.value,
-      clientUpdatedAt: new Date().toISOString(),
-      deviceId,
-      revision: 0
-    };
-    void saveProgressOfflineAware(selected.value.id, progress);
+    saveTimer = null;
+    void saveProgressOfflineAware(document.id, progress);
   }, 700);
 }
 
@@ -238,12 +279,41 @@ async function saveProgressOfflineAware(documentId: string, progress: ReadingPro
   } catch (caught) {
     if (shouldQueueReadingProgress(caught)) {
       await enqueueReadingProgress(documentId, progress).catch(() => {
-        error.value = "阅读进度暂时无法保存";
+        if (isCurrentDocumentVersion(documentId, progress.versionId)) {
+          error.value = "阅读进度暂时无法保存";
+        }
       });
+      return;
+    }
+    if (!isCurrentDocumentVersion(documentId, progress.versionId)) return;
+    if (shouldDiscardReadingProgress(caught)) {
+      void openFromRoute(true);
       return;
     }
     error.value = message(caught);
   }
+}
+
+function invalidateReadingContext(): void {
+  contentRequestId += 1;
+  loadMoreRequestId += 1;
+  loadingMore.value = false;
+  if (saveTimer !== null) {
+    window.clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  toc.value = [];
+  activeNode.value = null;
+  content.value = null;
+  chapterProgress.value = 0;
+}
+
+function isCurrentDocumentVersion(documentId: string, versionId: string): boolean {
+  return selected.value?.id === documentId && selected.value.currentVersionId === versionId;
+}
+
+function isCurrentContentRequest(requestId: number, documentId: string, versionId: string): boolean {
+  return requestId === contentRequestId && isCurrentDocumentVersion(documentId, versionId);
 }
 
 function flushOfflineProgress(): void {

@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "../api/http";
-import { enqueueReadingProgress, flushReadingProgressQueue, purgeReadingProgressForDocument, shouldQueueReadingProgress } from "../offline/progressQueue";
+import {
+  enqueueReadingProgress,
+  flushReadingProgressQueue,
+  purgeReadingProgressForDocument,
+  shouldDiscardReadingProgress,
+  shouldQueueReadingProgress
+} from "../offline/progressQueue";
 import type { ReadingProgress } from "../types/api";
 
 const progress: ReadingProgress = {
@@ -98,6 +104,35 @@ describe("offline reading progress queue", () => {
     expect(shouldQueueReadingProgress(network)).toBe(true);
     expect(shouldQueueReadingProgress(server)).toBe(true);
   });
+
+  it("discards obsolete reading positions and continues flushing newer progress", async () => {
+    vi.stubGlobal("indexedDB", undefined);
+    await enqueueReadingProgress("document-old", progress);
+    await enqueueReadingProgress("document-current", { ...progress, versionId: "version-2" });
+    const stale = new AppError(
+      "stale",
+      "validation",
+      400,
+      "READING_SECTION_INVALID",
+      undefined,
+      undefined,
+      false,
+      null
+    );
+    const sent: string[] = [];
+
+    const count = await flushReadingProgressQueue(async (documentId, queuedProgress) => {
+      sent.push(documentId);
+      if (documentId === "document-old") throw stale;
+      return queuedProgress;
+    });
+
+    expect(shouldDiscardReadingProgress(stale)).toBe(true);
+    expect(count).toBe(1);
+    expect(sent).toEqual(["document-old", "document-current"]);
+    await expect(flushReadingProgressQueue(async (_documentId, queued) => queued)).resolves.toBe(0);
+  });
+
   it("purges queued progress for a permanently deleted document", async () => {
     vi.stubGlobal("indexedDB", undefined);
     await enqueueReadingProgress("document-1", progress);

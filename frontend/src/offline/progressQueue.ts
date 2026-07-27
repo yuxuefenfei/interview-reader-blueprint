@@ -20,6 +20,11 @@ export function shouldQueueReadingProgress(error: unknown): boolean {
   return error instanceof AppError && error.retryable;
 }
 
+export function shouldDiscardReadingProgress(error: unknown): boolean {
+  return error instanceof AppError
+    && ["READING_VERSION_INVALID", "READING_SECTION_INVALID", "READING_BLOCK_INVALID"].includes(error.code);
+}
+
 export async function enqueueReadingProgress(documentId: string, progress: ReadingProgress): Promise<void> {
   const item: QueuedProgress = {
     id: Date.now() + Math.floor(Math.random() * 1000),
@@ -58,14 +63,20 @@ async function performFlush(send: SendProgress): Promise<number> {
     let sent = 0;
     let firstDeleteError: unknown = null;
     for (const item of items) {
-      await send(item.documentId, item.progress);
+      let accepted = false;
+      try {
+        await send(item.documentId, item.progress);
+        accepted = true;
+      } catch (error) {
+        if (!shouldDiscardReadingProgress(error)) throw error;
+      }
       try {
         // 网络确认与本地删除无法组成原子事务；服务端按客户端时间幂等，删除失败时允许下次安全重放。
         await requestTransaction(db, "readwrite", (store) => store.delete(item.id));
       } catch (error) {
         firstDeleteError ??= error;
       }
-      sent += 1;
+      if (accepted) sent += 1;
     }
     if (firstDeleteError) throw firstDeleteError;
     return sent;
@@ -133,10 +144,16 @@ function listQueuedProgress(db: IDBDatabase): Promise<QueuedProgress[]> {
 async function flushFallbackQueue(send: SendProgress): Promise<number> {
   const queue = readFallbackQueue();
   let sent = 0;
+  let handled = 0;
   for (const item of queue) {
-    await send(item.documentId, item.progress);
-    sent += 1;
-    writeFallbackQueue(queue.slice(sent));
+    try {
+      await send(item.documentId, item.progress);
+      sent += 1;
+    } catch (error) {
+      if (!shouldDiscardReadingProgress(error)) throw error;
+    }
+    handled += 1;
+    writeFallbackQueue(queue.slice(handled));
   }
   return sent;
 }
