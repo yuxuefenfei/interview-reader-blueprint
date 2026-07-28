@@ -43,7 +43,28 @@ vi.mock("../components/ContentBlockView.vue", () => ({
   }),
 }));
 vi.mock("../components/TocTree.vue", () => ({
-  default: defineComponent({ template: "<div />" }),
+  default: defineComponent({
+    props: {
+      nodes: { type: Array, default: () => [] },
+      activeNodeId: { type: String, default: null },
+      expandedNodeIds: { type: Array, default: () => [] },
+      pendingNodeId: { type: String, default: null },
+      failedNodeId: { type: String, default: null },
+    },
+    emits: ["select", "toggle"],
+    template: `
+      <div class="mock-toc-tree">
+        <button
+          v-for="item in nodes"
+          :key="item.id"
+          class="mock-toc-node"
+          :data-node-id="item.id"
+          :data-failed="item.id === failedNodeId"
+          @click="$emit('select', item)"
+        >{{ item.title }}<span v-if="item.id === failedNodeId">失败，重试</span></button>
+      </div>
+    `,
+  }),
 }));
 
 function document(id: string, versionId: string): DocumentSummary {
@@ -95,11 +116,17 @@ const ButtonStub = defineComponent({
   template: '<button v-bind="$attrs" :disabled="disabled" :data-loading="loading" @click="$emit(\'click\')"><slot /></button>',
 });
 
+const DrawerStub = defineComponent({
+  props: { modelValue: Boolean },
+  emits: ["update:modelValue"],
+  template: '<div v-if="modelValue" class="mock-drawer"><slot /></div>',
+});
+
 function mountReader() {
   return mount(ReaderView, {
     global: {
       config: { warnHandler: () => undefined },
-      stubs: { ElButton: ButtonStub },
+      stubs: { ElButton: ButtonStub, ElDrawer: DrawerStub },
     },
   });
 }
@@ -116,6 +143,10 @@ describe("ReaderView request coordination", () => {
       clear: () => values.clear(),
     });
     Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
       value: vi.fn(),
     });
@@ -199,6 +230,78 @@ describe("ReaderView request coordination", () => {
     expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-b");
     expect(wrapper.get(".mock-content").text()).toBe("block-b");
     expect(HTMLElement.prototype.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+    wrapper.unmount();
+  });
+
+  it("uses a two-level mobile drawer and persists the active chapter path", async () => {
+    const currentDocument = { ...document("document-a", "version-a"), title: "Redis", progressRatio: 0.46 };
+    const otherDocument = { ...document("document-b", "version-b"), title: "MongoDB", progressRatio: 0.2 };
+    const child = { ...node("child"), parentId: "root", level: 2 };
+    const root = {
+      ...node("root"),
+      nodeType: "SECTION" as const,
+      semanticRole: null,
+      children: [child],
+    };
+    api.documents.mockResolvedValue({ items: [currentDocument, otherDocument], nextCursor: null });
+    api.toc.mockResolvedValue([root]);
+    api.progress.mockResolvedValue({ sectionId: child.id });
+    api.content.mockResolvedValue(content(child, "block-child"));
+    api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+    const wrapper = mountReader();
+    await flushPromises();
+    expect(JSON.parse(localStorage.getItem("reader.toc.expanded.document-a") ?? "[]")).toContain(root.id);
+
+    await wrapper.get(".reader-menu-button").trigger("click");
+    await nextTick();
+    expect(wrapper.get(".reader-current-document").text()).toContain("Redis");
+    expect(wrapper.get(".reader-current-document").text()).toContain("46%");
+    expect(wrapper.find(".reader-document-list").exists()).toBe(false);
+
+    await wrapper.get(".reader-switch-document").trigger("click");
+    await nextTick();
+    const documentList = wrapper.get(".reader-document-list");
+    expect(documentList.text()).toContain("Redis");
+    expect(documentList.text()).toContain("MongoDB");
+    expect(documentList.get(".reader-document-option.active").text()).toContain("正在阅读");
+
+    const mongoOption = documentList.findAll(".reader-document-option")
+      .find((option) => option.text().includes("MongoDB"));
+    await mongoOption?.trigger("click");
+    await flushPromises();
+    expect(routing.push).toHaveBeenCalledWith("/reader/documents/document-b");
+    routing.route!.params.documentId = "document-b";
+    await nextTick();
+    await flushPromises();
+    expect(wrapper.find(".reader-drawer").exists()).toBe(true);
+    expect(wrapper.get(".reader-current-document").text()).toContain("MongoDB");
+    wrapper.unmount();
+  });
+
+  it("keeps the drawer and current content visible when chapter navigation fails", async () => {
+    const currentDocument = document("document-a", "version-a");
+    const nodeA = node("node-a");
+    const nodeB = node("node-b");
+    api.documents.mockResolvedValue({ items: [currentDocument], nextCursor: null });
+    api.toc.mockResolvedValue([nodeA, nodeB]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockImplementation((_versionId: string, nodeId: string) =>
+      nodeId === nodeA.id
+        ? Promise.resolve(content(nodeA, "block-a"))
+        : Promise.reject(new Error("chapter unavailable")));
+    api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+    const wrapper = mountReader();
+    await flushPromises();
+    await wrapper.get(".reader-menu-button").trigger("click");
+    await nextTick();
+    await wrapper.get(`.reader-drawer [data-node-id="${nodeB.id}"]`).trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(".reader-drawer").exists()).toBe(true);
+    expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe(nodeA.id);
+    expect(wrapper.get(".reader-drawer").text()).toContain("失败，重试");
     wrapper.unmount();
   });
 });
