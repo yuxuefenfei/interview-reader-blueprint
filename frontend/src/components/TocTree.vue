@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ArrowRight } from "@element-plus/icons-vue";
 import { useId } from "vue";
 import type { TocNode } from "../types/api";
 
@@ -84,7 +85,7 @@ function collapseFromKeyboard(node: TocNode): void {
           :aria-controls="childListId(node.id)"
           @click="emit('toggle', node.id)"
         >
-          <span aria-hidden="true">›</span>
+          <ArrowRight class="toc-toggle-icon" aria-hidden="true" />
         </button>
       </div>
       <TocTree

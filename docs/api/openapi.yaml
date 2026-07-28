@@ -904,7 +904,11 @@ components:
         title: { type: string }
         description: { type: [string, "null"] }
         currentVersionId: { $ref: "#/components/schemas/NullableUuid" }
-        progressRatio: { type: number, minimum: 0, maximum: 1 }
+        progressRatio:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 当前阅读位置占文档可翻页章节序列的比例。
     DocumentPage:
       type: object
       required: [items, nextCursor]
@@ -976,7 +980,11 @@ components:
         blockId: { $ref: "#/components/schemas/NullableUuid" }
         charOffset: { type: integer, minimum: 0 }
         blockViewportOffset: { type: integer, minimum: 0 }
-        progressRatio: { type: number, minimum: 0, maximum: 1 }
+        progressRatio:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 当前章节内的滚动进度比例，用于恢复阅读位置。
         clientUpdatedAt: { type: [string, "null"], format: date-time }
         deviceId: { type: [string, "null"], maxLength: 200 }
         revision: { type: integer, minimum: 0 }

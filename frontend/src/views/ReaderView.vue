@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowDown, ArrowLeft, ArrowRight, Close, Moon, Reading, Search, Sunny, Tickets } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowLeft, ArrowRight, Close, Expand, Fold, Moon, Reading, Search, Sunny, Tickets } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus/es/components/message/index";
 import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
+import ReaderDocumentList from "../components/ReaderDocumentList.vue";
+import ReaderDocumentSelector from "../components/ReaderDocumentSelector.vue";
 import TocTree from "../components/TocTree.vue";
 import { cacheNodeContent, getCachedNodeContent } from "../offline/contentCache";
 import {
@@ -16,6 +18,7 @@ import {
 } from "../offline/progressQueue";
 import type { DocumentSummary, NodeContent, ReadingProgress, TocNode } from "../types/api";
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
+import { clampProgressRatio, documentReadingPositionRatio } from "../utils/readingProgress";
 import {
   COLUMN_WIDTH_OPTIONS,
   comfortStyle,
@@ -42,6 +45,8 @@ const loading = ref(false);
 const error = ref("");
 const drawer = ref(false);
 const drawerView = ref<"toc" | "documents">("toc");
+const desktopNavView = ref<"toc" | "documents">("toc");
+const desktopNavCollapsed = ref(loadDesktopNavCollapsed());
 const expandedTocNodeIds = ref<string[]>([]);
 const failedNodeId = ref<string | null>(null);
 const documentQuery = ref("");
@@ -55,7 +60,8 @@ const searchInput = ref<{ focus: () => void } | null>(null);
 const readingArea = ref<HTMLElement | null>(null);
 const desktopTocArea = ref<HTMLElement | null>(null);
 const mobileTocArea = ref<HTMLElement | null>(null);
-const documentListArea = ref<HTMLElement | null>(null);
+const desktopDocumentListArea = ref<HTMLElement | null>(null);
+const mobileDocumentListArea = ref<HTMLElement | null>(null);
 const chapterProgress = ref(0);
 const theme = ref<ReaderTheme>(loadReaderTheme());
 const comfort = reactive(loadReaderComfort());
@@ -82,8 +88,21 @@ const readable = computed(() => flattenToc(toc.value).filter((node) => isQuestio
 const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));
 const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activeIndex.value - 1] : null);
 const nextNode = computed(() => activeIndex.value >= 0 && activeIndex.value < readable.value.length - 1 ? readable.value[activeIndex.value + 1] : null);
+const currentDocumentProgressRatio = computed(() => {
+  if (activeIndex.value < 0 || readable.value.length === 0) {
+    return clampProgressRatio(selected.value?.progressRatio);
+  }
+  return documentReadingPositionRatio(activeIndex.value, readable.value.length, chapterProgress.value);
+});
+const navigationDocument = computed<DocumentSummary | null>(() =>
+  selected.value ? { ...selected.value, progressRatio: currentDocumentProgressRatio.value } : null);
+const navigationDocuments = computed(() => documents.value.map((document) =>
+  document.id === selected.value?.id
+    ? { ...document, progressRatio: currentDocumentProgressRatio.value }
+    : document));
 const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
+const desktopRailProgressStyle = computed(() => ({ height: `${currentDocumentProgressRatio.value * 100}%` }));
 const readerPageStyle = computed(() => ({
   ...comfortStyle(comfort),
   "--reader-viewport-height": `${viewportHeight.value}px`,
@@ -93,12 +112,6 @@ const chapterPosition = computed(() => activeIndex.value >= 0 ? `${activeIndex.v
 const progressPercent = computed(() => Math.round(chapterProgress.value * 100));
 const currentTheme = computed(() => themeOptions.find((option) => option.value === theme.value) ?? themeOptions[0]);
 const searchShortcut = navigator.platform.toLowerCase().includes("mac") ? "⌘ K" : "Ctrl K";
-const filteredDocuments = computed(() => {
-  const normalizedQuery = documentQuery.value.trim().toLocaleLowerCase();
-  if (!normalizedQuery) return documents.value;
-  return documents.value.filter((document) =>
-    `${document.title} ${document.code}`.toLocaleLowerCase().includes(normalizedQuery));
-});
 
 watch(theme, (value) => {
   localStorage.setItem("reader.theme", value);
@@ -122,7 +135,9 @@ watch(() => activeNode.value?.id, async (nodeId) => {
   if (!nodeId) return;
   ensureActiveTocPathExpanded();
   await nextTick();
-  scrollActiveTocIntoView(desktopTocArea.value);
+  if (!desktopNavCollapsed.value && desktopNavView.value === "toc") {
+    scrollActiveTocIntoView(desktopTocArea.value);
+  }
   if (drawer.value && drawerView.value === "toc") scrollActiveTocIntoView(mobileTocArea.value);
 });
 onMounted(async () => {
@@ -206,7 +221,8 @@ async function openFromRoute(forceRefresh = false): Promise<void> {
     const initial = flattenToc(nextToc).find((node) => node.id === saved?.sectionId) || firstReadableNode(nextToc);
     if (initial) {
       ensureTocPathExpanded(initial.id, nextToc);
-      await selectNode(initial, false, !keepDrawerOpen);
+      const restoredChapterProgress = saved?.sectionId === initial.id ? saved.progressRatio : 0;
+      await selectNode(initial, false, !keepDrawerOpen, restoredChapterProgress);
     }
   } catch (caught) {
     if (requestId === documentRequestId) error.value = message(caught);
@@ -220,16 +236,16 @@ async function selectDocument(document: DocumentSummary, closeDrawer = true): Pr
   if (route.params.documentId !== document.id) await router.push(`/reader/documents/${document.id}`);
 }
 
-async function selectDocumentFromDrawer(document: DocumentSummary): Promise<void> {
+async function selectDocumentFromNavigation(document: DocumentSummary, surface: "desktop" | "mobile"): Promise<void> {
   documentSwitchError.value = "";
   if (document.id === selected.value?.id) {
-    await showTocView();
+    await showNavigationToc(surface);
     return;
   }
   pendingDocumentId.value = document.id;
   try {
     await selectDocument(document, false);
-    await showTocView();
+    await showNavigationToc(surface);
   } catch (caught) {
     documentSwitchError.value = message(caught);
   } finally {
@@ -237,7 +253,12 @@ async function selectDocumentFromDrawer(document: DocumentSummary): Promise<void
   }
 }
 
-async function selectNode(node: TocNode, shouldScroll = true, closeDrawer = true): Promise<void> {
+async function selectNode(
+  node: TocNode,
+  shouldScroll = true,
+  closeDrawer = true,
+  restoredChapterProgress = 0,
+): Promise<void> {
   const documentId = selected.value?.id;
   const versionId = selected.value?.currentVersionId;
   if (!documentId || !versionId) return;
@@ -267,12 +288,19 @@ async function selectNode(node: TocNode, shouldScroll = true, closeDrawer = true
     content.value = nextContent;
     ensureTocPathExpanded(node.id);
     if (closeDrawer) drawer.value = false;
+    chapterProgress.value = clampProgressRatio(restoredChapterProgress);
     if (shouldScroll) {
       await nextTick();
       readingArea.value?.scrollTo({ top: 0, behavior: "auto" });
+    } else if (chapterProgress.value > 0) {
+      await nextTick();
+      const area = readingArea.value;
+      if (area) {
+        const distance = Math.max(0, area.scrollHeight - area.clientHeight);
+        area.scrollTo({ top: distance * chapterProgress.value, behavior: "auto" });
+      }
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
-    chapterProgress.value = 0;
     scheduleProgress();
   } catch (caught) {
     if (isCurrentContentRequest(requestId, documentId, versionId)) {
@@ -487,15 +515,19 @@ function scrollActiveTocIntoView(container: HTMLElement | null): void {
     ?.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
 }
 
-async function showDocumentsView(): Promise<void> {
-  drawerView.value = "documents";
-  documentSwitchError.value = "";
-  await nextTick();
-  documentListArea.value?.querySelector<HTMLElement>(".reader-document-option.active")
+function scrollCurrentDocumentIntoView(container: HTMLElement | null): void {
+  container?.querySelector<HTMLElement>(".reader-document-option.active")
     ?.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
 }
 
-async function showTocView(): Promise<void> {
+async function showMobileDocumentsView(): Promise<void> {
+  drawerView.value = "documents";
+  documentSwitchError.value = "";
+  await nextTick();
+  scrollCurrentDocumentIntoView(mobileDocumentListArea.value);
+}
+
+async function showMobileTocView(): Promise<void> {
   drawerView.value = "toc";
   documentQuery.value = "";
   ensureActiveTocPathExpanded();
@@ -503,12 +535,47 @@ async function showTocView(): Promise<void> {
   scrollActiveTocIntoView(mobileTocArea.value);
 }
 
-function documentProgressPercent(document: DocumentSummary): number {
-  return Math.round(Math.min(1, Math.max(0, document.progressRatio ?? 0)) * 100);
+async function showDesktopDocumentsView(): Promise<void> {
+  desktopNavView.value = "documents";
+  documentSwitchError.value = "";
+  await nextTick();
+  scrollCurrentDocumentIntoView(desktopDocumentListArea.value);
 }
 
-function documentProgressStyle(document: DocumentSummary): { width: string } {
-  return { width: `${documentProgressPercent(document)}%` };
+async function showDesktopTocView(): Promise<void> {
+  desktopNavView.value = "toc";
+  documentQuery.value = "";
+  ensureActiveTocPathExpanded();
+  await nextTick();
+  scrollActiveTocIntoView(desktopTocArea.value);
+}
+
+function showNavigationToc(surface: "desktop" | "mobile"): Promise<void> {
+  return surface === "desktop" ? showDesktopTocView() : showMobileTocView();
+}
+
+function loadDesktopNavCollapsed(): boolean {
+  try {
+    const stored = localStorage.getItem("reader.desktopNav.collapsed");
+    if (stored === "true" || stored === "false") return stored === "true";
+  } catch {
+    // Use the responsive default if storage is unavailable.
+  }
+  return window.innerWidth < 1100;
+}
+
+async function toggleDesktopNav(): Promise<void> {
+  desktopNavCollapsed.value = !desktopNavCollapsed.value;
+  try {
+    localStorage.setItem("reader.desktopNav.collapsed", String(desktopNavCollapsed.value));
+  } catch {
+    // The current session can still use the selected layout.
+  }
+  if (!desktopNavCollapsed.value) {
+    await nextTick();
+    if (desktopNavView.value === "toc") scrollActiveTocIntoView(desktopTocArea.value);
+    else scrollCurrentDocumentIntoView(desktopDocumentListArea.value);
+  }
 }
 
 async function search(): Promise<void> {
@@ -556,7 +623,13 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
 <template>
   <div
     class="reader-page"
-    :class="[`theme-${theme}`, { 'reader-overlay-open': drawer || searchOpen }]"
+    :class="[
+      `theme-${theme}`,
+      {
+        'reader-overlay-open': drawer || searchOpen,
+        'desktop-nav-collapsed': desktopNavCollapsed,
+      },
+    ]"
     :style="readerPageStyle"
   >
     <header class="reader-header">
@@ -653,26 +726,60 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <output class="mobile-progress-label" aria-live="polite">{{ progressPercent }}%</output>
     </header>
 
-    <aside ref="desktopTocArea" class="reader-desktop-nav">
-      <div class="reader-documents">
-        <button
-          v-for="document in documents"
-          :key="document.id"
-          :class="{ active: document.id === selected?.id }"
-          type="button"
-          @click="selectDocument(document)"
-        >{{ document.title }}</button>
-      </div>
-      <TocTree
-        tree-id="desktop"
-        :nodes="toc"
-        :active-node-id="activeNode?.id || null"
-        :expanded-node-ids="expandedTocNodeIds"
-        :pending-node-id="pendingNodeId"
-        :failed-node-id="failedNodeId"
-        @select="selectNode"
-        @toggle="toggleTocNode"
-      />
+    <aside class="reader-desktop-nav" :class="{ collapsed: desktopNavCollapsed }">
+      <template v-if="desktopNavCollapsed">
+        <button class="reader-desktop-nav-expand" type="button" aria-label="展开文档目录" @click="toggleDesktopNav">
+          <Expand aria-hidden="true" />
+        </button>
+        <div class="reader-desktop-rail-progress" role="progressbar" aria-label="文档阅读位置" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="Math.round(currentDocumentProgressRatio * 100)">
+          <span :style="desktopRailProgressStyle"></span>
+        </div>
+      </template>
+      <template v-else-if="desktopNavView === 'toc'">
+        <div class="reader-desktop-nav-header">
+          <ReaderDocumentSelector :document="navigationDocument" @open="showDesktopDocumentsView" />
+          <button class="reader-desktop-nav-collapse" type="button" aria-label="收起文档侧栏" title="收起文档侧栏" @click="toggleDesktopNav">
+            <Fold aria-hidden="true" />
+          </button>
+        </div>
+        <div ref="desktopTocArea" class="reader-desktop-toc-scroll" aria-label="当前文档章节目录">
+          <div v-if="loading && toc.length === 0" class="reader-toc-state" role="status">正在加载目录…</div>
+          <div v-else-if="toc.length === 0" class="reader-toc-state">当前文档暂无目录</div>
+          <TocTree
+            v-else
+            tree-id="desktop"
+            :nodes="toc"
+            :active-node-id="activeNode?.id || null"
+            :expanded-node-ids="expandedTocNodeIds"
+            :pending-node-id="pendingNodeId"
+            :failed-node-id="failedNodeId"
+            @select="selectNode"
+            @toggle="toggleTocNode"
+          />
+        </div>
+      </template>
+      <template v-else>
+        <div class="reader-desktop-nav-header document-browser-header">
+          <button class="reader-drawer-back" type="button" aria-label="返回当前文档目录" @click="showDesktopTocView">
+            <ArrowLeft class="reader-drawer-back-icon" aria-hidden="true" />
+            返回目录
+          </button>
+          <strong>切换文档</strong>
+          <button class="reader-desktop-nav-collapse" type="button" aria-label="收起文档侧栏" title="收起文档侧栏" @click="toggleDesktopNav">
+            <Fold aria-hidden="true" />
+          </button>
+        </div>
+        <div ref="desktopDocumentListArea" class="reader-desktop-document-browser">
+          <ReaderDocumentList
+            v-model:query="documentQuery"
+            :documents="navigationDocuments"
+            :selected-document-id="selected?.id || null"
+            :pending-document-id="pendingDocumentId"
+            :error="documentSwitchError"
+            @select="selectDocumentFromNavigation($event, 'desktop')"
+          />
+        </div>
+      </template>
     </aside>
 
     <main
@@ -718,20 +825,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
               <strong>文档目录</strong>
               <el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" />
             </header>
-            <div v-if="selected" class="reader-current-document">
-              <div class="reader-current-document-copy">
-                <span>当前文档</span>
-                <strong :title="selected.title">{{ selected.title }}</strong>
-              </div>
-              <div class="reader-current-document-progress">
-                <span aria-hidden="true"><i :style="documentProgressStyle(selected)"></i></span>
-                <output :aria-label="`文档阅读进度 ${documentProgressPercent(selected)}%`">{{ documentProgressPercent(selected) }}%</output>
-              </div>
-              <button class="reader-switch-document" type="button" @click="showDocumentsView">
-                切换文档
-                <span aria-hidden="true">›</span>
-              </button>
-            </div>
+            <ReaderDocumentSelector :document="navigationDocument" @open="showMobileDocumentsView" />
           </div>
           <div ref="mobileTocArea" class="reader-toc-scroll" aria-label="当前文档章节目录">
             <div v-if="loading && toc.length === 0" class="reader-toc-state" role="status">正在加载目录…</div>
@@ -752,40 +846,23 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         <template v-else>
           <div class="reader-drawer-sticky">
             <header>
-              <button class="reader-drawer-back" type="button" aria-label="返回当前文档目录" @click="showTocView">
-                <span aria-hidden="true">‹</span>
+              <button class="reader-drawer-back" type="button" aria-label="返回当前文档目录" @click="showMobileTocView">
+                <ArrowLeft class="reader-drawer-back-icon" aria-hidden="true" />
                 返回目录
               </button>
               <strong>切换文档</strong>
               <el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" />
             </header>
-            <label v-if="documents.length > 8" class="reader-document-filter">
-              <span class="sr-only">筛选文档</span>
-              <input v-model="documentQuery" type="search" placeholder="筛选文档…" autocomplete="off" />
-            </label>
-            <p v-if="documentSwitchError" class="reader-document-switch-error" role="alert">{{ documentSwitchError }}</p>
           </div>
-          <div ref="documentListArea" class="reader-document-list" aria-label="文档列表">
-            <button
-              v-for="document in filteredDocuments"
-              :key="document.id"
-              class="reader-document-option"
-              :class="{ active: document.id === selected?.id }"
-              type="button"
-              :disabled="pendingDocumentId !== null"
-              @click="selectDocumentFromDrawer(document)"
-            >
-              <span class="reader-document-option-heading">
-                <strong :title="document.title">{{ document.title }}</strong>
-                <small v-if="document.id === selected?.id">正在阅读</small>
-                <small v-else-if="document.id === pendingDocumentId">加载中</small>
-              </span>
-              <span class="reader-document-option-progress">
-                <span aria-hidden="true"><i :style="documentProgressStyle(document)"></i></span>
-                <output :aria-label="`${document.title}阅读进度 ${documentProgressPercent(document)}%`">{{ documentProgressPercent(document) }}%</output>
-              </span>
-            </button>
-            <div v-if="filteredDocuments.length === 0" class="reader-toc-state">没有匹配的文档</div>
+          <div ref="mobileDocumentListArea" class="reader-mobile-document-browser">
+            <ReaderDocumentList
+              v-model:query="documentQuery"
+              :documents="navigationDocuments"
+              :selected-document-id="selected?.id || null"
+              :pending-document-id="pendingDocumentId"
+              :error="documentSwitchError"
+              @select="selectDocumentFromNavigation($event, 'mobile')"
+            />
           </div>
         </template>
       </section>

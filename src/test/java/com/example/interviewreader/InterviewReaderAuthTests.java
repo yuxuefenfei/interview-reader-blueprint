@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,7 +49,35 @@ class InterviewReaderAuthTests {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk());
+        mockMvc.perform(get("/favicon.ico"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/x-icon"));
     }
+
+    @Test
+    void unknownAuthenticatedApiReturnsProblemDetail404() throws Exception {
+        var session = mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "tester",
+                                  "password": "secret"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getCookie("IR_SESSION");
+        assertThat(session).isNotNull();
+
+        mockMvc.perform(get("/api/not-a-real-endpoint").cookie(session))
+                .andExpect(status().isNotFound())
+                .andExpect(result -> assertThat(result.getResponse().getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
     @Test
     void deepLinkedSpaRoutesReturnTheApplicationShell() throws Exception {
         mockMvc.perform(get("/admin/documents/9a9c5fc6-d310-44fe-aff4-cca83bf28d12"))

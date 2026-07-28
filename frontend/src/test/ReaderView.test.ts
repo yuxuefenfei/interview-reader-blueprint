@@ -234,7 +234,7 @@ describe("ReaderView request coordination", () => {
   });
 
   it("uses a two-level mobile drawer and persists the active chapter path", async () => {
-    const currentDocument = { ...document("document-a", "version-a"), title: "Redis", progressRatio: 0.46 };
+    const currentDocument = { ...document("document-a", "version-a"), title: "Redis", progressRatio: 0.73 };
     const otherDocument = { ...document("document-b", "version-b"), title: "MongoDB", progressRatio: 0.2 };
     const child = { ...node("child"), parentId: "root", level: 2 };
     const root = {
@@ -245,26 +245,31 @@ describe("ReaderView request coordination", () => {
     };
     api.documents.mockResolvedValue({ items: [currentDocument, otherDocument], nextCursor: null });
     api.toc.mockResolvedValue([root]);
-    api.progress.mockResolvedValue({ sectionId: child.id });
+    api.progress.mockResolvedValue({ sectionId: child.id, progressRatio: 0.46 });
     api.content.mockResolvedValue(content(child, "block-child"));
     api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
 
     const wrapper = mountReader();
     await flushPromises();
     expect(JSON.parse(localStorage.getItem("reader.toc.expanded.document-a") ?? "[]")).toContain(root.id);
+    await vi.advanceTimersByTimeAsync(701);
+    expect(api.saveProgress).toHaveBeenCalledWith(
+      "document-a",
+      expect.objectContaining({ sectionId: child.id, progressRatio: 0.46 }),
+    );
 
     await wrapper.get(".reader-menu-button").trigger("click");
     await nextTick();
-    expect(wrapper.get(".reader-current-document").text()).toContain("Redis");
-    expect(wrapper.get(".reader-current-document").text()).toContain("46%");
+    expect(wrapper.get(".reader-document-selector").text()).toContain("Redis");
+    expect(wrapper.get(".reader-document-selector").text()).toContain("46%");
     expect(wrapper.find(".reader-document-list").exists()).toBe(false);
 
-    await wrapper.get(".reader-switch-document").trigger("click");
+    await wrapper.get(".reader-document-selector").trigger("click");
     await nextTick();
     const documentList = wrapper.get(".reader-document-list");
     expect(documentList.text()).toContain("Redis");
     expect(documentList.text()).toContain("MongoDB");
-    expect(documentList.get(".reader-document-option.active").text()).toContain("正在阅读");
+    expect(documentList.get(".reader-document-option.active").text()).toContain("当前");
 
     const mongoOption = documentList.findAll(".reader-document-option")
       .find((option) => option.text().includes("MongoDB"));
@@ -275,7 +280,41 @@ describe("ReaderView request coordination", () => {
     await nextTick();
     await flushPromises();
     expect(wrapper.find(".reader-drawer").exists()).toBe(true);
-    expect(wrapper.get(".reader-current-document").text()).toContain("MongoDB");
+    expect(wrapper.get(".reader-document-selector").text()).toContain("MongoDB");
+    wrapper.unmount();
+  });
+
+  it("reuses the compact document navigation on desktop and persists its collapsed state", async () => {
+    localStorage.setItem("reader.desktopNav.collapsed", "false");
+    const currentDocument = { ...document("document-a", "version-a"), title: "Redis", progressRatio: 0.46 };
+    const otherDocument = { ...document("document-b", "version-b"), title: "MongoDB", progressRatio: 0.2 };
+    const currentNode = node("node-a");
+    api.documents.mockResolvedValue({ items: [currentDocument, otherDocument], nextCursor: null });
+    api.toc.mockResolvedValue([currentNode]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockResolvedValue(content(currentNode, "block-a"));
+    api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+    const wrapper = mountReader();
+    await flushPromises();
+    expect(wrapper.get(".reader-desktop-nav").classes()).not.toContain("collapsed");
+    expect(wrapper.get(".reader-desktop-nav .reader-document-selector").text()).toContain("Redis");
+    expect(wrapper.find(".reader-desktop-nav .reader-document-list").exists()).toBe(false);
+
+    await wrapper.get(".reader-desktop-nav .reader-document-selector").trigger("click");
+    await nextTick();
+    expect(wrapper.get(".reader-desktop-nav .reader-document-list").text()).toContain("MongoDB");
+
+    await wrapper.get(".reader-desktop-nav-collapse").trigger("click");
+    await nextTick();
+    expect(wrapper.get(".reader-desktop-nav").classes()).toContain("collapsed");
+    expect(localStorage.getItem("reader.desktopNav.collapsed")).toBe("true");
+    expect(wrapper.get(".reader-desktop-rail-progress").attributes("role")).toBe("progressbar");
+
+    await wrapper.get(".reader-desktop-nav-expand").trigger("click");
+    await nextTick();
+    expect(wrapper.get(".reader-desktop-nav").classes()).not.toContain("collapsed");
+    expect(localStorage.getItem("reader.desktopNav.collapsed")).toBe("false");
     wrapper.unmount();
   });
 

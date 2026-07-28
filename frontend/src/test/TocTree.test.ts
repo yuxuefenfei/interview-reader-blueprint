@@ -39,6 +39,7 @@ describe("TocTree", () => {
 
     const toggle = wrapper.get(".toc-toggle");
     expect(toggle.attributes("aria-expanded")).toBe("true");
+    expect(toggle.get(".toc-toggle-icon").element.tagName.toLowerCase()).toBe("svg");
     await toggle.trigger("click");
     expect(wrapper.emitted("toggle")?.[0]).toEqual([root.id]);
   });

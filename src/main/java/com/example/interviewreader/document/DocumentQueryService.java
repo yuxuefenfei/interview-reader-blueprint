@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -63,8 +64,15 @@ public class DocumentQueryService {
         var pageItems = hasNext ? documents.subList(0, safeLimit) : documents;
         var nextCursor = hasNext ? encodeDocumentCursor(pageItems.getLast()) : null;
         var progressByDocument = progressByDocument(pageItems.stream().map(DocumentEntity::getId).toList());
+        var readableNodesByVersion = readableNodeIdsByVersion(pageItems.stream()
+                .map(DocumentEntity::getCurrentVersionId)
+                .filter(Objects::nonNull)
+                .toList());
         return new DocumentPage(pageItems.stream()
-                .map(document -> mapDocumentSummary(document, progressByDocument.get(document.getId())))
+                .map(document -> mapDocumentSummary(
+                        document,
+                        progressByDocument.get(document.getId()),
+                        readableNodesByVersion.getOrDefault(document.getCurrentVersionId(), List.of())))
                 .toList(), nextCursor);
     }
 
@@ -78,7 +86,12 @@ public class DocumentQueryService {
         if (document == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
         }
-        return mapDocumentSummary(document, progress(documentId));
+        var readableNodesByVersion = readableNodeIdsByVersion(
+                document.getCurrentVersionId() == null ? List.of() : List.of(document.getCurrentVersionId()));
+        return mapDocumentSummary(
+                document,
+                progress(documentId),
+                readableNodesByVersion.getOrDefault(document.getCurrentVersionId(), List.of()));
     }
 
     public DocumentSummary latestReadDocument() {
@@ -524,8 +537,43 @@ public class DocumentQueryService {
         return result;
     }
 
-    private DocumentSummary mapDocumentSummary(DocumentEntity document, ReadingProgressEntity progress) {
-        var ratio = progress == null ? BigDecimal.ZERO : progress.getProgressRatio();
+    private Map<String, List<String>> readableNodeIdsByVersion(List<String> versionIds) {
+        if (versionIds.isEmpty()) {
+            return Map.of();
+        }
+        var uniqueVersionIds = versionIds.stream().distinct().toList();
+        var rows = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(
+                        CONTENT_NODE_ENTITY.ID,
+                        CONTENT_NODE_ENTITY.VERSION_ID,
+                        CONTENT_NODE_ENTITY.PARENT_ID,
+                        CONTENT_NODE_ENTITY.NODE_TYPE,
+                        CONTENT_NODE_ENTITY.SEMANTIC_ROLE,
+                        CONTENT_NODE_ENTITY.PATH)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.in(uniqueVersionIds))
+                .orderBy(CONTENT_NODE_ENTITY.VERSION_ID.asc(), CONTENT_NODE_ENTITY.PATH.asc()));
+        var parentIds = rows.stream()
+                .map(ContentNodeEntity::getParentId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        var result = new LinkedHashMap<String, List<String>>();
+        for (var row : rows) {
+            if (row.getNodeType() != NodeType.QUESTION
+                    && row.getSemanticRole() != SemanticRole.QUESTION
+                    && parentIds.contains(row.getId())) {
+                continue;
+            }
+            result.computeIfAbsent(row.getVersionId(), ignored -> new ArrayList<>()).add(row.getId());
+        }
+        return result;
+    }
+
+    private DocumentSummary mapDocumentSummary(
+            DocumentEntity document,
+            ReadingProgressEntity progress,
+            List<String> readableNodeIds) {
+        var ratio = documentProgressRatio(document, progress, readableNodeIds);
         return new DocumentSummary(
                 uuid(document.getId()),
                 document.getCode(),
@@ -533,6 +581,30 @@ public class DocumentQueryService {
                 document.getDescription(),
                 uuid(document.getCurrentVersionId()),
                 ratio);
+    }
+
+    private BigDecimal documentProgressRatio(
+            DocumentEntity document,
+            ReadingProgressEntity progress,
+            List<String> readableNodeIds) {
+        if (progress == null
+                || progress.getSectionId() == null
+                || document.getCurrentVersionId() == null
+                || !document.getCurrentVersionId().equals(progress.getVersionId())
+                || readableNodeIds.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        var sectionIndex = readableNodeIds.indexOf(progress.getSectionId());
+        if (sectionIndex < 0) {
+            return BigDecimal.ZERO;
+        }
+        var sectionRatio = Optional.ofNullable(progress.getProgressRatio())
+                .orElse(BigDecimal.ZERO)
+                .max(BigDecimal.ZERO)
+                .min(BigDecimal.ONE);
+        return BigDecimal.valueOf(sectionIndex)
+                .add(sectionRatio)
+                .divide(BigDecimal.valueOf(readableNodeIds.size()), 7, RoundingMode.HALF_UP);
     }
 
     private MutableTocNode mapMutableTocNode(ContentNodeEntity entity) {

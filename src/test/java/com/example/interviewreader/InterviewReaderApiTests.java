@@ -207,6 +207,14 @@ class InterviewReaderApiTests {
         mockMvc.perform(get("/api/reader/reading-progress/{documentId}", imported.documentId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.progressRatio").value(0.42));
+        mockMvc.perform(get("/api/reader/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progressRatio").value(0.71));
+        mockMvc.perform(get("/api/reader/documents")
+                        .param("query", "java-advanced-interview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(imported.documentId().toString()))
+                .andExpect(jsonPath("$.items[0].progressRatio").value(0.71));
     }
 
     @Test

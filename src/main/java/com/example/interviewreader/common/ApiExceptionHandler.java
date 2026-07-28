@@ -16,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.LinkedHashMap;
 
@@ -80,6 +81,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail handleIllegalArgument(IllegalArgumentException exception) {
         return problemFactory.create(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", "请求参数不合法。");
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail handleNoResourceFound(NoResourceFoundException exception) {
+        return problemFactory.create(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "请求的资源不存在。");
     }
 
     @ExceptionHandler(Exception.class)

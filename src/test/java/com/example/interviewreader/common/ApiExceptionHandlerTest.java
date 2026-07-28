@@ -6,8 +6,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.util.unit.DataSize;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,5 +29,16 @@ class ApiExceptionHandlerTest {
         } finally {
             RequestTrace.clear();
         }
+    }
+
+    @Test
+    void missingResourcesReturn404WithoutUnexpectedFailureLogs(CapturedOutput output) {
+        var handler = new ApiExceptionHandler(new ApiProblemFactory(), new UploadProperties(DataSize.ofMegabytes(10)));
+
+        var problem = handler.handleNoResourceFound(new NoResourceFoundException(HttpMethod.GET, "missing.css"));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(problem.getProperties()).containsEntry("code", "RESOURCE_NOT_FOUND");
+        assertThat(output).doesNotContain("Unhandled request failure");
     }
 }
