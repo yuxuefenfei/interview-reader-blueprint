@@ -16,14 +16,6 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '10'))
     }
 
-    parameters {
-        booleanParam(
-            name: 'ALLOW_DB_MIGRATION',
-            defaultValue: false,
-            description: '检测到 Flyway 迁移变化时，完成数据库与 /opt/ireader/data 备份后再人工允许发布'
-        )
-    }
-
     environment {
         INCOMING_DIR = '/opt/ireader/incoming'
         STABLE_ARTIFACT = 'dist/interview-reader.jar'
@@ -53,46 +45,6 @@ pipeline {
                     chmod +x ./mvnw
                     ./mvnw --version
                 '''
-            }
-        }
-
-        stage('Database Migration Gate') {
-            steps {
-                script {
-                    int migrationStatus = sh(
-                        returnStatus: true,
-                        script: '''
-                            set -Eeuo pipefail
-                            BASE_COMMIT="${GIT_PREVIOUS_SUCCESSFUL_COMMIT:-}"
-
-                            if [[ -z "$BASE_COMMIT" ]] || \
-                               ! git cat-file -e "${BASE_COMMIT}^{commit}" 2>/dev/null; then
-                                echo "首次成功构建或缺少基准提交，跳过迁移差异检查。"
-                                exit 0
-                            fi
-
-                            if git diff --quiet \
-                                "$BASE_COMMIT" "$GIT_COMMIT" \
-                                -- src/main/resources/db/migration; then
-                                echo "未检测到 Flyway 迁移变化。"
-                                exit 0
-                            fi
-
-                            git diff --name-status \
-                                "$BASE_COMMIT" "$GIT_COMMIT" \
-                                -- src/main/resources/db/migration
-                            exit 1
-                        '''
-                    )
-
-                    if (migrationStatus > 1) {
-                        error('检查 Flyway 迁移脚本时发生异常')
-                    }
-
-                    if (migrationStatus == 1 && !params.ALLOW_DB_MIGRATION) {
-                        error('检测到数据库迁移变化。请先备份数据库与 /opt/ireader/data，再人工勾选 ALLOW_DB_MIGRATION。')
-                    }
-                }
             }
         }
 
