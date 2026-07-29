@@ -19,6 +19,22 @@ function block(overrides: Partial<ContentBlock>): ContentBlock {
 }
 
 describe("ContentBlockView", () => {
+  it("renders restricted inline Markdown in reader and editor previews", () => {
+    const wrapper = mount(ContentBlockView, {
+      props: {
+        block: block({
+          payload: { text: "**误区一**：*不是* `Schema` [参考](https://example.com)" },
+          plainText: "**误区一**：*不是* `Schema` [参考](https://example.com)",
+        }),
+      },
+    });
+
+    expect(wrapper.get("strong").text()).toBe("误区一");
+    expect(wrapper.get("em").text()).toBe("不是");
+    expect(wrapper.get("code").text()).toBe("Schema");
+    expect(wrapper.get("a").attributes("target")).toBe("_blank");
+  });
+
   it("renders code blocks without collapsing whitespace", () => {
     const wrapper = mount(ContentBlockView, {
       props: {

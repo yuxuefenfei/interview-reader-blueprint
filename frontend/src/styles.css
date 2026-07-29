@@ -578,6 +578,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .reader-article h1 { margin: 0 0 28px; font-size: clamp(26px, 3vw, 34px); line-height: 1.28; letter-spacing: 0; }
 .content-block { color: var(--reader-text); font-size: var(--reader-font-size); line-height: var(--reader-line-height); }
 .paragraph, .heading-note, .content-block blockquote { margin: 0 0 20px; white-space: pre-wrap; }
+.inline-markdown { white-space: normal; }
 .heading-note { font-weight: 700; }
 .reader-list { margin: 0 0 20px; padding-left: 1.35em; }
 .reader-list li { margin: 6px 0; }

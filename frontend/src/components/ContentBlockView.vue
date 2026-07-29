@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { ContentBlock } from "../types/api";
+import InlineMarkdown from "./InlineMarkdown.vue";
 
 const copyLabel = ref("复制代码");
 let copyLabelTimer: number | null = null;
@@ -97,19 +98,19 @@ async function copyCode(block: ContentBlock): Promise<void> {
 <template>
   <article class="content-block" :data-block-id="block.id">
     <p v-if="block.blockType === 'paragraph'" class="paragraph">
-      {{ textFromPayload(block.payload, block.plainText) }}
+      <InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" />
     </p>
 
     <p v-else-if="block.blockType === 'heading_note'" class="heading-note">
-      {{ textFromPayload(block.payload, block.plainText) }}
+      <InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" />
     </p>
 
     <ul v-else-if="block.blockType === 'unordered_list'" class="reader-list">
-      <li v-for="item in itemsFromPayload(block.payload)" :key="item">{{ item }}</li>
+      <li v-for="item in itemsFromPayload(block.payload)" :key="item"><InlineMarkdown :text="item" /></li>
     </ul>
 
     <ol v-else-if="block.blockType === 'ordered_list'" class="reader-list">
-      <li v-for="item in itemsFromPayload(block.payload)" :key="item">{{ item }}</li>
+      <li v-for="item in itemsFromPayload(block.payload)" :key="item"><InlineMarkdown :text="item" /></li>
     </ol>
 
     <figure v-else-if="block.blockType === 'code'" class="code-block">
@@ -143,12 +144,12 @@ async function copyCode(block: ContentBlock): Promise<void> {
     </figure>
 
     <blockquote v-else-if="block.blockType === 'quote'" class="callout">
-      {{ textFromPayload(block.payload, block.plainText) }}
+      <InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" />
     </blockquote>
 
     <aside v-else-if="block.blockType === 'callout'" class="callout">
-      <strong v-if="typeof block.payload.title === 'string'">{{ block.payload.title }}</strong>
-      <span>{{ textFromPayload(block.payload, block.plainText) }}</span>
+      <strong v-if="typeof block.payload.title === 'string'"><InlineMarkdown :text="block.payload.title" /></strong>
+      <span><InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" /></span>
     </aside>
 
     <p v-else-if="block.blockType === 'formula'" class="formula">
