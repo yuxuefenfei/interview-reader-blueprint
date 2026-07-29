@@ -3,10 +3,6 @@ pipeline {
         label 'ireader-builder'
     }
 
-    triggers {
-        githubPush()
-    }
-
     tools {
         jdk 'jdk21'
         nodejs 'node20'
