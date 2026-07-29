@@ -8,6 +8,10 @@ pipeline {
         nodejs 'node20'
     }
 
+    triggers {
+        githubPush()
+    }
+
     options {
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
