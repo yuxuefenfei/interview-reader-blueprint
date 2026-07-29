@@ -114,4 +114,25 @@ describe("ContentBlockView", () => {
     });
     expect(wrapper.get("img").attributes("src")).toBe("/api/admin/versions/v1/editor/assets/new-image");
   });
+
+  it("lazy-loads images and restores focus after closing the keyboard-accessible preview", async () => {
+    const wrapper = mount(ContentBlockView, {
+      attachTo: document.body,
+      props: {
+        block: block({ blockType: "image", payload: { src: "/diagram.png", alt: "架构图" }, plainText: "架构图" })
+      }
+    });
+    const trigger = wrapper.get('[aria-label="查看大图：架构图"]');
+
+    expect(trigger.get("img").attributes("loading")).toBe("lazy");
+    await trigger.trigger("click");
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("关闭图片预览");
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await wrapper.vm.$nextTick();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger.element);
+    wrapper.unmount();
+  });
 });

@@ -136,11 +136,23 @@ const DrawerStub = defineComponent({
   template: '<div v-if="modelValue" class="mock-drawer"><slot /></div>',
 });
 
+const InputStub = defineComponent({
+  inheritAttrs: false,
+  props: { modelValue: { type: String, default: "" } },
+  emits: ["update:modelValue", "keyup"],
+  methods: {
+    focus() {
+      (this.$el.querySelector("input") as HTMLInputElement | null)?.focus();
+    },
+  },
+  template: '<div><input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" @keyup="$emit(\'keyup\', $event)" /><slot name="append" /></div>',
+});
+
 function mountReader() {
   return mount(ReaderView, {
     global: {
       config: { warnHandler: () => undefined },
-      stubs: { ElButton: ButtonStub, ElDrawer: DrawerStub },
+      stubs: { ElButton: ButtonStub, ElDrawer: DrawerStub, ElInput: InputStub },
     },
   });
 }
@@ -207,6 +219,32 @@ describe("ReaderView request coordination", () => {
       })
     );
     expect(wrapper.text()).not.toContain("阅读章节不属于目标版本");
+    wrapper.unmount();
+  });
+
+  it("searches the current document by default and exposes an explicit all-documents scope", async () => {
+    const currentDocument = document("document-a", "version-a");
+    const currentNode = node("node-a");
+    api.documents.mockResolvedValue({ items: [currentDocument], nextCursor: null });
+    api.toc.mockResolvedValue([currentNode]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockResolvedValue(content(currentNode, "block-a"));
+    api.search.mockResolvedValue([]);
+
+    const wrapper = mountReader();
+    await flushPromises();
+    await wrapper.get(".reader-header-search-trigger").trigger("click");
+    await nextTick();
+    const input = wrapper.get('input[name="reader-search"]');
+    await input.setValue("HashMap");
+    await input.trigger("keyup", { key: "Enter" });
+    await flushPromises();
+    expect(api.search).toHaveBeenLastCalledWith("HashMap", "document-a");
+
+    await wrapper.get('[aria-label="搜索范围"]').findAll("button")[1].trigger("click");
+    await input.trigger("keyup", { key: "Enter" });
+    await flushPromises();
+    expect(api.search).toHaveBeenLastCalledWith("HashMap", undefined);
     wrapper.unmount();
   });
 

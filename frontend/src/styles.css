@@ -577,7 +577,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 .reader-article h1 { margin: 0 0 28px; font-size: clamp(26px, 3vw, 34px); line-height: 1.28; letter-spacing: 0; }
 .content-block { color: var(--reader-text); font-size: var(--reader-font-size); line-height: var(--reader-line-height); }
-.paragraph, .heading-note, .content-block blockquote { margin: 0 0 20px; white-space: pre-wrap; }
+.paragraph, .heading-note, .content-block blockquote { margin: 0 0 24px; white-space: pre-wrap; }
 .inline-markdown { white-space: normal; }
 .heading-note { font-weight: 700; }
 .reader-list { margin: 0 0 20px; padding-left: 1.35em; }
@@ -945,7 +945,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .reader-article { padding: 30px 18px 28px; }
   .reader-article h1 { margin-bottom: 24px; font-size: 27px; }
   .content-block { font-size: max(16px, calc(var(--reader-font-size) - 1px)); line-height: var(--reader-line-height); }
-  .paragraph, .heading-note, .content-block blockquote { margin-bottom: 17px; }
+  .paragraph, .heading-note, .content-block blockquote { margin-bottom: 20px; }
   .code-block { margin: 20px -2px; }
   .code-block pre, .table-snapshot pre { padding: 15px; font-size: 13px; }
   .chapter-pagination {

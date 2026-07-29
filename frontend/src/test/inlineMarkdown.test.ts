@@ -28,4 +28,13 @@ describe("inline Markdown", () => {
     expect(wrapper.text()).toContain("第一行 第二行第三段");
     expect(wrapper.findAll("br")).toHaveLength(2);
   });
+
+  it("highlights matched text without interpreting it as HTML", () => {
+    const wrapper = mount(InlineMarkdown, {
+      props: { text: "HashMap 与 hashmap 的区别", highlight: "hashmap" },
+    });
+
+    expect(wrapper.findAll("mark")).toHaveLength(2);
+    expect(wrapper.findAll("mark").map((item) => item.text())).toEqual(["HashMap", "hashmap"]);
+  });
 });

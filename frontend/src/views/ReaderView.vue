@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus/es/components/message/index";
 import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
+import InlineMarkdown from "../components/InlineMarkdown.vue";
 import ReaderDocumentList from "../components/ReaderDocumentList.vue";
 import ReaderDocumentSelector from "../components/ReaderDocumentSelector.vue";
 import TocTree from "../components/TocTree.vue";
@@ -16,7 +17,7 @@ import {
   shouldDiscardReadingProgress,
   shouldQueueReadingProgress
 } from "../offline/progressQueue";
-import type { DocumentSummary, NodeContent, ReadingProgress, TocNode } from "../types/api";
+import type { DocumentSummary, NodeContent, ReadingProgress, SearchHit, TocNode } from "../types/api";
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
 import { clampProgressRatio, documentReadingPositionRatio } from "../utils/readingProgress";
 import {
@@ -55,7 +56,10 @@ const documentSwitchError = ref("");
 const searchOpen = ref(false);
 const comfortOpen = ref(false);
 const query = ref("");
-const searchHits = ref<Awaited<ReturnType<typeof readerApi.search>>>([]);
+const searchHits = ref<SearchHit[]>([]);
+const searchScope = ref<"document" | "all">("document");
+const searchHighlight = ref("");
+const searchLoading = ref(false);
 const searchInput = ref<{ focus: () => void } | null>(null);
 const readingArea = ref<HTMLElement | null>(null);
 const desktopTocArea = ref<HTMLElement | null>(null);
@@ -184,13 +188,13 @@ async function loadDocuments(): Promise<void> {
   } catch (caught) { error.value = message(caught); }
 }
 
-async function openFromRoute(forceRefresh = false): Promise<void> {
+async function openFromRoute(forceRefresh = false, requestedDocumentId?: string): Promise<void> {
   const requestId = ++documentRequestId;
   const keepDrawerOpen = drawer.value;
   invalidateReadingContext();
   loading.value = true;
   error.value = "";
-  let documentId = typeof route.params.documentId === "string" ? route.params.documentId : undefined;
+  let documentId = requestedDocumentId ?? (typeof route.params.documentId === "string" ? route.params.documentId : undefined);
   let latestReadDocument: DocumentSummary | null = null;
   if (!documentId) {
     try {
@@ -598,13 +602,39 @@ async function toggleDesktopNav(): Promise<void> {
 }
 
 async function search(): Promise<void> {
-  if (!query.value.trim()) { searchHits.value = []; return; }
-  try { searchHits.value = await readerApi.search(query.value.trim(), selected.value?.id); }
-  catch (caught) { error.value = message(caught); }
+  const term = query.value.trim();
+  if (!term) {
+    searchHits.value = [];
+    searchHighlight.value = "";
+    return;
+  }
+  searchLoading.value = true;
+  try {
+    searchHits.value = await readerApi.search(term, searchScope.value === "document" ? selected.value?.id : undefined);
+    searchHighlight.value = term;
+  } catch (caught) {
+    error.value = message(caught);
+  } finally {
+    searchLoading.value = false;
+  }
 }
 
-async function jump(hit: { documentId: string; nodeId: string }): Promise<void> {
-  if (hit.documentId !== selected.value?.id) await router.push(`/reader/documents/${hit.documentId}`);
+function setSearchScope(scope: "document" | "all"): void {
+  if (searchScope.value === scope) return;
+  searchScope.value = scope;
+  searchHits.value = [];
+  searchHighlight.value = "";
+}
+
+function searchHitSource(hit: SearchHit): string {
+  return hit.documentId === selected.value?.id ? "当前文档" : "其他文档";
+}
+
+async function jump(hit: SearchHit): Promise<void> {
+  if (hit.documentId !== selected.value?.id) {
+    await router.push(`/reader/documents/${hit.documentId}`);
+    await openFromRoute(false, hit.documentId);
+  }
   const node = flattenToc(toc.value).find((item) => item.id === hit.nodeId);
   if (node) await selectNode(node);
   searchOpen.value = false;
@@ -828,7 +858,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <template v-else-if="content">
         <article :key="content.node.id" class="reader-article" :data-node-id="content.node.id">
           <h1>{{ content.node.title }}</h1>
-          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :asset-base-url="selected ? `/assets/versions/${selected.currentVersionId}` : undefined" />
+          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :asset-base-url="selected ? `/assets/versions/${selected.currentVersionId}` : undefined" />
           <div v-if="content.nextAfterSeq" class="reader-load-more">
             <el-button :loading="loadingMore" @click="loadMoreContent">加载更多内容</el-button>
           </div>
@@ -910,15 +940,19 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
     >
       <section class="reader-search-sheet">
         <header>
-          <strong>搜索当前文档</strong>
+          <strong>搜索文档内容</strong>
           <el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" />
         </header>
+        <div class="comfort-option-grid" style="width:max-content;grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="搜索范围">
+          <button type="button" :class="{ active: searchScope === 'document' }" :aria-pressed="searchScope === 'document'" @click="setSearchScope('document')">当前文档</button>
+          <button type="button" :class="{ active: searchScope === 'all' }" :aria-pressed="searchScope === 'all'" @click="setSearchScope('all')">全部文档</button>
+        </div>
         <el-input ref="searchInput" v-model="query" name="reader-search" aria-label="搜索标题或正文" autocomplete="off" placeholder="搜索标题或正文…" clearable @keyup.enter="search">
-          <template #append><el-button :icon="Search" aria-label="搜索" @click="search" /></template>
+          <template #append><el-button :icon="Search" :loading="searchLoading" aria-label="搜索" @click="search" /></template>
         </el-input>
         <button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)">
-          <strong>{{ hit.title }}</strong>
-          <span>{{ hit.snippet }}</span>
+          <strong>{{ hit.title }} <small style="color:var(--reader-muted);font-size:11px;font-weight:400">{{ searchHitSource(hit) }}</small></strong>
+          <span><InlineMarkdown :text="hit.snippet" :highlight="searchHighlight" /></span>
         </button>
       </section>
     </el-drawer>
