@@ -178,6 +178,7 @@ class InterviewReaderApiTests {
 
         mockMvc.perform(get("/api/reader/search").param("q", "HashMap"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].documentTitle").isNotEmpty())
                 .andExpect(jsonPath("$[0].title").value("1.1 结论先行"));
         mockMvc.perform(get("/api/reader/search")
                         .param("q", "1.1 结论先行")

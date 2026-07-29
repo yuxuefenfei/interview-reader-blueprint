@@ -23,6 +23,7 @@ describe("reader comfort preferences", () => {
       fontSize: 18,
       lineHeight: 1.85,
       columnWidth: 740,
+      codeWrap: false,
     });
     expect(loadReaderTheme()).toBe("light");
     expect(readerThemeColor("light")).toBe("#f5f7f8");
@@ -31,7 +32,7 @@ describe("reader comfort preferences", () => {
   });
 
   it("persists valid preferences and exposes reader CSS variables", () => {
-    const comfort = { fontSize: 20, lineHeight: 1.95, columnWidth: 860 };
+    const comfort = { fontSize: 20, lineHeight: 1.95, columnWidth: 860, codeWrap: true };
 
     persistReaderComfort(comfort);
 
@@ -53,6 +54,7 @@ describe("reader comfort preferences", () => {
       fontSize: 22,
       lineHeight: 1.6,
       columnWidth: 740,
+      codeWrap: false,
     });
     expect(loadReaderTheme()).toBe("light");
   });

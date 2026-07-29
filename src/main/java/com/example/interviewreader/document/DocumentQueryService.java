@@ -273,6 +273,7 @@ public class DocumentQueryService {
             }
             hits.add(new SearchHit(
                     uuid(document.getId()),
+                    document.getTitle(),
                     uuid(version.getId()),
                     uuid(node.getId()),
                     uuid(block.getId()),

@@ -1,6 +1,7 @@
 const FONT_SIZE_KEY = "reader.fontSize";
 const LINE_HEIGHT_KEY = "reader.lineHeight";
 const COLUMN_WIDTH_KEY = "reader.columnWidth";
+const CODE_WRAP_KEY = "reader.codeWrap";
 
 export type ReaderTheme = "light" | "dark" | "sepia";
 
@@ -8,6 +9,7 @@ export interface ReaderComfort {
   fontSize: number;
   lineHeight: number;
   columnWidth: number;
+  codeWrap: boolean;
 }
 
 export const FONT_SIZE_OPTIONS = [16, 17, 18, 19, 20, 22] as const;
@@ -42,6 +44,7 @@ export function loadReaderComfort(): ReaderComfort {
     fontSize: readNumber(FONT_SIZE_KEY, 18, 16, 22),
     lineHeight: readNumber(LINE_HEIGHT_KEY, 1.85, 1.6, 2.1),
     columnWidth: readNumber(COLUMN_WIDTH_KEY, 740, 560, 960),
+    codeWrap: localStorage.getItem(CODE_WRAP_KEY) === "true",
   };
 }
 
@@ -49,6 +52,7 @@ export function persistReaderComfort(comfort: ReaderComfort): void {
   localStorage.setItem(FONT_SIZE_KEY, String(comfort.fontSize));
   localStorage.setItem(LINE_HEIGHT_KEY, String(comfort.lineHeight));
   localStorage.setItem(COLUMN_WIDTH_KEY, String(comfort.columnWidth));
+  localStorage.setItem(CODE_WRAP_KEY, String(comfort.codeWrap));
 }
 
 export function loadReaderTheme(): ReaderTheme {

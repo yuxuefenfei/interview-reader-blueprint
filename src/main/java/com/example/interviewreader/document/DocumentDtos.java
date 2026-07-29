@@ -67,6 +67,7 @@ public final class DocumentDtos {
 
     public record SearchHit(
             UUID documentId,
+            String documentTitle,
             UUID versionId,
             UUID nodeId,
             UUID blockId,

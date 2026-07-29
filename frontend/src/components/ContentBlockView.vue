@@ -10,11 +10,16 @@ const props = defineProps<{
   block: ContentBlock;
   assetBaseUrl?: string;
   highlight?: string;
+  wrapCode?: boolean;
+  showCodeWrapToggle?: boolean;
 }>();
+const emit = defineEmits<{ "update:wrapCode": [value: boolean] }>();
 
 const imageLoadFailed = ref(false);
 const imagePreviewOpen = ref(false);
 const imagePreviewScale = ref(1);
+const imagePreviewZoomOut = ref<HTMLButtonElement | null>(null);
+const imagePreviewZoomIn = ref<HTMLButtonElement | null>(null);
 const imagePreviewClose = ref<HTMLButtonElement | null>(null);
 let previousFocus: HTMLElement | null = null;
 const imageLightboxStyle: CSSProperties = {
@@ -26,6 +31,7 @@ const imageLightboxToolbarStyle: CSSProperties = { display: "flex", justifyConte
 const imageLightboxButtonStyle: CSSProperties = { minHeight: "36px", padding: "0 11px", border: "1px solid rgba(255, 255, 255, .42)", borderRadius: "var(--radius-sm)", background: "rgba(255, 255, 255, .1)", color: "inherit", font: "inherit" };
 const imageLightboxStageStyle: CSSProperties = { minWidth: "0", minHeight: "0", overflow: "auto", display: "grid", placeItems: "center", padding: "16px" };
 const imageLightboxImageStyle = computed<CSSProperties>(() => ({ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", transformOrigin: "center", transition: "transform 140ms ease-out", transform: `scale(${imagePreviewScale.value})` }));
+const codeBlockStyle = computed<CSSProperties | undefined>(() => props.wrapCode ? { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } : undefined);
 const imageAssetKey = computed(() => typeof props.block.payload.assetKey === "string" ? props.block.payload.assetKey.trim() : "");
 const imageAlt = computed(() => typeof props.block.payload.alt === "string" ? props.block.payload.alt : props.block.plainText);
 const imageCaption = computed(() => typeof props.block.payload.caption === "string" ? props.block.payload.caption : "");
@@ -89,7 +95,20 @@ function handleImagePreviewKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     event.preventDefault();
     closeImagePreview();
+    return;
   }
+  if (event.key !== "Tab") return;
+
+  const controls = [imagePreviewZoomOut.value, imagePreviewZoomIn.value, imagePreviewClose.value]
+    .filter((control): control is HTMLButtonElement => !!control && !control.disabled);
+  if (controls.length === 0) return;
+  event.preventDefault();
+  const currentIndex = controls.indexOf(document.activeElement as HTMLButtonElement);
+  const offset = event.shiftKey ? -1 : 1;
+  const nextIndex = currentIndex < 0
+    ? event.shiftKey ? controls.length - 1 : 0
+    : (currentIndex + offset + controls.length) % controls.length;
+  controls[nextIndex].focus();
 }
 
 function tableCellText(value: unknown): string {
@@ -163,11 +182,14 @@ async function copyCode(block: ContentBlock): Promise<void> {
     <figure v-else-if="block.blockType === 'code'" class="code-block">
       <figcaption>
         <span>{{ codeLanguage(block.payload, block) }}</span>
-        <button class="code-copy" type="button" :aria-label="copyLabel" :title="copyLabel" @click="copyCode(block)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" /></svg>
-        </button>
+        <div style="display:flex;align-items:center;gap:4px">
+          <button v-if="showCodeWrapToggle" class="code-copy" type="button" style="width:auto;padding:0 8px" :aria-pressed="!!wrapCode" :aria-label="wrapCode ? '关闭代码自动换行' : '启用代码自动换行'" :title="wrapCode ? '关闭自动换行' : '自动换行'" @click="emit('update:wrapCode', !wrapCode)">换行</button>
+          <button class="code-copy" type="button" :aria-label="copyLabel" :title="copyLabel" @click="copyCode(block)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1 2-2v-8a2 2 0 0 1 2-2Z" /></svg>
+          </button>
+        </div>
       </figcaption>
-      <pre><code>{{ codeTextFromPayload(block.payload, block.plainText) }}</code></pre>
+      <pre :style="codeBlockStyle"><code>{{ codeTextFromPayload(block.payload, block.plainText) }}</code></pre>
     </figure>
 
     <div v-else-if="block.blockType === 'table'" class="table-wrap">
@@ -224,9 +246,9 @@ async function copyCode(block: ContentBlock): Promise<void> {
         @click.self="closeImagePreview"
       >
         <div :style="imageLightboxToolbarStyle">
-          <button type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale <= 1" aria-label="缩小图片" @click="adjustImagePreviewScale(-0.25)">−</button>
+          <button ref="imagePreviewZoomOut" type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale <= 1" aria-label="缩小图片" @click="adjustImagePreviewScale(-0.25)">−</button>
           <output style="min-width:42px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums" aria-live="polite">{{ Math.round(imagePreviewScale * 100) }}%</output>
-          <button type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale >= 3" aria-label="放大图片" @click="adjustImagePreviewScale(0.25)">＋</button>
+          <button ref="imagePreviewZoomIn" type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale >= 3" aria-label="放大图片" @click="adjustImagePreviewScale(0.25)">＋</button>
           <button ref="imagePreviewClose" type="button" :style="imageLightboxButtonStyle" aria-label="关闭图片预览" @click="closeImagePreview">关闭</button>
         </div>
         <div :style="imageLightboxStageStyle">

@@ -36,7 +36,7 @@ export interface DocumentListResponse { items: DocumentSummary[]; nextCursor: st
 export interface TocNode { id: string; parentId: string | null; title: string; level: number; nodeType: NodeType; semanticRole: SemanticRole | null; anchor: string; sourcePageStart: number | null; children: TocNode[]; }
 export interface ContentBlock { id: string; blockKey: string; seq: number; blockType: BlockType; payload: Record<string, unknown>; plainText: string; sourcePage: number | null; sourceBbox: SourceBbox | null; confidence: number | null; }
 export interface NodeContent { node: TocNode; blocks: ContentBlock[]; nextAfterSeq: number | null; }
-export interface SearchHit { documentId: string; versionId: string; nodeId: string; blockId: string; title: string; sectionPath: string[]; snippet: string; score: number; }
+export interface SearchHit { documentId: string; documentTitle: string; versionId: string; nodeId: string; blockId: string; title: string; sectionPath: string[]; snippet: string; score: number; }
 export interface ReadingProgress { versionId: string; sectionId: string | null; blockId: string | null; charOffset: number; blockViewportOffset: number; progressRatio: number; clientUpdatedAt: string | null; deviceId: string | null; revision: number; }
 export interface SourceBbox { page?: number | null; x?: number | null; y?: number | null; width?: number | null; height?: number | null; }
 export interface ImportJob { id: string; targetDocumentId: string | null; sourceType: SourceType; status: ImportStatus; currentStage: ImportStage | null; progress: number; statistics: Record<string, unknown>; errorCode: string | null; errorMessage: string | null; }

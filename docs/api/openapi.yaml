@@ -961,9 +961,10 @@ components:
         nextAfterSeq: { type: [integer, "null"] }
     SearchHit:
       type: object
-      required: [documentId, versionId, nodeId, blockId, title, sectionPath, snippet, score]
+      required: [documentId, documentTitle, versionId, nodeId, blockId, title, sectionPath, snippet, score]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
+        documentTitle: { type: string }
         versionId: { $ref: "#/components/schemas/Uuid" }
         nodeId: { $ref: "#/components/schemas/Uuid" }
         blockId: { $ref: "#/components/schemas/Uuid" }

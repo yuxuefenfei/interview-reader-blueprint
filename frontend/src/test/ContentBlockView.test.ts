@@ -35,7 +35,7 @@ describe("ContentBlockView", () => {
     expect(wrapper.get("a").attributes("target")).toBe("_blank");
   });
 
-  it("renders code blocks without collapsing whitespace", () => {
+  it("renders code blocks without collapsing whitespace unless the reading setting enables wrapping", async () => {
     const wrapper = mount(ContentBlockView, {
       props: {
         block: block({
@@ -49,6 +49,12 @@ describe("ContentBlockView", () => {
     expect(wrapper.find("pre").text()).toContain("  void run()");
     expect(wrapper.text()).toContain("java");
     expect(wrapper.find(".code-copy").exists()).toBe(true);
+    expect(wrapper.get("pre").attributes("style")).toBeUndefined();
+    await wrapper.setProps({ wrapCode: true });
+    expect(wrapper.get("pre").attributes("style")).toContain("white-space: pre-wrap");
+    await wrapper.setProps({ showCodeWrapToggle: true });
+    await wrapper.get('[aria-label="关闭代码自动换行"]').trigger("click");
+    expect(wrapper.emitted("update:wrapCode")).toEqual([[false]]);
   });
 
   it("renders tables with horizontal-safe markup", () => {
@@ -127,6 +133,13 @@ describe("ContentBlockView", () => {
     expect(trigger.get("img").attributes("loading")).toBe("lazy");
     await trigger.trigger("click");
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("关闭图片预览");
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("放大图片");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true }));
+    await wrapper.vm.$nextTick();
     expect(document.activeElement?.getAttribute("aria-label")).toBe("关闭图片预览");
 
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));

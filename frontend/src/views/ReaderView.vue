@@ -627,7 +627,7 @@ function setSearchScope(scope: "document" | "all"): void {
 }
 
 function searchHitSource(hit: SearchHit): string {
-  return hit.documentId === selected.value?.id ? "当前文档" : "其他文档";
+  return hit.documentTitle;
 }
 
 async function jump(hit: SearchHit): Promise<void> {
@@ -665,6 +665,7 @@ function resetComfort(): void {
   comfort.fontSize = 18;
   comfort.lineHeight = 1.85;
   comfort.columnWidth = 740;
+  comfort.codeWrap = false;
 }
 function message(value: unknown): string { return toUserMessage(value, "加载失败"); }
 </script>
@@ -743,6 +744,13 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
               <legend>正文栏宽</legend>
               <div class="comfort-option-grid">
                 <button v-for="option in COLUMN_WIDTH_OPTIONS" :key="option.value" type="button" :class="{ active: comfort.columnWidth === option.value }" :aria-pressed="comfort.columnWidth === option.value" @click="comfort.columnWidth = option.value">{{ option.label.replace(/\s\d+$/, '') }}</button>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>代码显示</legend>
+              <div class="comfort-option-grid">
+                <button type="button" :class="{ active: !comfort.codeWrap }" :aria-pressed="!comfort.codeWrap" @click="comfort.codeWrap = false">不换行</button>
+                <button type="button" :class="{ active: comfort.codeWrap }" :aria-pressed="comfort.codeWrap" @click="comfort.codeWrap = true">自动换行</button>
               </div>
             </fieldset>
           </section>
@@ -858,7 +866,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <template v-else-if="content">
         <article :key="content.node.id" class="reader-article" :data-node-id="content.node.id">
           <h1>{{ content.node.title }}</h1>
-          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :asset-base-url="selected ? `/assets/versions/${selected.currentVersionId}` : undefined" />
+          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :wrap-code="comfort.codeWrap" show-code-wrap-toggle :asset-base-url="selected ? `/assets/versions/${selected.currentVersionId}` : undefined" @update:wrap-code="comfort.codeWrap = $event" />
           <div v-if="content.nextAfterSeq" class="reader-load-more">
             <el-button :loading="loadingMore" @click="loadMoreContent">加载更多内容</el-button>
           </div>
