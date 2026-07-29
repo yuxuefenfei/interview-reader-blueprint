@@ -336,11 +336,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: transparent; color: inherit;
 }
 .reader-heading { min-width: 0; display: grid; gap: 2px; }
-.reader-heading strong { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.reader-heading span { overflow: hidden; color: var(--reader-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.reader-heading > :is(strong, span) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader-heading strong { font-size: 15px; }
+.reader-heading span { color: var(--reader-muted); font-size: 12px; }
 .reader-header-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.mobile-chapter-progress { display: none; }
-.mobile-progress-label { display: none; }
+.reader-account-menu { display: none; }
+.mobile-chapter-progress, .mobile-progress-label { display: none; }
 
 .reader-desktop-nav {
   min-height: 0;
@@ -770,18 +771,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   text-align: center;
 }
 .reader-drawer[data-view="documents"] header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 8px;
+  position: relative;
+  justify-content: flex-start;
 }
-.reader-drawer[data-view="documents"] header > strong { justify-self: center; white-space: nowrap; }
-.reader-drawer[data-view="documents"] header > .el-button { justify-self: end; }
+.reader-drawer[data-view="documents"] header > strong {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
 .reader-drawer-back {
   min-height: 44px;
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   padding: 0 8px 0 2px;
   border: 0;
   border-radius: var(--radius-sm);
@@ -791,7 +795,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   font-weight: 650;
   line-height: 1;
 }
-.reader-drawer-back-icon { width: 16px; height: 16px; }
+.reader-drawer-back-icon { flex: 0 0 14px; width: 14px; height: 14px; transform: translateY(-1px); }
 .reader-document-filter input {
   width: 100%;
   min-height: 44px;
@@ -820,7 +824,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   display: grid;
   align-content: start;
   gap: 2px;
-  padding: 6px 6px calc(16px + env(safe-area-inset-bottom));
+  padding: 10px 6px calc(16px + env(safe-area-inset-bottom));
 }
 .reader-document-option {
   position: relative;
@@ -986,7 +990,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
-@media (max-width: 1050px) and (min-width: 761px) { .admin-main { padding: 0; } }
 /* Admin workspace refresh: dense operational surfaces with clear primary actions. */
 .document-table .el-table__row { cursor: pointer; }
 .table-pager { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 16px; color: #667085; font-size: 13px; }
@@ -1151,7 +1154,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .block-edit-controls { grid-template-columns: 1fr; }
 }
 @media (max-width: 1120px) and (min-width: 761px) {
-  .admin-main { padding: 0; }
   .admin-view:not(.editor-view) > :not(.admin-page-header) { margin-right: 24px; margin-left: 24px; }
   .admin-page-header { gap: 16px; padding-right: 24px; padding-left: 24px; }
   .admin-page-description { display: none; }
@@ -1198,17 +1200,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .reader-search-placeholder { min-width: 0; flex: 1; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .reader-header-search-trigger kbd { padding: 2px 5px; border: 1px solid var(--reader-line); border-radius: 4px; background: color-mix(in srgb, var(--reader-surface), var(--reader-line) 20%); color: var(--reader-muted); font-family: inherit; font-size: 10px; line-height: 1.2; white-space: nowrap; }
 .reader-theme-trigger { min-width: 92px; justify-content: center; color: var(--reader-text); }
-.reader-theme-chevron { margin-left: 2px; font-size: 12px !important; color: var(--reader-muted); }
+.reader-theme-chevron { font-size: 12px !important; color: var(--reader-muted); }
 .reader-header-search-trigger:hover, .reader-comfort-button:hover,
 .reader-comfort-button[aria-expanded="true"], .reader-theme-trigger:hover {
   background: var(--brand-100); color: var(--brand-700);
   border-color: var(--brand-500);
 }
 .reader-header-search-trigger .el-icon, .reader-comfort-button .el-icon, .reader-theme-trigger .el-icon { flex: 0 0 auto; font-size: 15px; }
-.reader-page.theme-dark .reader-header-search-trigger:hover,
-.reader-page.theme-dark .reader-comfort-button:hover,
-.reader-page.theme-dark .reader-comfort-button[aria-expanded="true"],
-.reader-page.theme-dark .reader-theme-trigger:hover { background: #1b3c3d; color: #b4fff0; }
+.reader-page.theme-dark .reader-header-actions button:hover,
+.reader-page.theme-dark .reader-comfort-button[aria-expanded="true"] { background: #1b3c3d; color: #b4fff0; }
 .reader-page.theme-dark { color-scheme: dark; }
 .el-dropdown-menu__item.is-active { background: var(--brand-100); color: var(--brand-700); font-weight: 700; }
 .reader-comfort-panel { display: grid; gap: 18px; color: var(--ink-900); }
@@ -1225,6 +1225,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .comfort-option-grid button { min-height: 34px; padding: 5px 7px; border: 1px solid var(--line-200); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--ink-700); cursor: pointer; font-size: 12px; transition: background-color 120ms, border-color 120ms, color 120ms; }
 .comfort-option-grid button:hover { border-color: var(--brand-500); color: var(--brand-700); }
 .comfort-option-grid button.active { border-color: var(--brand-500); background: var(--brand-100); color: var(--brand-700); font-weight: 700; }
+@media (max-width: 1100px) and (min-width: 761px) {
+  .reader-comfort-button > span, .reader-admin-link, .reader-logout-button { display: none; }
+  .reader-account-menu { display: flex; }
+}
 @media (max-width: 760px) {
   .reader-header-search-trigger, .reader-theme-trigger { width: 44px; min-width: 44px; min-height: 44px; justify-content: center; padding: 0; border: 0; }
   .reader-header-search-trigger .reader-search-placeholder,

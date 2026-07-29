@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowDown, ArrowLeft, ArrowRight, Close, Expand, Fold, Moon, Reading, Search, Sunny, Tickets } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowLeft, ArrowLeftBold, ArrowRight, Close, Expand, Fold, Moon, Reading, Search, Sunny, Tickets, User } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus/es/components/message/index";
@@ -84,7 +84,15 @@ const themeOptions = [
   { value: "dark" as const, label: "深色", icon: Moon },
 ];
 
-const readable = computed(() => flattenToc(toc.value).filter((node) => isQuestionNode(node) || node.children.length === 0));
+function isReadableNode(node: TocNode): boolean {
+  return isQuestionNode(node) || node.children.length === 0;
+}
+
+function firstReadableDescendant(node: TocNode): TocNode | null {
+  return flattenToc(node.children).find(isReadableNode) ?? null;
+}
+
+const readable = computed(() => flattenToc(toc.value).filter(isReadableNode));
 const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));
 const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activeIndex.value - 1] : null);
 const nextNode = computed(() => activeIndex.value >= 0 && activeIndex.value < readable.value.length - 1 ? readable.value[activeIndex.value + 1] : null);
@@ -259,36 +267,39 @@ async function selectNode(
   closeDrawer = true,
   restoredChapterProgress = 0,
 ): Promise<void> {
+  const targetNode = isReadableNode(node) ? node : firstReadableDescendant(node);
+  if (!targetNode) return;
+
   const documentId = selected.value?.id;
   const versionId = selected.value?.currentVersionId;
   if (!documentId || !versionId) return;
-  if (chapterLoading.value && pendingNodeId.value === node.id) return;
+  if (chapterLoading.value && pendingNodeId.value === targetNode.id) return;
   contentAbortController?.abort();
   cancelLoadMore();
   const abortController = new AbortController();
   contentAbortController = abortController;
   const requestId = ++contentRequestId;
   chapterLoading.value = true;
-  pendingNodeId.value = node.id;
+  pendingNodeId.value = targetNode.id;
   failedNodeId.value = null;
   error.value = "";
   try {
     let nextContent: NodeContent;
     try {
-      nextContent = await readerApi.content(versionId, node.id, undefined, abortController.signal);
-      void cacheNodeContent(documentId, versionId, node.id, 100, nextContent).catch(() => undefined);
+      nextContent = await readerApi.content(versionId, targetNode.id, undefined, abortController.signal);
+      void cacheNodeContent(documentId, versionId, targetNode.id, 100, nextContent).catch(() => undefined);
     } catch (caught) {
       if (abortController.signal.aborted) return;
-      const cached = await getCachedNodeContent(versionId, node.id, 100);
+      const cached = await getCachedNodeContent(versionId, targetNode.id, 100);
       if (!cached) throw caught;
       nextContent = cached;
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
-    activeNode.value = node;
+    activeNode.value = targetNode;
     content.value = nextContent;
-    ensureTocPathExpanded(node.id);
+    ensureTocPathExpanded(targetNode.id);
     if (closeDrawer) drawer.value = false;
-    chapterProgress.value = clampProgressRatio(restoredChapterProgress);
+    chapterProgress.value = clampProgressRatio(targetNode.id === node.id ? restoredChapterProgress : 0);
     if (shouldScroll) {
       await nextTick();
       readingArea.value?.scrollTo({ top: 0, behavior: "auto" });
@@ -304,7 +315,7 @@ async function selectNode(
     scheduleProgress();
   } catch (caught) {
     if (isCurrentContentRequest(requestId, documentId, versionId)) {
-      failedNodeId.value = node.id;
+      failedNodeId.value = targetNode.id;
       if (!content.value) error.value = message(caught);
     }
   } finally {
@@ -314,6 +325,14 @@ async function selectNode(
       if (contentAbortController === abortController) contentAbortController = null;
     }
   }
+}
+
+function handleAccountCommand(command: string): void {
+  if (command === "admin") {
+    void router.push("/admin");
+    return;
+  }
+  if (command === "logout") emit("logout");
 }
 
 async function loadMoreContent(): Promise<void> {
@@ -713,7 +732,20 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           </template>
         </el-dropdown>
         <el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button>
-        <el-button text @click="emit('logout')">退出</el-button>
+        <el-button class="reader-logout-button" text @click="emit('logout')">退出</el-button>
+        <el-dropdown class="reader-account-menu" trigger="click" placement="bottom-end" @command="handleAccountCommand">
+          <button class="reader-theme-trigger" type="button" aria-label="账户菜单" title="账户菜单">
+            <el-icon><User /></el-icon>
+            <span>账户</span>
+            <el-icon class="reader-theme-chevron"><ArrowDown /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="admin">管理后台</el-dropdown-item>
+              <el-dropdown-item command="logout">退出</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
       <!-- 桌面阅读进度条 -->
       <div class="reader-header-progress" aria-hidden="true">
@@ -761,7 +793,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <template v-else>
         <div class="reader-desktop-nav-header document-browser-header">
           <button class="reader-drawer-back" type="button" aria-label="返回当前文档目录" @click="showDesktopTocView">
-            <ArrowLeft class="reader-drawer-back-icon" aria-hidden="true" />
+            <ArrowLeftBold class="reader-drawer-back-icon" aria-hidden="true" />
             返回目录
           </button>
           <strong>切换文档</strong>
@@ -848,11 +880,10 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           <div class="reader-drawer-sticky">
             <header>
               <button class="reader-drawer-back" type="button" aria-label="返回当前文档目录" @click="showMobileTocView">
-                <ArrowLeft class="reader-drawer-back-icon" aria-hidden="true" />
+                <ArrowLeftBold class="reader-drawer-back-icon" aria-hidden="true" />
                 返回目录
               </button>
               <strong>切换文档</strong>
-              <el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" />
             </header>
           </div>
           <div ref="mobileDocumentListArea" class="reader-mobile-document-browser">

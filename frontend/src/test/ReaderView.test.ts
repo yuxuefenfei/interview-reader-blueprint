@@ -85,6 +85,20 @@ function node(id: string): TocNode {
   };
 }
 
+function section(id: string, children: TocNode[]): TocNode {
+  return {
+    id,
+    parentId: null,
+    title: id,
+    level: 1,
+    nodeType: "SECTION",
+    semanticRole: null,
+    anchor: `anchor-${id}`,
+    sourcePageStart: null,
+    children,
+  };
+}
+
 function block(id: string): ContentBlock {
   return {
     id,
@@ -233,6 +247,33 @@ describe("ReaderView request coordination", () => {
     wrapper.unmount();
   });
 
+  it("opens a section at its first readable chapter so pagination remains available", async () => {
+    const currentDocument = document("document-a", "version-a");
+    const first = { ...node("first"), parentId: "section", level: 2 };
+    const second = { ...node("second"), parentId: "section", level: 2 };
+    const root = section("section", [first, second]);
+    api.documents.mockResolvedValue({ items: [currentDocument], nextCursor: null });
+    api.toc.mockResolvedValue([root]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockImplementation((_versionId: string, nodeId: string) =>
+      Promise.resolve(content(nodeId === first.id ? first : second, `block-${nodeId}`)));
+    api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+    const wrapper = mountReader();
+    await flushPromises();
+    api.content.mockClear();
+
+    await wrapper.get(".reader-desktop-nav-expand").trigger("click");
+    await wrapper.get('.reader-desktop-nav [data-node-id="section"]').trigger("click");
+    await flushPromises();
+
+    expect(api.content).toHaveBeenCalledWith("version-a", "first", undefined, expect.any(AbortSignal));
+    expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("first");
+    expect(wrapper.get(".chapter-position").text()).toBe("1 / 2");
+    expect(wrapper.get(".chapter-nav-next").attributes("disabled")).toBeUndefined();
+    wrapper.unmount();
+  });
+
   it("uses a two-level mobile drawer and persists the active chapter path", async () => {
     const currentDocument = { ...document("document-a", "version-a"), title: "Redis", progressRatio: 0.73 };
     const otherDocument = { ...document("document-b", "version-b"), title: "MongoDB", progressRatio: 0.2 };
@@ -266,6 +307,8 @@ describe("ReaderView request coordination", () => {
 
     await wrapper.get(".reader-document-selector").trigger("click");
     await nextTick();
+    expect(wrapper.get(".reader-drawer-back").text()).toContain("返回目录");
+    expect(wrapper.find('[aria-label="关闭目录"]').exists()).toBe(false);
     const documentList = wrapper.get(".reader-document-list");
     expect(documentList.text()).toContain("Redis");
     expect(documentList.text()).toContain("MongoDB");
