@@ -838,6 +838,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
               :expanded-node-ids="expandedTocNodeIds"
               :pending-node-id="pendingNodeId"
               :failed-node-id="failedNodeId"
+              compact-groups
               @select="selectNode"
               @toggle="toggleTocNode"
             />

@@ -497,7 +497,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   overflow-wrap: anywhere;
 }
 .toc-node.has-children .toc-title { font-weight: 700; }
-.toc-row:hover, .toc-row:focus-within { background: color-mix(in srgb, var(--reader-accent), transparent 90%); color: var(--reader-accent); }
+.toc-row:focus-within { background: color-mix(in srgb, var(--reader-accent), transparent 90%); color: var(--reader-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .toc-row:hover { background: color-mix(in srgb, var(--reader-accent), transparent 90%); color: var(--reader-accent); }
+  .reader-document-option:hover { background: color-mix(in srgb, var(--reader-accent), transparent 94%); }
+}
 .toc-node:focus-visible, .toc-toggle:focus-visible {
   z-index: 1;
   outline: 2px solid color-mix(in srgb, var(--reader-accent), transparent 36%);
@@ -670,12 +674,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   z-index: 2;
   display: grid;
   gap: 0;
-  padding: max(4px, env(safe-area-inset-top)) 8px 0;
-  border-bottom: 1px solid var(--reader-line);
+  padding: env(safe-area-inset-top) 0 0;
   background: var(--reader-surface);
 }
-.reader-drawer-sticky > header { min-height: 44px; padding: 0 4px; }
-.reader-drawer-sticky .reader-document-selector { height: 48px; }
+.reader-drawer-sticky > header {
+  min-height: 56px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--reader-line);
+}
+.reader-drawer-sticky .reader-document-selector { height: 56px; padding-right: 16px; padding-left: 16px; }
+.reader-drawer-sticky .reader-document-selector-main output { width: 4ch; text-align: right; }
 .reader-drawer header, .reader-search-sheet header {
   display: flex; align-items: center; justify-content: space-between;
 }
@@ -830,7 +838,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   color: var(--reader-text);
   text-align: left;
 }
-.reader-document-option:hover { background: color-mix(in srgb, var(--reader-accent), transparent 94%); }
 .reader-document-option.active {
   background: color-mix(in srgb, var(--reader-accent), transparent 90%);
   color: var(--reader-accent);
@@ -916,6 +923,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     line-height: 12px; pointer-events: none;
   }
   .reader-desktop-nav { display: none; }
+  .toc-tree-compact-groups .toc-group-label .toc-title {
+    color: var(--reader-muted);
+    font-size: 12px;
+    letter-spacing: .035em;
+  }
+  .toc-tree-compact-groups .toc-node:not(.toc-group-label),
+  .toc-tree-compact-groups .toc-toggle { min-height: 52px; }
+  .toc-tree-compact-groups .toc-row.active { background: color-mix(in srgb, var(--reader-accent), transparent 92%); }
+  .toc-tree-compact-groups .toc-row:not(.active):active {
+    background: color-mix(in srgb, var(--reader-accent), transparent 94%);
+    color: var(--reader-accent);
+  }
   .reader-content { height: calc(var(--reader-viewport-height, 100vh) - 70px); overflow: auto; }
   .chapter-transition-status { top: 82px; left: 50%; }
   .reader-article { padding: 30px 18px 28px; }

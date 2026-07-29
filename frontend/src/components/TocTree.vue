@@ -9,12 +9,14 @@ const props = withDefaults(defineProps<{
   expandedNodeIds?: string[];
   pendingNodeId?: string | null;
   failedNodeId?: string | null;
+  compactGroups?: boolean;
   depth?: number;
   treeId?: string;
 }>(), {
   expandedNodeIds: () => [],
   pendingNodeId: null,
   failedNodeId: null,
+  compactGroups: false,
   depth: 0,
   treeId: undefined,
 });
@@ -47,7 +49,7 @@ function collapseFromKeyboard(node: TocNode): void {
 </script>
 
 <template>
-  <ol class="toc-tree" :class="{ 'toc-tree-root': depth === 0 }">
+  <ol class="toc-tree" :class="{ 'toc-tree-root': depth === 0, 'toc-tree-compact-groups': compactGroups }">
     <li v-for="node in nodes" :key="node.id" class="toc-item">
       <div
         class="toc-row"
@@ -58,7 +60,16 @@ function collapseFromKeyboard(node: TocNode): void {
         }"
         :style="{ '--toc-depth': visualDepth(), '--toc-indent': `${visualDepth() * 16}px` }"
       >
+        <div
+          v-if="compactGroups && node.children.length"
+          class="toc-node toc-group-label has-children"
+          :title="node.title"
+        >
+          <span v-if="depth > 0" class="toc-guide" aria-hidden="true"></span>
+          <span class="toc-title">{{ node.title }}</span>
+        </div>
         <button
+          v-else
           class="toc-node"
           type="button"
           :class="{ 'has-children': node.children.length > 0 }"
@@ -96,6 +107,7 @@ function collapseFromKeyboard(node: TocNode): void {
         :expanded-node-ids="expandedNodeIds"
         :pending-node-id="pendingNodeId"
         :failed-node-id="failedNodeId"
+        :compact-groups="compactGroups"
         :depth="depth + 1"
         :tree-id="treeInstanceId"
         @select="emit('select', $event)"

@@ -63,6 +63,26 @@ describe("TocTree", () => {
     expect(deepestRow?.getAttribute("style")).toContain("--toc-indent: 48px");
   });
 
+  it("renders parent nodes as non-selectable group labels in the compact mobile drawer", async () => {
+    const child = node("child", "Child chapter");
+    const root = node("root", "Part one", [child]);
+    const wrapper = mount(TocTree, {
+      props: {
+        nodes: [root],
+        activeNodeId: null,
+        expandedNodeIds: [root.id],
+        compactGroups: true,
+      },
+    });
+
+    expect(wrapper.get(".toc-group-label").text()).toBe("Part one");
+    expect(wrapper.find('[data-toc-node-id="root"]').exists()).toBe(false);
+    expect(wrapper.find('[data-toc-node-id="child"]').exists()).toBe(true);
+
+    await wrapper.get(".toc-toggle").trigger("click");
+    expect(wrapper.emitted("toggle")?.[0]).toEqual([root.id]);
+  });
+
   it("announces pending and failed chapter states", () => {
     const pending = node("pending", "Pending");
     const failed = node("failed", "Failed");
