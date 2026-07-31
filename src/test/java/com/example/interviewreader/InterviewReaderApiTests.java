@@ -179,7 +179,10 @@ class InterviewReaderApiTests {
         mockMvc.perform(get("/api/reader/search").param("q", "HashMap"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].documentTitle").isNotEmpty())
-                .andExpect(jsonPath("$[0].title").value("1.1 结论先行"));
+                .andExpect(jsonPath("$[0].title").value("1.1 结论先行"))
+                .andExpect(jsonPath("$[0].sectionPath[0]").value("1. HashMap 为什么线程不安全？"))
+                .andExpect(jsonPath("$[0].sectionPath[1]").value("1.1 结论先行"))
+                .andExpect(jsonPath("$[0].snippet").value(org.hamcrest.Matchers.containsString("HashMap")));
         mockMvc.perform(get("/api/reader/search")
                         .param("q", "1.1 结论先行")
                         .param("documentId", imported.documentId().toString())
@@ -187,7 +190,8 @@ class InterviewReaderApiTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].documentId").value(imported.documentId().toString()))
-                .andExpect(jsonPath("$[0].title").value("1.1 结论先行"));
+                .andExpect(jsonPath("$[0].title").value("1.1 结论先行"))
+                .andExpect(jsonPath("$[0].score").value(4.0));
 
         var progress = """
                 {
@@ -1448,6 +1452,56 @@ class InterviewReaderApiTests {
         assertThat(versions.get(0).get("id").asText()).isEqualTo(revisionId.toString());
         assertThat(versions.get(0).get("parentVersionId").isNull()).isTrue();
         assertThat(versions.get(0).get("parentVersionNo").asInt()).isEqualTo(1);
+    }
+
+    @Test
+    void deletingEmptyStructureNodePromotesChildrenWithoutDeletingTheirContent() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "delete-empty-node-" + UUID.randomUUID());
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        var before = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor", imported.versionId()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var rootId = UUID.fromString(before.get("nodes").get(0).get("id").asText());
+        var childId = UUID.fromString(before.get("nodes").get(1).get("id").asText());
+        var childAnchor = before.get("nodes").get(1).get("anchor").asText();
+
+        mockMvc.perform(delete("/api/admin/versions/{versionId}/editor/nodes/{nodeId}", imported.versionId(), rootId)
+                        .param("draftRevision", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version.draftRevision").value(1))
+                .andExpect(jsonPath("$.nodes.length()").value(1))
+                .andExpect(jsonPath("$.nodes[0].id").value(childId.toString()))
+                .andExpect(jsonPath("$.nodes[0].parentId").isEmpty())
+                .andExpect(jsonPath("$.nodes[0].level").value(1))
+                .andExpect(jsonPath("$.nodes[0].sortOrder").value(10))
+                .andExpect(jsonPath("$.nodes[0].anchor").value(childAnchor));
+
+        mockMvc.perform(get("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", imported.versionId(), childId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1));
+        mockMvc.perform(delete("/api/admin/versions/{versionId}/editor/nodes/{nodeId}", imported.versionId(), childId)
+                        .param("draftRevision", "1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("NODE_NOT_EMPTY"));
+    }
+
+    @Test
+    void deletingTheLastEmptyStructureNodeIsRejected() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "keep-last-node-" + UUID.randomUUID());
+        ((ArrayNode) source.get("sections")).remove(1);
+        ((ArrayNode) source.get("blocks")).removeAll();
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        var snapshot = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor", imported.versionId()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var nodeId = UUID.fromString(snapshot.get("nodes").get(0).get("id").asText());
+
+        mockMvc.perform(delete("/api/admin/versions/{versionId}/editor/nodes/{nodeId}", imported.versionId(), nodeId)
+                        .param("draftRevision", "0"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LAST_NODE_REQUIRED"));
     }
 
     @Test

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { ArrowDown, ArrowLeft, ArrowLeftBold, ArrowRight, Close, Expand, Fold, Moon, Reading, Search, Sunny, Tickets, User } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowLeft, ArrowLeftBold, ArrowRight, Close, Expand, Fold, Reading, Search, Tickets, User } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus/es/components/message/index";
 import { readerApi } from "../api/reader";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import InlineMarkdown from "../components/InlineMarkdown.vue";
+import ReaderComfortSettings from "../components/ReaderComfortSettings.vue";
 import ReaderDocumentList from "../components/ReaderDocumentList.vue";
 import ReaderDocumentSelector from "../components/ReaderDocumentSelector.vue";
 import TocTree from "../components/TocTree.vue";
@@ -21,10 +22,7 @@ import type { DocumentSummary, NodeContent, ReadingProgress, SearchHit, TocNode 
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
 import { clampProgressRatio, documentReadingPositionRatio } from "../utils/readingProgress";
 import {
-  COLUMN_WIDTH_OPTIONS,
   comfortStyle,
-  FONT_SIZE_OPTIONS,
-  LINE_HEIGHT_OPTIONS,
   loadReaderComfort,
   loadReaderTheme,
   persistReaderComfort,
@@ -55,11 +53,14 @@ const pendingDocumentId = ref<string | null>(null);
 const documentSwitchError = ref("");
 const searchOpen = ref(false);
 const comfortOpen = ref(false);
+const mobileComfortOpen = ref(false);
 const query = ref("");
 const searchHits = ref<SearchHit[]>([]);
 const searchScope = ref<"document" | "all">("document");
 const searchHighlight = ref("");
 const searchLoading = ref(false);
+const searchError = ref("");
+const searchCompletedTerm = ref("");
 const searchInput = ref<{ focus: () => void } | null>(null);
 const readingArea = ref<HTMLElement | null>(null);
 const desktopTocArea = ref<HTMLElement | null>(null);
@@ -78,15 +79,18 @@ let saveTimer: number | null = null;
 let documentRequestId = 0;
 let contentRequestId = 0;
 let loadMoreRequestId = 0;
+let searchRequestId = 0;
+let searchTimer: number | null = null;
 let contentAbortController: AbortController | null = null;
 let loadMoreAbortController: AbortController | null = null;
+let searchAbortController: AbortController | null = null;
+let ignoredRouteDocumentId: string | null = null;
+let keepSearchHighlightAfterClose = false;
 const completedNodes = new Set<string>();
-
-const themeOptions = [
-  { value: "light" as const, label: "浅色", icon: Sunny },
-  { value: "sepia" as const, label: "护眼", icon: Reading },
-  { value: "dark" as const, label: "深色", icon: Moon },
-];
+const contentPrefetches = new Map<string, {
+  controller: AbortController;
+  promise: Promise<NodeContent>;
+}>();
 
 function isReadableNode(node: TocNode): boolean {
   return isQuestionNode(node) || node.children.length === 0;
@@ -122,15 +126,46 @@ const readerPageStyle = computed(() => ({
 const readerSurfaceStyle = computed(() => ({ backgroundColor: readerThemeColor(theme.value) }));
 const chapterPosition = computed(() => activeIndex.value >= 0 ? `${activeIndex.value + 1} / ${readable.value.length}` : `0 / ${readable.value.length}`);
 const progressPercent = computed(() => Math.round(chapterProgress.value * 100));
-const currentTheme = computed(() => themeOptions.find((option) => option.value === theme.value) ?? themeOptions[0]);
 const searchShortcut = navigator.platform.toLowerCase().includes("mac") ? "⌘ K" : "Ctrl K";
+const searchGroups = computed(() => {
+  const grouped = new Map<string, { documentId: string; documentTitle: string; hits: SearchHit[] }>();
+  for (const hit of searchHits.value) {
+    const group = grouped.get(hit.documentId) ?? {
+      documentId: hit.documentId,
+      documentTitle: hit.documentTitle,
+      hits: [],
+    };
+    group.hits.push(hit);
+    grouped.set(hit.documentId, group);
+  }
+  return [...grouped.values()];
+});
 
 watch(theme, (value) => {
   localStorage.setItem("reader.theme", value);
   updateThemeColor(value);
 });
 watch(comfort, (value) => persistReaderComfort(value), { deep: true });
-watch(() => route.params.documentId, () => { void openFromRoute(); });
+watch(() => route.params.documentId, (documentId) => {
+  if (typeof documentId === "string" && ignoredRouteDocumentId === documentId) {
+    ignoredRouteDocumentId = null;
+    return;
+  }
+  void openFromRoute();
+});
+watch([query, searchScope], () => scheduleSearch());
+watch(searchOpen, (open) => {
+  if (open) {
+    scheduleSearch();
+  } else {
+    cancelSearchRequest();
+    if (keepSearchHighlightAfterClose) {
+      keepSearchHighlightAfterClose = false;
+    } else {
+      searchHighlight.value = "";
+    }
+  }
+});
 watch(drawer, async (open) => {
   if (!open) {
     drawerView.value = "toc";
@@ -165,8 +200,10 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   if (saveTimer !== null) window.clearTimeout(saveTimer);
+  if (searchTimer !== null) window.clearTimeout(searchTimer);
   contentAbortController?.abort();
   loadMoreAbortController?.abort();
+  searchAbortController?.abort();
   window.removeEventListener("online", flushOfflineProgress);
   window.removeEventListener("keydown", handleGlobalShortcut);
   window.removeEventListener("resize", syncViewportHeight);
@@ -270,9 +307,11 @@ async function selectNode(
   shouldScroll = true,
   closeDrawer = true,
   restoredChapterProgress = 0,
+  targetBlockId: string | null = null,
 ): Promise<void> {
   const targetNode = isReadableNode(node) ? node : firstReadableDescendant(node);
   if (!targetNode) return;
+  if (!targetBlockId) searchHighlight.value = "";
 
   const documentId = selected.value?.id;
   const versionId = selected.value?.currentVersionId;
@@ -290,7 +329,12 @@ async function selectNode(
   try {
     let nextContent: NodeContent;
     try {
-      nextContent = await readerApi.content(versionId, targetNode.id, undefined, abortController.signal);
+      const prefetchKey = contentPrefetchKey(versionId, targetNode.id);
+      const prefetched = contentPrefetches.get(prefetchKey);
+      nextContent = prefetched
+        ? await prefetched.promise
+        : await readerApi.content(versionId, targetNode.id, undefined, abortController.signal);
+      contentPrefetches.delete(prefetchKey);
       void cacheNodeContent(documentId, versionId, targetNode.id, 100, nextContent).catch(() => undefined);
     } catch (caught) {
       if (abortController.signal.aborted) return;
@@ -306,7 +350,15 @@ async function selectNode(
     chapterProgress.value = clampProgressRatio(targetNode.id === node.id ? restoredChapterProgress : 0);
     if (shouldScroll) {
       await nextTick();
-      readingArea.value?.scrollTo({ top: 0, behavior: "auto" });
+      const targetBlock = targetBlockId
+        ? [...(readingArea.value?.querySelectorAll<HTMLElement>("[data-block-id]") ?? [])]
+            .find((element) => element.dataset.blockId === targetBlockId)
+        : null;
+      if (targetBlock) {
+        targetBlock.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+      } else {
+        readingArea.value?.scrollTo({ top: 0, behavior: "auto" });
+      }
     } else if (chapterProgress.value > 0) {
       await nextTick();
       const area = readingArea.value;
@@ -451,6 +503,7 @@ function invalidateReadingContext(): void {
   activeNode.value = null;
   content.value = null;
   chapterProgress.value = 0;
+  clearContentPrefetches();
 }
 
 function cancelLoadMore(): void {
@@ -466,6 +519,52 @@ function isCurrentDocumentVersion(documentId: string, versionId: string): boolea
 
 function isCurrentContentRequest(requestId: number, documentId: string, versionId: string): boolean {
   return requestId === contentRequestId && isCurrentDocumentVersion(documentId, versionId);
+}
+
+function contentPrefetchKey(versionId: string, nodeId: string): string {
+  return `${versionId}:${nodeId}`;
+}
+
+function shouldPrefetchContent(): boolean {
+  const connection = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  }).connection;
+  return connection?.saveData !== true && connection?.effectiveType !== "slow-2g" && connection?.effectiveType !== "2g";
+}
+
+function prefetchNode(node: TocNode | null): void {
+  const targetNode = node && (isReadableNode(node) ? node : firstReadableDescendant(node));
+  const documentId = selected.value?.id;
+  const versionId = selected.value?.currentVersionId;
+  if (!targetNode || !documentId || !versionId || targetNode.id === activeNode.value?.id || !shouldPrefetchContent()) return;
+  const key = contentPrefetchKey(versionId, targetNode.id);
+  if (contentPrefetches.has(key)) return;
+  if (contentPrefetches.size >= 4) {
+    const oldestKey = contentPrefetches.keys().next().value as string | undefined;
+    if (oldestKey) {
+      contentPrefetches.get(oldestKey)?.controller.abort();
+      contentPrefetches.delete(oldestKey);
+    }
+  }
+  const controller = new AbortController();
+  const promise = readerApi.content(versionId, targetNode.id, undefined, controller.signal)
+    .then((prefetchedContent) => {
+      if (isCurrentDocumentVersion(documentId, versionId)) {
+        void cacheNodeContent(documentId, versionId, targetNode.id, 100, prefetchedContent).catch(() => undefined);
+      }
+      return prefetchedContent;
+    })
+    .catch((caught) => {
+      contentPrefetches.delete(key);
+      throw caught;
+    });
+  contentPrefetches.set(key, { controller, promise });
+  void promise.catch(() => undefined);
+}
+
+function clearContentPrefetches(): void {
+  contentPrefetches.forEach(({ controller }) => controller.abort());
+  contentPrefetches.clear();
 }
 
 function flushOfflineProgress(): void {
@@ -601,42 +700,104 @@ async function toggleDesktopNav(): Promise<void> {
   }
 }
 
-async function search(): Promise<void> {
+function scheduleSearch(): void {
+  if (searchTimer !== null) {
+    window.clearTimeout(searchTimer);
+    searchTimer = null;
+  }
+  cancelSearchRequest();
+  searchHits.value = [];
+  searchError.value = "";
+  searchCompletedTerm.value = "";
+  searchHighlight.value = "";
   const term = query.value.trim();
-  if (!term) {
+  if (!searchOpen.value || term.length < 2) {
+    return;
+  }
+  searchTimer = window.setTimeout(() => {
+    searchTimer = null;
+    void runSearch();
+  }, 500);
+}
+
+function cancelSearchRequest(): void {
+  if (searchTimer !== null) {
+    window.clearTimeout(searchTimer);
+    searchTimer = null;
+  }
+  searchAbortController?.abort();
+  searchAbortController = null;
+  searchRequestId += 1;
+  searchLoading.value = false;
+}
+
+function searchNow(): void {
+  if (searchTimer !== null) {
+    window.clearTimeout(searchTimer);
+    searchTimer = null;
+  }
+  void runSearch();
+}
+
+async function runSearch(): Promise<void> {
+  const term = query.value.trim();
+  if (term.length < 2 || !searchOpen.value) {
     searchHits.value = [];
     searchHighlight.value = "";
     return;
   }
+  searchAbortController?.abort();
+  const abortController = new AbortController();
+  searchAbortController = abortController;
+  const requestId = ++searchRequestId;
   searchLoading.value = true;
+  searchError.value = "";
   try {
-    searchHits.value = await readerApi.search(term, searchScope.value === "document" ? selected.value?.id : undefined);
+    const hits = await readerApi.search(
+      term,
+      searchScope.value === "document" ? selected.value?.id : undefined,
+      abortController.signal,
+    );
+    if (requestId !== searchRequestId || abortController.signal.aborted) return;
+    searchHits.value = hits;
     searchHighlight.value = term;
+    searchCompletedTerm.value = term;
   } catch (caught) {
-    error.value = message(caught);
+    if (requestId !== searchRequestId || abortController.signal.aborted) return;
+    searchError.value = message(caught);
   } finally {
-    searchLoading.value = false;
+    if (requestId === searchRequestId) {
+      searchLoading.value = false;
+      if (searchAbortController === abortController) searchAbortController = null;
+    }
   }
 }
 
 function setSearchScope(scope: "document" | "all"): void {
   if (searchScope.value === scope) return;
   searchScope.value = scope;
-  searchHits.value = [];
-  searchHighlight.value = "";
 }
 
 function searchHitSource(hit: SearchHit): string {
-  return hit.documentTitle;
+  return hit.sectionPath.join(" / ") || hit.title;
 }
 
 async function jump(hit: SearchHit): Promise<void> {
   if (hit.documentId !== selected.value?.id) {
-    await router.push(`/reader/documents/${hit.documentId}`);
-    await openFromRoute(false, hit.documentId);
+    ignoredRouteDocumentId = hit.documentId;
+    try {
+      await router.push(`/reader/documents/${hit.documentId}`);
+      await openFromRoute(false, hit.documentId);
+    } finally {
+      if (ignoredRouteDocumentId === hit.documentId) ignoredRouteDocumentId = null;
+    }
   }
   const node = flattenToc(toc.value).find((item) => item.id === hit.nodeId);
-  if (node) await selectNode(node);
+  if (node) {
+    searchHighlight.value = query.value.trim();
+    await selectNode(node, true, true, 0, hit.blockId);
+    keepSearchHighlightAfterClose = true;
+  }
   searchOpen.value = false;
 }
 
@@ -656,16 +817,12 @@ function updateThemeColor(value: ReaderTheme): void {
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", readerThemeColor(value));
 }
 
-function chooseTheme(command: string | number | object): void {
-  if (command === "light" || command === "sepia" || command === "dark") setTheme(command);
-}
-
-function setTheme(value: ReaderTheme): void { theme.value = value; }
 function resetComfort(): void {
   comfort.fontSize = 18;
   comfort.lineHeight = 1.85;
   comfort.columnWidth = 740;
   comfort.codeWrap = false;
+  comfort.fontFamily = "sans";
 }
 function message(value: unknown): string { return toUserMessage(value, "加载失败"); }
 </script>
@@ -676,7 +833,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
     :class="[
       `theme-${theme}`,
       {
-        'reader-overlay-open': drawer || searchOpen,
+        'reader-overlay-open': drawer || searchOpen || mobileComfortOpen,
         'desktop-nav-collapsed': desktopNavCollapsed,
       },
     ]"
@@ -705,7 +862,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         <el-popover v-model:visible="comfortOpen" placement="bottom-end" :width="340" trigger="click" popper-class="reader-comfort-popper">
           <template #reference>
             <button
-              class="reader-comfort-button"
+              class="reader-comfort-button reader-comfort-desktop"
               type="button"
               aria-label="阅读设置"
               title="阅读设置"
@@ -715,60 +872,26 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
               <span>阅读设置</span>
             </button>
           </template>
-          <section class="reader-comfort-panel" aria-label="阅读舒适度设置">
-            <header>
-              <div><strong>阅读舒适度</strong><span>设置会自动保存在当前设备</span></div>
-              <button type="button" @click="resetComfort">恢复默认</button>
-            </header>
-            <fieldset>
-              <legend>阅读主题</legend>
-              <div class="comfort-option-grid theme-options">
-                <button type="button" :class="{ active: theme === 'light' }" :aria-pressed="theme === 'light'" @click="setTheme('light')">浅色</button>
-                <button type="button" :class="{ active: theme === 'sepia' }" :aria-pressed="theme === 'sepia'" @click="setTheme('sepia')">护眼</button>
-                <button type="button" :class="{ active: theme === 'dark' }" :aria-pressed="theme === 'dark'" @click="setTheme('dark')">深色</button>
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>正文字号 <output>{{ comfort.fontSize }}px</output></legend>
-              <div class="comfort-option-grid font-options">
-                <button v-for="value in FONT_SIZE_OPTIONS" :key="value" type="button" :class="{ active: comfort.fontSize === value }" :aria-pressed="comfort.fontSize === value" @click="comfort.fontSize = value">{{ value }}</button>
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>行距</legend>
-              <div class="comfort-option-grid">
-                <button v-for="option in LINE_HEIGHT_OPTIONS" :key="option.value" type="button" :class="{ active: comfort.lineHeight === option.value }" :aria-pressed="comfort.lineHeight === option.value" @click="comfort.lineHeight = option.value">{{ option.label.replace(/\s[\d.]+$/, '') }}</button>
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>正文栏宽</legend>
-              <div class="comfort-option-grid">
-                <button v-for="option in COLUMN_WIDTH_OPTIONS" :key="option.value" type="button" :class="{ active: comfort.columnWidth === option.value }" :aria-pressed="comfort.columnWidth === option.value" @click="comfort.columnWidth = option.value">{{ option.label.replace(/\s\d+$/, '') }}</button>
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>代码显示</legend>
-              <div class="comfort-option-grid">
-                <button type="button" :class="{ active: !comfort.codeWrap }" :aria-pressed="!comfort.codeWrap" @click="comfort.codeWrap = false">不换行</button>
-                <button type="button" :class="{ active: comfort.codeWrap }" :aria-pressed="comfort.codeWrap" @click="comfort.codeWrap = true">自动换行</button>
-              </div>
-            </fieldset>
-          </section>
+          <ReaderComfortSettings
+            v-model:theme="theme"
+            v-model:font-size="comfort.fontSize"
+            v-model:line-height="comfort.lineHeight"
+            v-model:column-width="comfort.columnWidth"
+            v-model:code-wrap="comfort.codeWrap"
+            v-model:font-family="comfort.fontFamily"
+            @reset="resetComfort"
+          />
         </el-popover>
-        <el-dropdown trigger="click" placement="bottom-end" @command="chooseTheme">
-          <button class="reader-theme-trigger" type="button" aria-label="切换阅读主题" :title="`当前主题：${currentTheme.label}`">
-            <el-icon><component :is="currentTheme.icon" /></el-icon>
-            <span>{{ currentTheme.label }}</span>
-            <el-icon class="reader-theme-chevron"><ArrowDown /></el-icon>
-          </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item v-for="option in themeOptions" :key="option.value" :command="option.value" :class="{ 'is-active': theme === option.value }">
-                <el-icon><component :is="option.icon" /></el-icon>{{ option.label }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <button
+          class="reader-comfort-button reader-comfort-mobile"
+          type="button"
+          aria-label="阅读设置"
+          title="阅读设置"
+          :aria-expanded="mobileComfortOpen"
+          @click="mobileComfortOpen = true"
+        >
+          <el-icon><Reading /></el-icon>
+        </button>
         <el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button>
         <el-button class="reader-logout-button" text @click="emit('logout')">退出</el-button>
         <el-dropdown class="reader-account-menu" trigger="click" placement="bottom-end" @command="handleAccountCommand">
@@ -825,6 +948,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
             :failed-node-id="failedNodeId"
             @select="selectNode"
             @toggle="toggleTocNode"
+            @prefetch="prefetchNode"
           />
         </div>
       </template>
@@ -872,9 +996,9 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           </div>
         </article>
         <nav class="chapter-pagination" aria-label="章节翻页">
-          <el-button class="chapter-nav-button chapter-nav-previous" :disabled="!previousNode || chapterLoading" :loading="pendingNodeId === previousNode?.id" :icon="ArrowLeft" @click="previousNode && selectNode(previousNode)">上一节</el-button>
+          <el-button class="chapter-nav-button chapter-nav-previous" :disabled="!previousNode || chapterLoading" :loading="pendingNodeId === previousNode?.id" :icon="ArrowLeft" @pointerenter="prefetchNode(previousNode)" @focus="prefetchNode(previousNode)" @click="previousNode && selectNode(previousNode)">上一节</el-button>
           <span class="chapter-position" aria-live="polite">{{ chapterPosition }}</span>
-          <el-button class="chapter-nav-button chapter-nav-next" type="primary" :disabled="!nextNode || chapterLoading" :loading="pendingNodeId === nextNode?.id" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
+          <el-button class="chapter-nav-button chapter-nav-next" type="primary" :disabled="!nextNode || chapterLoading" :loading="pendingNodeId === nextNode?.id" @pointerenter="prefetchNode(nextNode)" @focus="prefetchNode(nextNode)" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
         </nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
@@ -911,6 +1035,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
               compact-groups
               @select="selectNode"
               @toggle="toggleTocNode"
+              @prefetch="prefetchNode"
             />
           </div>
         </template>
@@ -955,13 +1080,67 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           <button type="button" :class="{ active: searchScope === 'document' }" :aria-pressed="searchScope === 'document'" @click="setSearchScope('document')">当前文档</button>
           <button type="button" :class="{ active: searchScope === 'all' }" :aria-pressed="searchScope === 'all'" @click="setSearchScope('all')">全部文档</button>
         </div>
-        <el-input ref="searchInput" v-model="query" name="reader-search" aria-label="搜索标题或正文" autocomplete="off" placeholder="搜索标题或正文…" clearable @keyup.enter="search">
-          <template #append><el-button :icon="Search" :loading="searchLoading" aria-label="搜索" @click="search" /></template>
+        <el-input
+          ref="searchInput"
+          v-model="query"
+          name="reader-search"
+          aria-label="搜索标题或正文"
+          aria-describedby="reader-search-feedback"
+          autocomplete="off"
+          placeholder="输入至少 2 个字符…"
+          clearable
+          @keyup.enter="searchNow"
+        >
+          <template #append><el-button :icon="Search" :loading="searchLoading" aria-label="立即搜索" @click="searchNow" /></template>
         </el-input>
-        <button v-for="hit in searchHits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)">
-          <strong>{{ hit.title }} <small style="color:var(--reader-muted);font-size:11px;font-weight:400">{{ searchHitSource(hit) }}</small></strong>
-          <span><InlineMarkdown :text="hit.snippet" :highlight="searchHighlight" /></span>
-        </button>
+        <div id="reader-search-feedback" class="reader-search-feedback" role="status" aria-live="polite">
+          <template v-if="query.trim().length === 1">再输入 1 个字符开始搜索</template>
+          <template v-else-if="searchLoading">正在搜索“{{ query.trim() }}”…</template>
+          <template v-else-if="searchError">
+            <span>{{ searchError }}</span>
+            <button type="button" @click="searchNow">重新搜索</button>
+          </template>
+          <template v-else-if="searchCompletedTerm && searchHits.length === 0">没有找到“{{ searchCompletedTerm }}”</template>
+          <template v-else-if="searchCompletedTerm">找到 {{ searchHits.length }} 条结果</template>
+          <template v-else>可搜索章节标题和正文</template>
+        </div>
+        <div v-if="searchGroups.length" class="reader-search-groups">
+          <section v-for="group in searchGroups" :key="group.documentId" class="reader-search-group">
+            <header v-if="searchScope === 'all'">
+              <strong>{{ group.documentTitle }}</strong>
+              <span>{{ group.hits.length }} 条</span>
+            </header>
+            <button v-for="hit in group.hits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)">
+              <strong><InlineMarkdown :text="hit.title" :highlight="searchHighlight" /></strong>
+              <small>{{ searchHitSource(hit) }}</small>
+              <span><InlineMarkdown :text="hit.snippet" :highlight="searchHighlight" /></span>
+            </button>
+          </section>
+        </div>
+      </section>
+    </el-drawer>
+
+    <el-drawer
+      v-model="mobileComfortOpen"
+      class="reader-overlay-drawer reader-comfort-drawer"
+      direction="btt"
+      size="min(82vh, 620px)"
+      :with-header="false"
+    >
+      <section class="reader-mobile-comfort-sheet">
+        <header>
+          <strong>阅读设置</strong>
+          <el-button circle :icon="Close" aria-label="关闭阅读设置" @click="mobileComfortOpen = false" />
+        </header>
+        <ReaderComfortSettings
+          v-model:theme="theme"
+          v-model:font-size="comfort.fontSize"
+          v-model:line-height="comfort.lineHeight"
+          v-model:column-width="comfort.columnWidth"
+          v-model:code-wrap="comfort.codeWrap"
+          v-model:font-family="comfort.fontFamily"
+          @reset="resetComfort"
+        />
       </section>
     </el-drawer>
   </div>

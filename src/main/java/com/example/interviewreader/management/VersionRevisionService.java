@@ -227,6 +227,78 @@ public class VersionRevisionService {
         return editorSnapshot(versionId);
     }
 
+    /**
+     * Removes an empty structural node without removing its subtree.
+     * Direct children are promoted into the deleted node's position and the complete tree is normalized afterwards.
+     */
+    @Transactional
+    public ManagementDtos.EditorSnapshot deleteNode(UUID versionId, UUID nodeId, long draftRevision) {
+        var version = requireDraft(versionId);
+        requireRevision(version, draftRevision);
+        var node = requireNode(version.getId(), nodeId);
+        var existingBlock = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
+                .select(CONTENT_BLOCK_ENTITY.ID)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.getId()))
+                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(node.getId()))
+                .limit(1));
+        if (existingBlock != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "NODE_NOT_EMPTY", "请先删除该节点的全部内容块。");
+        }
+
+        var persisted = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .from(CONTENT_NODE_ENTITY)
+                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.getId())));
+        if (persisted.size() <= 1) {
+            throw new ApiException(HttpStatus.CONFLICT, "LAST_NODE_REQUIRED", "文档至少需要保留一个结构节点。");
+        }
+
+        var children = new HashMap<String, List<ContentNodeEntity>>();
+        for (var item : persisted) {
+            children.computeIfAbsent(Objects.toString(item.getParentId(), "ROOT"), ignored -> new ArrayList<>()).add(item);
+        }
+        children.values().forEach(list -> list.sort(
+                Comparator.comparingInt(ContentNodeEntity::getSortOrder).thenComparing(ContentNodeEntity::getId)));
+
+        var parentKey = Objects.toString(node.getParentId(), "ROOT");
+        var siblings = children.getOrDefault(parentKey, new ArrayList<>());
+        var targetIndex = -1;
+        for (var index = 0; index < siblings.size(); index++) {
+            if (siblings.get(index).getId().equals(node.getId())) {
+                targetIndex = index;
+                break;
+            }
+        }
+        if (targetIndex < 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "STRUCTURE_INVALID", "当前文档结构不完整，请刷新后再试。");
+        }
+
+        var promotedChildren = new ArrayList<>(children.getOrDefault(node.getId(), List.of()));
+        for (var child : promotedChildren) {
+            child.setParentId(node.getParentId());
+            var parentUpdate = UpdateWrapper.of(ContentNodeEntity.class)
+                    .set(CONTENT_NODE_ENTITY.PARENT_ID, node.getParentId());
+            contentNodeMapper.updateByQuery(
+                    parentUpdate.toEntity(),
+                    false,
+                    QueryWrapper.create()
+                            .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.getId()))
+                            .and(CONTENT_NODE_ENTITY.ID.eq(child.getId())));
+        }
+        siblings.remove(targetIndex);
+        siblings.addAll(targetIndex, promotedChildren);
+        children.put(parentKey, siblings);
+        children.remove(node.getId());
+
+        contentNodeMapper.deleteById(node.getId());
+        var remaining = persisted.stream().filter(item -> !item.getId().equals(node.getId())).toList();
+        applyPaths(children, "ROOT", null, 1);
+        remaining.forEach(contentNodeMapper::update);
+        advanceDraft(version);
+        return editorSnapshot(versionId);
+    }
+
     @Transactional
     public ManagementDtos.EditorSnapshot updateStructure(UUID versionId, ManagementDtos.StructureUpdateRequest request) {
         var version = requireDraft(versionId);

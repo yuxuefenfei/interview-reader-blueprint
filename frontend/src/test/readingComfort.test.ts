@@ -24,6 +24,7 @@ describe("reader comfort preferences", () => {
       lineHeight: 1.85,
       columnWidth: 740,
       codeWrap: false,
+      fontFamily: "sans",
     });
     expect(loadReaderTheme()).toBe("light");
     expect(readerThemeColor("light")).toBe("#f5f7f8");
@@ -32,7 +33,7 @@ describe("reader comfort preferences", () => {
   });
 
   it("persists valid preferences and exposes reader CSS variables", () => {
-    const comfort = { fontSize: 20, lineHeight: 1.95, columnWidth: 860, codeWrap: true };
+    const comfort = { fontSize: 20, lineHeight: 1.95, columnWidth: 860, codeWrap: true, fontFamily: "serif" as const };
 
     persistReaderComfort(comfort);
 
@@ -41,6 +42,7 @@ describe("reader comfort preferences", () => {
       "--reader-font-size": "20px",
       "--reader-line-height": "1.95",
       "--reader-column": "860px",
+      "--reader-body-font": '"Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, serif',
     });
   });
 
@@ -48,6 +50,7 @@ describe("reader comfort preferences", () => {
     localStorage.setItem("reader.fontSize", "100");
     localStorage.setItem("reader.lineHeight", "0.5");
     localStorage.setItem("reader.columnWidth", "not-a-number");
+    localStorage.setItem("reader.fontFamily", "comic");
     localStorage.setItem("reader.theme", "neon");
 
     expect(loadReaderComfort()).toEqual({
@@ -55,6 +58,7 @@ describe("reader comfort preferences", () => {
       lineHeight: 1.6,
       columnWidth: 740,
       codeWrap: false,
+      fontFamily: "sans",
     });
     expect(loadReaderTheme()).toBe("light");
   });

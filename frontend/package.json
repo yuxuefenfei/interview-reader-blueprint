@@ -15,6 +15,7 @@
     "@vitejs/plugin-vue": "6.0.7",
     "axios": "1.18.1",
     "element-plus": "2.14.3",
+    "highlight.js": "11.11.1",
     "vue": "3.5.39",
     "vue-router": "5.1.0"
   },

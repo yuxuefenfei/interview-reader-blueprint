@@ -479,6 +479,24 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/EditorSnapshot" }
         "409": { $ref: "#/components/responses/Problem" }
+    delete:
+      summary: Delete an empty draft node and promote its direct children
+      parameters:
+        - $ref: "#/components/parameters/VersionId"
+        - $ref: "#/components/parameters/NodeId"
+        - { name: draftRevision, in: query, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        default: { $ref: "#/components/responses/Problem" }
+        "200":
+          description: Updated editor snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EditorSnapshot" }
+        "409":
+          description: Draft revision conflict, non-empty node, or last remaining node
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
   /admin/versions/{versionId}/editor/structure:
     patch:
       summary: Replace parent and sibling order for all draft nodes

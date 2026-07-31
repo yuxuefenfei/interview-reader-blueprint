@@ -1,5 +1,5 @@
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 import ContentBlockView from "../components/ContentBlockView.vue";
 import type { ContentBlock } from "../types/api";
 
@@ -50,11 +50,49 @@ describe("ContentBlockView", () => {
     expect(wrapper.text()).toContain("java");
     expect(wrapper.find(".code-copy").exists()).toBe(true);
     expect(wrapper.get("pre").attributes("style")).toBeUndefined();
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.find(".hljs-keyword").exists()).toBe(true));
+    expect(wrapper.find(".hljs-keyword").text()).toBe("class");
+    expect(wrapper.get("pre").element.textContent).toBe("class A {\n  void run() {}\n}");
     await wrapper.setProps({ wrapCode: true });
     expect(wrapper.get("pre").attributes("style")).toContain("white-space: pre-wrap");
     await wrapper.setProps({ showCodeWrapToggle: true });
     await wrapper.get('[aria-label="关闭代码自动换行"]').trigger("click");
     expect(wrapper.emitted("update:wrapCode")).toEqual([[false]]);
+  });
+
+  it("does not add template indentation before an HTTP request line", async () => {
+    const code = "GET orders/_search\n{\n  \"size\": 0\n}";
+    const wrapper = mount(ContentBlockView, {
+      props: {
+        block: block({
+          blockType: "code",
+          payload: { language: "http", text: code },
+          plainText: code,
+        }),
+      },
+    });
+
+    await flushPromises();
+    expect(wrapper.get("pre").element.textContent).toBe(code);
+    expect(wrapper.get("pre").element.textContent?.startsWith("GET")).toBe(true);
+  });
+
+  it("keeps unknown code languages as escaped plain text", async () => {
+    const wrapper = mount(ContentBlockView, {
+      props: {
+        block: block({
+          blockType: "code",
+          payload: { language: "unknown-language", text: "<script>alert(1)</script>" },
+          plainText: "<script>alert(1)</script>",
+        }),
+      },
+    });
+
+    await flushPromises();
+    expect(wrapper.find(".hljs").exists()).toBe(false);
+    expect(wrapper.get("code").text()).toBe("<script>alert(1)</script>");
+    expect(wrapper.find("script").exists()).toBe(false);
   });
 
   it("renders tables with horizontal-safe markup", () => {
@@ -119,6 +157,25 @@ describe("ContentBlockView", () => {
       block: block({ blockType: "image", payload: { assetKey: "new-image", alt: "新图片" }, plainText: "新图片" })
     });
     expect(wrapper.get("img").attributes("src")).toBe("/api/admin/versions/v1/editor/assets/new-image");
+  });
+
+  it("keeps the image description and offers an explicit retry after loading fails", async () => {
+    const wrapper = mount(ContentBlockView, {
+      props: {
+        block: block({
+          blockType: "image",
+          payload: { src: "/diagram.png", alt: "线程模型图", caption: "Reactor 线程模型" },
+          plainText: "线程模型图",
+        }),
+      },
+    });
+
+    await wrapper.get("img").trigger("error");
+    expect(wrapper.get(".image-unavailable-message").text()).toContain("图片加载失败");
+    expect(wrapper.get("figcaption").text()).toBe("Reactor 线程模型");
+
+    await wrapper.get(".image-unavailable-message button").trigger("click");
+    expect(wrapper.get("img").attributes("src")).toBe("/diagram.png");
   });
 
   it("lazy-loads images and restores focus after closing the keyboard-accessible preview", async () => {

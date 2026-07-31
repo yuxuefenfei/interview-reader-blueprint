@@ -34,6 +34,9 @@ describe("TocTree", () => {
     expect(wrapper.get('[data-toc-node-id="child"]').attributes("aria-current")).toBe("location");
     expect(wrapper.get(".toc-node-status.current").text()).toBe("当前");
 
+    await rootNavigation.trigger("pointerenter");
+    expect(wrapper.emitted("prefetch")?.[0]).toEqual([root]);
+
     await rootNavigation.trigger("click");
     expect(wrapper.emitted("select")?.[0]?.[0]).toEqual(root);
 

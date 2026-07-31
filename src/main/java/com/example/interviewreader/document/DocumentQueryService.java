@@ -256,8 +256,12 @@ public class DocumentQueryService {
         var versionsById = versionsById(versionIds);
         var documentIds = versionsById.values().stream().map(DocumentVersionEntity::getDocumentId).distinct().toList();
         var documentsById = documentsById(documentIds);
+        var nodesWithAncestors = nodesIncludingAncestors(nodesById.values());
+        var titleMatchedNodeIds = titleMatchedNodes.stream()
+                .map(ContentNodeEntity::getId)
+                .collect(java.util.stream.Collectors.toSet());
 
-        var hits = new ArrayList<SearchHit>();
+        var rankedHits = new ArrayList<RankedSearchHit>();
         for (var block : matchedBlocks) {
             var node = nodesById.get(block.getNodeId());
             var version = node == null ? null : versionsById.get(node.getVersionId());
@@ -271,21 +275,26 @@ public class DocumentQueryService {
             if (!containsIgnoreCase(block.getPlainText(), needle) && !containsIgnoreCase(node.getTitle(), needle)) {
                 continue;
             }
-            hits.add(new SearchHit(
+            var score = searchScore(node, block, needle, titleMatchedNodeIds.contains(node.getId()));
+            var hit = new SearchHit(
                     uuid(document.getId()),
                     document.getTitle(),
                     uuid(version.getId()),
                     uuid(node.getId()),
                     uuid(block.getId()),
                     node.getTitle(),
-                    List.of(node.getTitle()),
-                    snippet(block.getPlainText()),
-                    BigDecimal.ONE));
-            if (hits.size() >= safeLimit) {
-                break;
-            }
+                    sectionPath(node, nodesWithAncestors),
+                    centeredSnippet(block.getPlainText(), needle),
+                    score);
+            rankedHits.add(new RankedSearchHit(hit, node.getPath(), block.getSeq()));
         }
-        return hits;
+        rankedHits.sort(Comparator
+                .comparing((RankedSearchHit ranked) -> ranked.hit().score(), Comparator.reverseOrder())
+                .thenComparing(ranked -> ranked.hit().documentTitle(), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(RankedSearchHit::nodePath, Comparator.nullsLast(String::compareTo))
+                .thenComparingInt(RankedSearchHit::blockSeq)
+                .thenComparing(ranked -> ranked.hit().blockId()));
+        return rankedHits.stream().limit(safeLimit).map(RankedSearchHit::hit).toList();
     }
 
     private Map<String, ContentNodeEntity> nodesById(List<String> nodeIds) {
@@ -538,6 +547,73 @@ public class DocumentQueryService {
         return result;
     }
 
+    private Map<String, ContentNodeEntity> nodesIncludingAncestors(Collection<ContentNodeEntity> leafNodes) {
+        var result = new LinkedHashMap<String, ContentNodeEntity>();
+        leafNodes.forEach(node -> result.put(node.getId(), node));
+        var versionIds = leafNodes.stream()
+                .map(ContentNodeEntity::getVersionId)
+                .collect(java.util.stream.Collectors.toSet());
+        var pendingParentIds = leafNodes.stream()
+                .map(ContentNodeEntity::getParentId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        while (!pendingParentIds.isEmpty()) {
+            pendingParentIds.removeAll(result.keySet());
+            if (pendingParentIds.isEmpty()) {
+                break;
+            }
+            var parents = contentNodeMapper.selectListByQuery(QueryWrapper.create()
+                    .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                    .from(CONTENT_NODE_ENTITY)
+                    .where(CONTENT_NODE_ENTITY.ID.in(pendingParentIds))
+                    .and(CONTENT_NODE_ENTITY.VERSION_ID.in(versionIds)));
+            pendingParentIds = new LinkedHashSet<>();
+            for (var parent : parents) {
+                result.put(parent.getId(), parent);
+                if (parent.getParentId() != null && !result.containsKey(parent.getParentId())) {
+                    pendingParentIds.add(parent.getParentId());
+                }
+            }
+        }
+        return result;
+    }
+
+    private static List<String> sectionPath(
+            ContentNodeEntity node,
+            Map<String, ContentNodeEntity> nodesById
+    ) {
+        var titles = new LinkedList<String>();
+        var visited = new HashSet<String>();
+        var current = node;
+        while (current != null && visited.add(current.getId())) {
+            titles.addFirst(current.getTitle());
+            current = current.getParentId() == null ? null : nodesById.get(current.getParentId());
+        }
+        return List.copyOf(titles);
+    }
+
+    private static BigDecimal searchScore(
+            ContentNodeEntity node,
+            ContentBlockEntity block,
+            String needle,
+            boolean titleMatched
+    ) {
+        if (titleMatched && node.getTitle().equalsIgnoreCase(needle)) {
+            return new BigDecimal("4.0");
+        }
+        if (titleMatched) {
+            return new BigDecimal("3.0");
+        }
+        var text = Objects.requireNonNullElse(block.getPlainText(), "");
+        if (text.equalsIgnoreCase(needle)) {
+            return new BigDecimal("2.5");
+        }
+        if (text.regionMatches(true, 0, needle, 0, needle.length())) {
+            return new BigDecimal("2.0");
+        }
+        return BigDecimal.ONE;
+    }
+
     private Map<String, List<String>> readableNodeIdsByVersion(List<String> versionIds) {
         if (versionIds.isEmpty()) {
             return Map.of();
@@ -662,11 +738,36 @@ public class DocumentQueryService {
         return readTree(json);
     }
 
-    private static String snippet(String text) {
-        if (text == null) {
+    static String centeredSnippet(String text, String needle) {
+        if (text == null || text.isEmpty()) {
             return "";
         }
-        return text.length() <= 140 ? text : text.substring(0, 140);
+        var maxLength = 140;
+        if (text.length() <= maxLength) {
+            return text;
+        }
+        var matchIndex = indexOfIgnoreCase(text, needle);
+        if (matchIndex < 0) {
+            return text.substring(0, maxLength).stripTrailing() + "…";
+        }
+        var desiredStart = matchIndex - Math.max(24, (maxLength - needle.length()) / 2);
+        var start = Math.max(0, Math.min(desiredStart, text.length() - maxLength));
+        var end = Math.min(text.length(), start + maxLength);
+        var snippet = text.substring(start, end).strip();
+        return (start > 0 ? "…" : "") + snippet + (end < text.length() ? "…" : "");
+    }
+
+    private static int indexOfIgnoreCase(String value, String needle) {
+        if (needle == null || needle.isEmpty()) {
+            return 0;
+        }
+        var lastStart = value.length() - needle.length();
+        for (var index = 0; index <= lastStart; index++) {
+            if (value.regionMatches(true, index, needle, 0, needle.length())) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private static String lower(String value) {
@@ -705,6 +806,9 @@ public class DocumentQueryService {
 
     private static UUID uuid(String value) {
         return value == null ? null : UUID.fromString(value);
+    }
+
+    private record RankedSearchHit(SearchHit hit, String nodePath, int blockSeq) {
     }
 
     private static final class MutableTocNode {

@@ -40,7 +40,7 @@ function textSegments(value: string | undefined): TextSegment[] {
     <template v-for="(token, index) in renderedTokens" :key="index">
       <template v-if="token.type === 'text'">
         <template v-for="(segment, segmentIndex) in textSegments(token.text)" :key="segmentIndex">
-          <mark v-if="segment.highlighted" style="padding:0 .08em;border-radius:2px;background:color-mix(in srgb,#facc15,transparent 56%);color:inherit">{{ segment.text }}</mark>
+          <mark v-if="segment.highlighted" class="inline-search-mark">{{ segment.text }}</mark>
           <template v-else>{{ segment.text }}</template>
         </template>
       </template>

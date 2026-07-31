@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from "vue";
 import type { ContentBlock } from "../types/api";
+import { highlightCode } from "../utils/codeHighlight";
 import InlineMarkdown from "./InlineMarkdown.vue";
 
 const copyLabel = ref("复制代码");
@@ -16,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{ "update:wrapCode": [value: boolean] }>();
 
 const imageLoadFailed = ref(false);
+const imageRetryKey = ref(0);
 const imagePreviewOpen = ref(false);
 const imagePreviewScale = ref(1);
 const imagePreviewZoomOut = ref<HTMLButtonElement | null>(null);
@@ -32,6 +34,11 @@ const imageLightboxButtonStyle: CSSProperties = { minHeight: "36px", padding: "0
 const imageLightboxStageStyle: CSSProperties = { minWidth: "0", minHeight: "0", overflow: "auto", display: "grid", placeItems: "center", padding: "16px" };
 const imageLightboxImageStyle = computed<CSSProperties>(() => ({ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", transformOrigin: "center", transition: "transform 140ms ease-out", transform: `scale(${imagePreviewScale.value})` }));
 const codeBlockStyle = computed<CSSProperties | undefined>(() => props.wrapCode ? { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } : undefined);
+const codeText = computed(() => codeTextFromPayload(props.block.payload, props.block.plainText));
+const codeLanguageName = computed(() => codeLanguage(props.block.payload, props.block));
+const highlightedCode = ref<string | null>(null);
+const codeHighlightPending = ref(false);
+let codeHighlightRequestId = 0;
 const imageAssetKey = computed(() => typeof props.block.payload.assetKey === "string" ? props.block.payload.assetKey.trim() : "");
 const imageAlt = computed(() => typeof props.block.payload.alt === "string" ? props.block.payload.alt : props.block.plainText);
 const imageCaption = computed(() => typeof props.block.payload.caption === "string" ? props.block.payload.caption : "");
@@ -45,10 +52,25 @@ const imageUrl = computed(() => {
 // Retry the image when that immutable resource URL changes instead of retaining an old load failure.
 watch(imageUrl, () => {
   imageLoadFailed.value = false;
+  imageRetryKey.value = 0;
   closeImagePreview();
 });
+watch([codeText, codeLanguageName], async ([text, language]) => {
+  const requestId = ++codeHighlightRequestId;
+  highlightedCode.value = null;
+  codeHighlightPending.value = true;
+  try {
+    const highlighted = await highlightCode(text, language);
+    if (requestId === codeHighlightRequestId) highlightedCode.value = highlighted;
+  } catch {
+    if (requestId === codeHighlightRequestId) highlightedCode.value = null;
+  } finally {
+    if (requestId === codeHighlightRequestId) codeHighlightPending.value = false;
+  }
+}, { immediate: true });
 
 onBeforeUnmount(() => {
+  codeHighlightRequestId += 1;
   document.removeEventListener("keydown", handleImagePreviewKeydown);
   if (copyLabelTimer !== null) {
     window.clearTimeout(copyLabelTimer);
@@ -89,6 +111,11 @@ function closeImagePreview(): void {
 
 function adjustImagePreviewScale(delta: number): void {
   imagePreviewScale.value = Math.min(3, Math.max(1, Math.round((imagePreviewScale.value + delta) * 100) / 100));
+}
+
+function retryImageLoad(): void {
+  imageRetryKey.value += 1;
+  imageLoadFailed.value = false;
 }
 
 function handleImagePreviewKeydown(event: KeyboardEvent): void {
@@ -181,7 +208,7 @@ async function copyCode(block: ContentBlock): Promise<void> {
 
     <figure v-else-if="block.blockType === 'code'" class="code-block">
       <figcaption>
-        <span>{{ codeLanguage(block.payload, block) }}</span>
+        <span>{{ codeLanguageName }}</span>
         <div style="display:flex;align-items:center;gap:4px">
           <button v-if="showCodeWrapToggle" class="code-copy" type="button" style="width:auto;padding:0 8px" :aria-pressed="!!wrapCode" :aria-label="wrapCode ? '关闭代码自动换行' : '启用代码自动换行'" :title="wrapCode ? '关闭自动换行' : '自动换行'" @click="emit('update:wrapCode', !wrapCode)">换行</button>
           <button class="code-copy" type="button" :aria-label="copyLabel" :title="copyLabel" @click="copyCode(block)">
@@ -189,7 +216,7 @@ async function copyCode(block: ContentBlock): Promise<void> {
           </button>
         </div>
       </figcaption>
-      <pre :style="codeBlockStyle"><code>{{ codeTextFromPayload(block.payload, block.plainText) }}</code></pre>
+      <pre :style="codeBlockStyle" :aria-busy="codeHighlightPending"><code v-if="highlightedCode !== null" class="hljs" v-html="highlightedCode"></code><code v-else>{{ codeText }}</code></pre>
     </figure>
 
     <div v-else-if="block.blockType === 'table'" class="table-wrap">
@@ -227,9 +254,14 @@ async function copyCode(block: ContentBlock): Promise<void> {
 
     <figure v-else-if="block.blockType === 'image'" class="image-block" :class="{ unavailable: !imageUrl || imageLoadFailed }">
       <button v-if="imageUrl && !imageLoadFailed" type="button" style="width:100%;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;cursor:zoom-in" :aria-label="`查看大图：${imageAlt || '图片'}`" @click="openImagePreview">
-        <img :src="imageUrl" :alt="imageDecorative ? '' : imageAlt" loading="lazy" decoding="async" @error="imageLoadFailed = true" />
+        <img :key="`${imageUrl}:${imageRetryKey}`" :src="imageUrl" :alt="imageDecorative ? '' : imageAlt" loading="lazy" decoding="async" @error="imageLoadFailed = true" />
       </button>
-      <figcaption v-if="imageCaption || !imageUrl || imageLoadFailed">{{ imageCaption || imageAlt || "图片当前不可用；离线时请在联网后重试。" }}</figcaption>
+      <div v-if="!imageUrl || imageLoadFailed" class="image-unavailable-message" role="status">
+        <strong>{{ imageLoadFailed ? "图片加载失败" : "图片当前不可用" }}</strong>
+        <span>{{ imageLoadFailed ? "请检查网络后重试。" : "当前内容没有可用的图片地址。" }}</span>
+        <button v-if="imageUrl" type="button" @click="retryImageLoad">重新加载</button>
+      </div>
+      <figcaption v-if="imageCaption || ((!imageUrl || imageLoadFailed) && !imageDecorative && imageAlt)">{{ imageCaption || imageAlt }}</figcaption>
     </figure>
 
     <hr v-else-if="block.blockType === 'divider'" />

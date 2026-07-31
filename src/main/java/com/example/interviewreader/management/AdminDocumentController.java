@@ -94,6 +94,15 @@ public class AdminDocumentController {
         return service.updateNode(versionId, nodeId, request);
     }
 
+    @DeleteMapping("/versions/{versionId}/editor/nodes/{nodeId}")
+    public ManagementDtos.EditorSnapshot deleteNode(
+            @PathVariable UUID versionId,
+            @PathVariable UUID nodeId,
+            @RequestParam long draftRevision
+    ) {
+        return service.deleteNode(versionId, nodeId, draftRevision);
+    }
+
     @PatchMapping("/versions/{versionId}/editor/structure")
     public ManagementDtos.EditorSnapshot updateStructure(
             @PathVariable UUID versionId,

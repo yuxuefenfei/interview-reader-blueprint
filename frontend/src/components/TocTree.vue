@@ -24,6 +24,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   select: [node: TocNode];
   toggle: [nodeId: string];
+  prefetch: [node: TocNode];
 }>();
 const treeInstanceId = props.treeId ?? useId();
 
@@ -78,6 +79,8 @@ function collapseFromKeyboard(node: TocNode): void {
           :data-toc-node-id="node.id"
           :title="node.title"
           @click="emit('select', node)"
+          @pointerenter="emit('prefetch', node)"
+          @focus="emit('prefetch', node)"
           @keydown.right.prevent="expandFromKeyboard(node)"
           @keydown.left.prevent="collapseFromKeyboard(node)"
         >
@@ -112,6 +115,7 @@ function collapseFromKeyboard(node: TocNode): void {
         :tree-id="treeInstanceId"
         @select="emit('select', $event)"
         @toggle="emit('toggle', $event)"
+        @prefetch="emit('prefetch', $event)"
       />
     </li>
   </ol>
