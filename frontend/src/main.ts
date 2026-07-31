@@ -32,6 +32,7 @@ import "element-plus/es/components/drawer/style/css";
 import "element-plus/es/components/dropdown/style/css";
 import "element-plus/es/components/empty/style/css";
 import "element-plus/es/components/form/style/css";
+import "element-plus/es/components/form-item/style/css";
 import "element-plus/es/components/icon/style/css";
 import "element-plus/es/components/input/style/css";
 import "element-plus/es/components/loading/style/css";

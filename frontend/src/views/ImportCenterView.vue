@@ -217,9 +217,9 @@ function message(value: unknown): string { return toUserMessage(value, "导入�
     <div class="import-layout">
       <el-card shadow="never" class="import-form-card">
         <template #header><div class="card-heading"><div><strong>新建导入任务</strong><span>明确选择目标文档时生成新版本；留空时创建新文档，不再静默合并。</span></div></div></template>
-        <el-form label-position="top">
+        <el-form label-position="top" class="import-task-form">
           <el-form-item label="目标文档"><el-select v-model="targetDocumentId" name="target-document" filterable remote clearable reserve-keyword placeholder="留空则创建新文档…" :remote-method="searchDocuments" :loading="documentLoading" :prefix-icon="Search" :disabled="uploading || job !== null"><el-option v-for="candidate in documents" :key="candidate.id" :label="`${candidate.title} · ${candidate.code}`" :value="candidate.id" /></el-select></el-form-item>
-          <el-form-item label="源文件"><el-upload drag :auto-upload="false" :show-file-list="true" :limit="1" :on-change="(file: { raw?: UploadRawFile }) => file.raw && selectFile(file.raw)" :before-upload="selectFile"><el-icon class="upload-icon"><UploadFilled /></el-icon><div>拖入文件或点击选择</div><template #tip>支持 PDF、Excel、Markdown 和 JSON 文档包</template></el-upload></el-form-item>
+          <el-form-item label="源文件"><el-upload drag :auto-upload="false" :show-file-list="true" :limit="1" :on-change="(file: { raw?: UploadRawFile }) => file.raw && selectFile(file.raw)" :before-upload="selectFile"><el-icon class="upload-icon"><UploadFilled /></el-icon><div>拖入文件或点击选择</div><template #tip><div class="el-upload__tip">支持 PDF、Excel、Markdown 和 JSON 文档包</div></template></el-upload></el-form-item>
           <div class="recognized-file"><span>识别类型</span><el-tag v-if="recognizedType" type="info" effect="plain">{{ zh(recognizedType) }}</el-tag><span v-else class="muted-text">选择文件后自动识别，服务端会再次按文件内容校验。</span></div>
           <el-button type="primary" :icon="DocumentAdd" :loading="uploading" :disabled="!selectedFile" data-testid="start-import" @click="upload">开始导入</el-button>
         </el-form>

@@ -63,7 +63,10 @@ body {
 }
 button, input, textarea, select { font: inherit; }
 button, a { touch-action: manipulation; }
-button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+button:focus-visible,
+input:not(.el-input__inner):not(.el-select__input):focus-visible,
+textarea:not(.el-textarea__inner):focus-visible,
+select:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
@@ -1130,6 +1133,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .import-layout { display: grid; grid-template-columns: minmax(390px, .92fr) minmax(390px, 1.08fr); gap: 20px; align-items: start; }
 .import-form-card, .import-progress-card { min-height: 420px; border-color: #d9e2e9; }
 .import-form-card .el-select { width: 100%; }
+.import-task-form .el-form-item { margin-bottom: 22px; }
+.import-task-form .el-form-item__label { margin-bottom: 8px; font-weight: 650; line-height: 1.45; }
+.import-task-form .el-upload,
+.import-task-form .el-upload-dragger,
+.import-task-form .el-upload__tip { width: 100%; }
+.import-task-form .el-upload__tip { margin-top: 8px; line-height: 1.5; }
+.import-task-form .recognized-file { margin: 0 0 22px; }
 .recognized-file { display: flex; align-items: center; gap: 10px; min-height: 42px; margin: -2px 0 20px; padding: 10px 12px; border: 1px solid #dce6ea; background: #f8fafb; }
 .recognized-file > span:first-child { color: #536274; font-size: 13px; }
 .muted-text { color: #7a8795; font-size: 13px; }
