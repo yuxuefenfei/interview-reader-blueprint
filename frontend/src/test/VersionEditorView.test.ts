@@ -110,6 +110,10 @@ const FormItemStub = defineComponent({
   },
   template: '<label><span>{{ label }}</span><slot /><span v-if="error" class="form-error">{{ error }}</span></label>'
 });
+const TooltipStub = defineComponent({
+  props: { content: { type: String, default: "" } },
+  template: '<span :data-tooltip="content"><slot /></span>'
+});
 
 function mountView() {
   return shallowMount(VersionEditorView, {
@@ -135,6 +139,7 @@ function mountView() {
         ElSelect: true,
         ElSwitch: true,
         ElTag: true,
+        ElTooltip: TooltipStub,
         ElTree: TreeStub,
         ElUpload: true,
         Teleport: true
@@ -244,6 +249,9 @@ describe("VersionEditorView autosave", () => {
     expect(drawer.text()).toContain("当前位置");
     expect(drawer.text()).toContain("结构类型");
     expect(drawer.text()).toContain("内容语义");
+    expect(drawer.findAll(".node-property-info")).toHaveLength(3);
+    expect(drawer.text()).not.toContain("标题会同步显示在目录与阅读页中");
+    expect(drawer.text()).not.toContain("决定该节点在目录层级中的结构定位");
     expect(drawer.findAll('input[name="node-type"]')).toHaveLength(7);
     expect(drawer.findAll('input[name="semantic-role"]')).toHaveLength(11);
     expect(drawer.get('[data-testid="save-node-properties"]').attributes("disabled")).toBeDefined();

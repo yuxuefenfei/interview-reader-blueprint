@@ -9,6 +9,7 @@ import { adminApi } from "../api/admin";
 import { formatTime, zh } from "../shared/presentation";
 import type { AdminDocumentSummary, DeletionJob, DocumentMetadata, VersionSummary } from "../types/api";
 import AdminPageHeader from "../components/AdminPageHeader.vue";
+import ReadonlyIdentifier from "../components/ReadonlyIdentifier.vue";
 
 type ActionKind = "create" | "publish" | "discard" | "take-down" | "restore" | "delete-document" | "retry-delete";
 type MoreCommand = "create" | "discard";
@@ -301,7 +302,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
     <el-card v-if="metadata" shadow="never" class="document-metadata-card">
       <template #header><div class="card-heading"><div><h2>文档资料</h2><span>资料独立于内容版本，保存后立即同步阅读端。</span></div><el-button :icon="EditPen" :disabled="deletionLocked" data-testid="edit-document-metadata" @click="openMetadataEditor">编辑资料</el-button></div></template>
       <dl class="document-metadata-grid">
-        <div><dt>只读标识</dt><dd><code>{{ metadata.code }}</code></dd></div>
+        <div><dt>只读标识</dt><dd><ReadonlyIdentifier :value="metadata.code" /></dd></div>
         <div><dt>描述</dt><dd>{{ metadata.description || '暂无描述' }}</dd></div>
         <div><dt>标签</dt><dd class="document-tag-list"><el-tag v-for="tag in metadata.tags" :key="tag" effect="plain">{{ tag }}</el-tag><span v-if="!metadata.tags.length" class="muted-text">暂无标签</span></dd></div>
       </dl>
@@ -340,7 +341,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
     <el-dialog v-model="metadataDialogVisible" title="编辑文档资料" width="min(560px, 92vw)" :close-on-click-modal="false">
       <el-form label-position="top" @submit.prevent>
         <el-form-item label="文档标题" required><el-input v-model="metadataForm.title" name="document-title" autocomplete="off" maxlength="500" show-word-limit /></el-form-item>
-        <el-form-item label="只读标识"><el-input :model-value="metadata?.code" name="document-code" autocomplete="off" spellcheck="false" disabled /></el-form-item>
+        <el-form-item label="只读标识"><ReadonlyIdentifier :value="metadata?.code" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="metadataForm.description" name="document-description" autocomplete="off" type="textarea" :rows="4" maxlength="5000" show-word-limit /></el-form-item>
         <el-form-item label="标签"><el-select v-model="metadataForm.tags" name="document-tags" multiple filterable allow-create default-first-option :multiple-limit="20" placeholder="输入标签后按回车…"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select><span class="form-help">最多 20 个，单个标签最多 50 个字符；标签忽略大小写去重。</span></el-form-item>
       </el-form>

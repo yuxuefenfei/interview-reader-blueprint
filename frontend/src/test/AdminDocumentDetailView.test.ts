@@ -75,6 +75,10 @@ const FormItemStub = defineComponent({ template: '<label><slot /></label>' });
 const InputStub = defineComponent({ props: { modelValue: [String, Number] }, template: '<input :value="modelValue" />' });
 const SelectStub = defineComponent({ template: '<div><slot /></div>' });
 const OptionStub = defineComponent({ template: '<span />' });
+const ReadonlyIdentifierStub = defineComponent({
+  props: { value: { type: String, default: "" } },
+  template: '<code class="readonly-identifier">{{ value }}</code>'
+});
 
 function version(overrides: Partial<VersionSummary> & Pick<VersionSummary, "id" | "versionNo" | "status">): VersionSummary {
   return {
@@ -142,7 +146,8 @@ function mountView() {
         ElFormItem: FormItemStub,
         ElInput: InputStub,
         ElSelect: SelectStub,
-        ElOption: OptionStub
+        ElOption: OptionStub,
+        ReadonlyIdentifier: ReadonlyIdentifierStub
       }
     }
   });
@@ -185,6 +190,7 @@ describe("AdminDocumentDetailView", () => {
     await flushPromises();
 
     expect(wrapper.get(".document-metadata-card").text()).toContain("原始描述");
+    expect(wrapper.get(".document-metadata-card .readonly-identifier").text()).toBe("java-guide");
     expect(wrapper.findAll('[data-testid="edit-document-metadata"]')).toHaveLength(1);
     await wrapper.get('[data-testid="edit-document-metadata"]').trigger("click");
     await flushPromises();

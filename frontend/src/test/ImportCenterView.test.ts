@@ -50,6 +50,10 @@ const AlertStub = defineComponent({ props: { title: String, description: String 
 const ProgressStub = defineComponent({ template: '<div />' });
 const TagStub = defineComponent({ template: '<span><slot /></span>' });
 const SimpleStub = defineComponent({ template: '<div><slot /></div>' });
+const ReadonlyIdentifierStub = defineComponent({
+  props: { value: { type: String, default: "" } },
+  template: '<code class="readonly-identifier">{{ value }}</code>'
+});
 
 const readyJob: ImportJob = {
   id: "job-1", targetDocumentId: null, sourceType: "MARKDOWN", status: "READY", currentStage: "REVIEWING",
@@ -83,7 +87,8 @@ function mountView() {
         ElTag: TagStub,
         ElIcon: SimpleStub,
         ElRadioGroup: SimpleStub,
-        ElRadio: SimpleStub
+        ElRadio: SimpleStub,
+        ReadonlyIdentifier: ReadonlyIdentifierStub
       }
     }
   });
@@ -130,7 +135,7 @@ describe("ImportCenterView", () => {
     await flushPromises();
 
     expect(wrapper.get(".import-document-preview").text()).toContain("新文档资料");
-    expect(wrapper.get('.import-document-preview input[value="guide"]').attributes("value")).toBe("guide");
+    expect(wrapper.get(".import-document-preview .readonly-identifier").text()).toBe("guide");
     await wrapper.get('[data-testid="commit-import"]').trigger("click");
     await flushPromises();
 

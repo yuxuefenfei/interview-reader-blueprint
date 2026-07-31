@@ -12,6 +12,7 @@ import { TERMINAL_IMPORT_STATUSES } from "../types/api";
 import type { AdminDocumentSummary, ImportDocumentPreview, ImportIssue, ImportJob, ImportResolution } from "../types/api";
 import { toUserMessage } from "../utils/errorMessage";
 import AdminPageHeader from "../components/AdminPageHeader.vue";
+import ReadonlyIdentifier from "../components/ReadonlyIdentifier.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -37,6 +38,12 @@ const selectedTarget = computed(() => documents.value.find((document) => documen
 const matchingDocumentLocked = computed(() => preview.value?.matchingDocument?.status === "DELETING" || preview.value?.matchingDocument?.status === "DELETE_FAILED");
 const metadataEditable = computed(() => Boolean(preview.value?.editable) && resolution.value !== "IMPORT_AS_NEW_VERSION");
 const fallbackTitle = computed(() => preview.value?.title === "Markdown Document" || preview.value?.title === "PDF Document");
+const readonlyDocumentKey = computed(() => {
+  if (!preview.value) return "";
+  return resolution.value === "CREATE_NEW"
+    ? preview.value.suggestedDocumentKey || preview.value.documentKey
+    : preview.value.documentKey;
+});
 
 onMounted(() => {
   document.addEventListener("visibilitychange", onVisibilityChange);
@@ -240,7 +247,7 @@ function message(value: unknown): string { return toUserMessage(value, "导入�
             <el-alert v-if="selectedTarget" :title="`目标文档：${selectedTarget.title} · ${selectedTarget.code}`" type="info" :closable="false" show-icon description="来源标题、描述和标签不会写入目标文档。" />
             <el-form label-position="top" class="import-metadata-form">
               <el-form-item label="标题" required><el-input v-model="metadataForm.title" name="import-title" autocomplete="off" maxlength="500" show-word-limit :disabled="!metadataEditable" /></el-form-item>
-              <el-form-item label="只读标识"><el-input :model-value="resolution === 'CREATE_NEW' ? preview.suggestedDocumentKey || preview.documentKey : preview.documentKey" name="import-code" autocomplete="off" spellcheck="false" disabled /></el-form-item>
+              <el-form-item label="只读标识"><ReadonlyIdentifier :value="readonlyDocumentKey" /></el-form-item>
               <el-form-item label="描述"><el-input v-model="metadataForm.description" name="import-description" autocomplete="off" type="textarea" :rows="3" maxlength="5000" show-word-limit :disabled="!metadataEditable" /></el-form-item>
               <el-form-item label="标签"><el-select v-model="metadataForm.tags" name="import-tags" multiple filterable allow-create default-first-option :multiple-limit="20" :disabled="!metadataEditable" placeholder="输入标签后按回车…"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select></el-form-item>
             </el-form>

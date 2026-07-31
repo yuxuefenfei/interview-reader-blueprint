@@ -18,6 +18,10 @@ const routing = vi.hoisted(() => ({
   route: null as { params: { documentId?: string } } | null,
   push: vi.fn(),
 }));
+const messages = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+}));
 
 vi.mock("../api/reader", () => ({ readerApi: api }));
 vi.mock("vue-router", () => ({
@@ -35,7 +39,7 @@ vi.mock("../offline/progressQueue", () => ({
   shouldQueueReadingProgress: vi.fn(() => false),
 }));
 vi.mock("../utils/readingDevice", () => ({ getOrCreateReadingDeviceId: () => "test-device" }));
-vi.mock("element-plus/es/components/message/index", () => ({ ElMessage: { success: vi.fn() } }));
+vi.mock("element-plus/es/components/message/index", () => ({ ElMessage: messages }));
 vi.mock("../components/ContentBlockView.vue", () => ({
   default: defineComponent({
     props: { block: { type: Object, required: true } },
@@ -310,6 +314,10 @@ describe("ReaderView request coordination", () => {
     expect(wrapper.get(".reader-content").attributes("aria-busy")).toBe("true");
     expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-a");
     expect(wrapper.get(".mock-content").text()).toBe("block-a");
+    expect(wrapper.find(".chapter-transition-status").exists()).toBe(false);
+    expect(wrapper.findAll(".chapter-loading-dots")).toHaveLength(2);
+    expect(wrapper.find(".mobile-progress-label").exists()).toBe(false);
+    expect(wrapper.text()).toContain("正在加载下一节");
 
     await wrapper.get(".chapter-nav-next").trigger("click");
     expect(api.content.mock.calls.filter((call) => call[1] === "node-b")).toHaveLength(1);
@@ -319,6 +327,8 @@ describe("ReaderView request coordination", () => {
     expect(wrapper.get(".reader-content").attributes("aria-busy")).toBe("false");
     expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-b");
     expect(wrapper.get(".mock-content").text()).toBe("block-b");
+    expect(wrapper.findAll(".chapter-loading-dots")).toHaveLength(0);
+    expect(wrapper.get(".mobile-progress-label").text()).toBe("0%");
     expect(HTMLElement.prototype.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
     wrapper.unmount();
   });
@@ -483,6 +493,12 @@ describe("ReaderView request coordination", () => {
     expect(wrapper.find(".reader-drawer").exists()).toBe(true);
     expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe(nodeA.id);
     expect(wrapper.get(".reader-drawer").text()).toContain("失败，重试");
+    expect(wrapper.findAll(".chapter-loading-dots")).toHaveLength(0);
+    expect(messages.error).toHaveBeenCalledWith({
+      message: "章节加载失败，请重试",
+      duration: 2_000,
+      showClose: false,
+    });
     wrapper.unmount();
   });
 });

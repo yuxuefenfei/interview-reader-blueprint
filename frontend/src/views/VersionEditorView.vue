@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toUserMessage } from "../utils/errorMessage";
-import { Delete, EditPen, FolderOpened, FullScreen, Hide, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
+import { Delete, EditPen, FolderOpened, FullScreen, Hide, InfoFilled, MoreFilled, Plus, Rank, RefreshRight, Search, Setting, View } from "@element-plus/icons-vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus/es/components/message/index";
@@ -948,8 +948,13 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         <el-form label-position="top" class="node-property-form">
           <section class="node-property-section" aria-labelledby="node-basic-heading">
             <header>
-              <div><span class="node-property-step">01</span><h3 id="node-basic-heading">基本信息</h3></div>
-              <p>标题会同步显示在目录与阅读页中。</p>
+              <div>
+                <span class="node-property-step">01</span>
+                <h3 id="node-basic-heading">基本信息</h3>
+                <el-tooltip content="标题会同步显示在目录与阅读页中。" placement="top">
+                  <button class="node-property-info" type="button" aria-label="基本信息说明"><InfoFilled aria-hidden="true" /></button>
+                </el-tooltip>
+              </div>
             </header>
             <el-form-item label="标题" :error="nodeTitleError">
               <el-input
@@ -966,8 +971,13 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
 
           <fieldset class="node-property-section node-property-fieldset">
             <legend>
-              <span><span class="node-property-step">02</span>结构类型</span>
-              <small>决定目录层级中的结构定位</small>
+              <span>
+                <span class="node-property-step">02</span>
+                结构类型
+                <el-tooltip content="决定该节点在目录层级中的结构定位。" placement="top">
+                  <button class="node-property-info" type="button" aria-label="结构类型说明"><InfoFilled aria-hidden="true" /></button>
+                </el-tooltip>
+              </span>
             </legend>
             <div class="node-type-grid">
               <label v-for="type in nodeTypeChoices" :key="type.value" class="node-type-choice">
@@ -982,8 +992,13 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
 
           <fieldset class="node-property-section node-property-fieldset">
             <legend>
-              <span><span class="node-property-step">03</span>内容语义</span>
-              <small>可选，描述该节点在阅读内容中的作用</small>
+              <span>
+                <span class="node-property-step">03</span>
+                内容语义
+                <el-tooltip content="可选，用于描述该节点在阅读内容中的作用。" placement="top">
+                  <button class="node-property-info" type="button" aria-label="内容语义说明"><InfoFilled aria-hidden="true" /></button>
+                </el-tooltip>
+              </span>
             </legend>
             <div class="semantic-role-grid">
               <label v-for="role in semanticRoleChoices" :key="role.value ?? 'none'" class="semantic-role-choice">

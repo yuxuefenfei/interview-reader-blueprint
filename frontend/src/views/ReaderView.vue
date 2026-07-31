@@ -119,6 +119,7 @@ const navigationDocuments = computed(() => documents.value.map((document) =>
 const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const desktopRailProgressStyle = computed(() => ({ height: `${currentDocumentProgressRatio.value * 100}%` }));
+const chapterTransitioning = computed(() => chapterLoading.value && content.value !== null);
 const readerPageStyle = computed(() => ({
   ...comfortStyle(comfort),
   "--reader-viewport-height": `${viewportHeight.value}px`,
@@ -372,7 +373,11 @@ async function selectNode(
   } catch (caught) {
     if (isCurrentContentRequest(requestId, documentId, versionId)) {
       failedNodeId.value = targetNode.id;
-      if (!content.value) error.value = message(caught);
+      if (content.value) {
+        ElMessage.error({ message: "章节加载失败，请重试", duration: 2_000, showClose: false });
+      } else {
+        error.value = message(caught);
+      }
     }
   } finally {
     if (requestId === contentRequestId) {
@@ -909,14 +914,17 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         </el-dropdown>
       </div>
       <!-- 桌面阅读进度条 -->
-      <div class="reader-header-progress" aria-hidden="true">
-        <span :style="desktopProgressStyle"></span>
+      <div class="reader-header-progress" :class="{ 'is-loading': chapterTransitioning }" aria-hidden="true">
+        <span class="reader-progress-fill" :style="desktopProgressStyle"></span>
+        <span v-if="chapterTransitioning" class="chapter-loading-dots"><i /><i /><i /></span>
       </div>
       <!-- 移动端章节进度条 -->
-      <div class="mobile-chapter-progress" aria-label="当前章节阅读进度">
-        <span :style="mobileProgressStyle"></span>
+      <div class="mobile-chapter-progress" :class="{ 'is-loading': chapterTransitioning }" aria-label="当前章节阅读进度">
+        <span class="reader-progress-fill" :style="mobileProgressStyle"></span>
+        <span v-if="chapterTransitioning" class="chapter-loading-dots" aria-hidden="true"><i /><i /><i /></span>
       </div>
-      <output class="mobile-progress-label" aria-live="polite">{{ progressPercent }}%</output>
+      <output v-if="!chapterTransitioning" class="mobile-progress-label" aria-live="polite">{{ progressPercent }}%</output>
+      <span v-if="chapterTransitioning" class="sr-only" role="status" aria-live="polite">正在加载下一节</span>
     </header>
 
     <aside class="reader-desktop-nav" :class="{ collapsed: desktopNavCollapsed }">
@@ -984,7 +992,6 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       :aria-busy="chapterLoading"
       @scroll.passive="onReadingScroll"
     >
-      <div v-if="chapterLoading && content" class="chapter-transition-status" role="status" aria-live="polite">正在加载章节…</div>
       <div v-if="loading" class="reader-state">正在加载章节…</div>
       <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
       <template v-else-if="content">
