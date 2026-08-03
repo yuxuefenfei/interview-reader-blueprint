@@ -42,7 +42,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
   <section class="admin-view">
     <AdminPageHeader eyebrow="内容资产" title="文档管理" description="查看文档状态，进入版本详情完成修订、发布和草稿清理。">
       <template #actions>
-        <div class="document-header-tools">
+        <div class="document-header-tools ui-action-row ui-action-row--nowrap">
           <el-input v-model="query" class="document-header-search" name="admin-document-search" autocomplete="off" clearable placeholder="搜索文档名称或标识…" :prefix-icon="Search" @keyup.enter="load(true)" @clear="load(true)" />
           <el-tooltip content="刷新文档" placement="bottom">
             <el-button circle :icon="RefreshRight" :loading="loading" aria-label="刷新文档" @click="load(true)" />
@@ -63,7 +63,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         <el-table-column label="最近更新" width="190"><template #default="{ row }">{{ formatTime(row.updatedAt) }}</template></el-table-column>
         <el-table-column label="操作" width="140" fixed="right"><template #default="{ row }"><el-button text type="primary" :icon="View" @click.stop="openTableRow(row)">查看详情</el-button></template></el-table-column>
       </el-table>
-      <div class="table-pager"><span>第 {{ page }} 页</span><div><el-button :disabled="page === 1" @click="previous">上一页</el-button><el-button :disabled="!hasNext" @click="next">下一页</el-button></div></div>
+      <div class="table-pager"><span>第 {{ page }} 页</span><div class="ui-action-row ui-action-row--nowrap"><el-button :disabled="page === 1" @click="previous">上一页</el-button><el-button :disabled="!hasNext" @click="next">下一页</el-button></div></div>
     </el-card>
   </section>
 </template>

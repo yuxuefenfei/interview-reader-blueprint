@@ -30,7 +30,7 @@ const imageLightboxStyle: CSSProperties = {
   padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
   background: "rgba(7, 15, 24, .92)",
 };
-const imageLightboxToolbarStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "8px", minHeight: "44px", color: "#f8fafc" };
+const imageLightboxToolbarStyle: CSSProperties = { justifyContent: "flex-end", minHeight: "44px", color: "#f8fafc" };
 const imageLightboxButtonStyle: CSSProperties = { minHeight: "36px", padding: "0 11px", border: "1px solid rgba(255, 255, 255, .42)", borderRadius: "var(--radius-sm)", background: "rgba(255, 255, 255, .1)", color: "inherit", font: "inherit" };
 const imageLightboxStageStyle: CSSProperties = { minWidth: "0", minHeight: "0", overflow: "auto", display: "grid", placeItems: "center", padding: "16px" };
 const imageLightboxImageStyle = computed<CSSProperties>(() => ({ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", transformOrigin: "center", transition: "transform 140ms ease-out", transform: `scale(${imagePreviewScale.value})` }));
@@ -211,7 +211,7 @@ async function copyCode(block: ContentBlock): Promise<void> {
     <figure v-else-if="block.blockType === 'code'" class="code-block">
       <figcaption>
         <span>{{ codeLanguageName }}</span>
-        <div style="display:flex;align-items:center;gap:4px">
+        <div class="ui-action-row ui-action-row--compact ui-action-row--nowrap">
           <button v-if="showCodeWrapToggle" class="code-copy" type="button" style="width:auto;padding:0 8px" :aria-pressed="!!wrapCode" :aria-label="wrapCode ? '关闭代码自动换行' : '启用代码自动换行'" :title="wrapCode ? '关闭自动换行' : '自动换行'" @click="emit('update:wrapCode', !wrapCode)">换行</button>
           <button class="code-copy" type="button" :aria-label="copyLabel" :title="copyLabel" @click="copyCode(block)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1 2-2v-8a2 2 0 0 1 2-2Z" /></svg>
@@ -277,7 +277,7 @@ async function copyCode(block: ContentBlock): Promise<void> {
         :aria-label="`图片预览：${imageAlt || '图片'}`"
         @click.self="closeImagePreview"
       >
-        <div :style="imageLightboxToolbarStyle">
+        <div class="ui-action-row ui-action-row--nowrap" :style="imageLightboxToolbarStyle">
           <button ref="imagePreviewZoomOut" type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale <= 1" aria-label="缩小图片" @click="adjustImagePreviewScale(-0.25)">−</button>
           <output style="min-width:42px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums" aria-live="polite">{{ Math.round(imagePreviewScale * 100) }}%</output>
           <button ref="imagePreviewZoomIn" type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale >= 3" aria-label="放大图片" @click="adjustImagePreviewScale(0.25)">＋</button>

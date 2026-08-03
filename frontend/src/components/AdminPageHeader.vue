@@ -29,7 +29,7 @@ const emit = defineEmits<{ back: [] }>();
         <slot name="meta" />
       </div>
     </div>
-    <div v-if="$slots.actions" class="admin-page-actions">
+    <div v-if="$slots.actions" class="admin-page-actions ui-action-row ui-action-row--nowrap">
       <slot name="actions" />
     </div>
   </header>

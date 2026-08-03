@@ -101,7 +101,7 @@ async function loadSavedPreview(force = false): Promise<void> {
   <main class="detached-preview-page">
     <header class="detached-preview-header">
       <div><p class="eyebrow">弹出预览</p><strong>{{ document?.title || "草稿预览" }}</strong></div>
-      <div class="detached-preview-actions"><span :class="{ live: connected }">{{ statusLabel }}</span><el-button circle :icon="RefreshRight" aria-label="刷新已保存草稿" title="刷新已保存草稿" @click="loadSavedPreview(true)" /></div>
+      <div class="detached-preview-actions ui-action-row ui-action-row--nowrap"><span :class="{ live: connected }">{{ statusLabel }}</span><el-button circle :icon="RefreshRight" aria-label="刷新已保存草稿" title="刷新已保存草稿" @click="loadSavedPreview(true)" /></div>
     </header>
     <section class="detached-preview-content" v-loading="loading">
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />

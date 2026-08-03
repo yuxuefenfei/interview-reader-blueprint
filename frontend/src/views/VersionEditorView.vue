@@ -901,11 +901,11 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
 
       <main class="editor-content-panel">
         <section v-if="selectedNode" class="node-inspector">
-          <div class="section-heading"><div><p class="eyebrow">当前节点</p><h2>{{ selectedNode.title }}</h2><span class="node-path">{{ nodePath }}</span></div><div class="node-actions"><el-button data-testid="delete-node" type="danger" plain :icon="Delete" :loading="nodeDeleting" :disabled="!canDeleteSelectedNode" :title="deleteNodeTitle" @click="deleteSelectedNode">删除空节点</el-button><el-button data-testid="node-properties-trigger" :icon="Setting" @click="openNodeProperties">节点属性</el-button></div></div>
+          <div class="section-heading"><div><p class="eyebrow">当前节点</p><h2>{{ selectedNode.title }}</h2><span class="node-path">{{ nodePath }}</span></div><div class="node-actions ui-action-row"><el-button data-testid="delete-node" type="danger" plain :icon="Delete" :loading="nodeDeleting" :disabled="!canDeleteSelectedNode" :title="deleteNodeTitle" @click="deleteSelectedNode">删除空节点</el-button><el-button data-testid="node-properties-trigger" :icon="Setting" @click="openNodeProperties">节点属性</el-button></div></div>
         </section>
 
         <section class="block-editor" v-loading="nodeLoading">
-          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions"><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="emptyBlockCount" type="warning" plain :icon="Delete" :loading="cleaningEmptyBlocks" @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
+          <div class="section-heading"><div><p class="eyebrow">内容编辑</p><h2>编辑与阅读预览</h2></div><div class="block-heading-actions ui-action-row"><span>{{ blocks.length }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span><el-button v-if="emptyBlockCount" type="warning" plain :icon="Delete" :loading="cleaningEmptyBlocks" @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）</el-button><el-button type="primary" plain :icon="Plus" :loading="creatingBlock" @click="addBlock">新增内容块</el-button></div></div>
           <div class="editor-content-workbench">
             <aside ref="blockListRef" class="editor-block-list" aria-label="内容块列表">
               <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
@@ -916,7 +916,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
             <section class="block-detail-panel">
               <el-empty v-if="!activeBlock" description="从左侧选择一个内容块开始编辑" :image-size="72" />
               <template v-else>
-                <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><div class="block-detail-actions"><el-button type="danger" plain :icon="Delete" :loading="deletingBlockId === activeBlock.id" @click="deleteActiveBlock">删除</el-button></div></header>
+                <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><div class="block-detail-actions ui-action-row"><el-button type="danger" plain :icon="Delete" :loading="deletingBlockId === activeBlock.id" @click="deleteActiveBlock">删除</el-button></div></header>
                 <div class="block-edit-controls"><el-select v-model="activeBlock.blockType" aria-label="内容块类型" @change="scheduleBlockSave"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="activeBlock.blockType === 'code'" v-model="activeBlock.language" name="block-code-language" autocomplete="off" spellcheck="false" clearable placeholder="例如：Java…" @input="scheduleBlockSave" /></div>
                 <template v-if="activeBlock.blockType === 'image'">
                   <div class="image-block-editor">
@@ -935,7 +935,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         </section>
         <Teleport to="body">
           <aside v-show="previewVisible" ref="previewPanelRef" class="editor-preview-panel" role="region" aria-label="实时预览" :style="{ transform: `translate3d(${previewOffset.x}px, ${previewOffset.y}px, 0)` }">
-            <header><div><p class="eyebrow">实时预览</p><strong>{{ previewNode?.title }}</strong></div><div class="preview-header-actions" @pointerdown.stop><el-radio-group v-model="previewMode" size="small"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="RefreshRight" aria-label="还原实时预览位置" title="还原到右侧" @click="resetPreviewPosition" /><el-button circle :icon="Hide" aria-label="隐藏实时预览" title="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
+            <header><div><p class="eyebrow">实时预览</p><strong>{{ previewNode?.title }}</strong></div><div class="preview-header-actions ui-action-row ui-action-row--nowrap" @pointerdown.stop><el-radio-group v-model="previewMode"><el-radio-button value="block">当前块</el-radio-button><el-radio-button value="node">当前节点</el-radio-button></el-radio-group><el-button circle :icon="RefreshRight" aria-label="还原实时预览位置" title="还原到右侧" @click="resetPreviewPosition" /><el-button circle :icon="Hide" aria-label="隐藏实时预览" title="隐藏实时预览" @click="previewVisible = false" /></div><button class="preview-drag-handle" type="button" aria-label="拖动实时预览" @pointerdown="startPreviewDrag"><el-icon><Rank /></el-icon></button></header>
             <div ref="previewScrollRef" class="editor-preview-scroll">
               <article class="editor-preview-article"><div v-if="previewNode" class="preview-node-meta"><el-tag effect="plain">{{ zh(previewNode.nodeType) }}</el-tag><el-tag v-if="previewNode.semanticRole" type="success" effect="plain">{{ zh(previewNode.semanticRole) }}</el-tag></div><h1>{{ previewHeading }}</h1><div v-for="block in visiblePreviewBlocks" :key="block.id" class="editor-preview-block" :class="{ active: activeBlockId === block.id }" :data-preview-block-id="block.id" @click="activateBlock(block.id)"><ContentBlockView :block="block" :asset-base-url="`/api/admin/versions/${versionId}/editor/assets`" /></div><el-empty v-if="!visiblePreviewBlocks.length" description="暂无可预览内容" :image-size="72" /></article>
             </div>
@@ -1031,7 +1031,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
             <span class="node-property-status" :class="{ dirty: nodeFormDirty, saving: nodeSaving }" aria-live="polite">
               <i aria-hidden="true" />{{ nodePropertyStatusLabel }}
             </span>
-            <div>
+            <div class="ui-action-row ui-action-row--nowrap">
               <el-button data-testid="cancel-node-properties" :disabled="nodeSaving" @click="requestCloseNodeProperties">取消</el-button>
               <el-button
                 data-testid="save-node-properties"

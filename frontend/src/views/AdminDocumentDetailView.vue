@@ -315,7 +315,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         <section v-if="publishedVersion" class="current-version-panel" aria-labelledby="current-version-heading">
           <div class="current-version-identity"><span>{{ document?.status === 'OFFLINE' ? '已保留的发布版本' : '当前线上版本' }}</span><h3 id="current-version-heading">v{{ publishedVersion.versionNo }}</h3><small>发布于 {{ formatTime(publishedVersion.publishedAt || publishedVersion.createdAt) }}</small></div>
           <div class="current-version-meta"><div><el-tag :type="document?.status === 'OFFLINE' ? 'info' : 'success'">{{ zh(document?.status) }}</el-tag><el-tag effect="plain">{{ zh(publishedVersion.sourceType) }}</el-tag></div><strong class="version-file-name">{{ publishedVersion.sourceFileName || '未命名来源文件' }}</strong><span>{{ lineageLabel(publishedVersion) }}</span></div>
-          <div class="current-version-actions">
+          <div class="current-version-actions ui-action-row">
             <el-button :icon="Plus" :loading="isActive(publishedVersion.id, 'create')" :disabled="actionsLocked && !isActive(publishedVersion.id, 'create')" :data-testid="`create-${publishedVersion.id}`" @click="createRevision(publishedVersion)">基于 v{{ publishedVersion.versionNo }} 创建修订</el-button>
             <el-button v-if="document?.status === 'PUBLISHED'" type="warning" plain :loading="isActive(documentId, 'take-down')" :disabled="actionsLocked && !isActive(documentId, 'take-down')" :data-testid="`take-down-${publishedVersion.id}`" @click="takeDown">下架</el-button>
           </div>
@@ -326,7 +326,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
           <article v-for="version in historyVersions" :key="version.id" :data-version-id="version.id" class="version-row" :class="{ 'latest-draft': isLatestDraft(version), 'branch-draft': isBranchDraft(version) }">
             <div class="version-number"><strong>v{{ version.versionNo }}</strong><span>{{ formatTime(version.createdAt) }}</span></div>
             <div class="version-meta"><div><el-tag :type="version.status === 'DRAFT' ? 'warning' : 'info'">{{ versionStatusLabel(version) }}</el-tag><el-tag effect="plain">{{ zh(version.sourceType) }}</el-tag></div><strong class="version-file-name">{{ version.sourceFileName || '未命名来源文件' }}</strong><span class="version-lineage">{{ lineageLabel(version) }}</span><span v-if="isBranchDraft(version)" class="version-branch-warning">不包含当前线上版本的后续变更，发布前请核对内容。</span></div>
-            <div class="version-row-actions">
+            <div class="version-row-actions ui-action-row">
               <template v-if="version.status === 'DRAFT'">
                 <el-button type="primary" :icon="EditPen" :disabled="actionsLocked" :data-testid="`edit-${version.id}`" @click="editVersion(version)">继续编辑</el-button>
                 <el-button type="success" plain :icon="CircleCheckFilled" :loading="isActive(version.id, 'publish')" :disabled="actionsLocked && !isActive(version.id, 'publish')" :data-testid="`publish-${version.id}`" @click="publish(version)">发布 v{{ version.versionNo }}</el-button>
@@ -345,7 +345,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
         <el-form-item label="描述"><el-input v-model="metadataForm.description" name="document-description" autocomplete="off" type="textarea" :rows="4" maxlength="5000" show-word-limit /></el-form-item>
         <el-form-item label="标签"><el-select v-model="metadataForm.tags" name="document-tags" multiple filterable allow-create default-first-option :multiple-limit="20" placeholder="输入标签后按回车…"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select><span class="form-help">最多 20 个，单个标签最多 50 个字符；标签忽略大小写去重。</span></el-form-item>
       </el-form>
-      <template #footer><el-button :disabled="metadataSaving" @click="metadataDialogVisible = false">取消</el-button><el-button type="primary" :loading="metadataSaving" data-testid="save-document-metadata" @click="saveMetadata">保存并立即生效</el-button></template>
+      <template #footer><div class="ui-action-row ui-action-row--end"><el-button :disabled="metadataSaving" @click="metadataDialogVisible = false">取消</el-button><el-button type="primary" :loading="metadataSaving" data-testid="save-document-metadata" @click="saveMetadata">保存并立即生效</el-button></div></template>
     </el-dialog>
   </section>
 </template>

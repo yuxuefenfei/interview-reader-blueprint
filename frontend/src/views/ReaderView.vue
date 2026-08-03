@@ -1064,7 +1064,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         <strong :title="activeNode?.title || selected?.title || '阅读器'">{{ activeNode?.title || selected?.title || "阅读器" }}</strong>
         <span :title="selected?.title">{{ selected?.title }}</span>
       </div>
-      <div class="reader-header-actions">
+      <div class="reader-header-actions ui-action-row ui-action-row--nowrap">
         <button
           class="reader-header-search-trigger"
           type="button"
