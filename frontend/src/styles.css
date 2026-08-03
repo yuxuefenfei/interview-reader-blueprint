@@ -416,7 +416,9 @@ select:focus-visible {
 .reader-heading strong { font-size: 15px; }
 .reader-heading span { color: var(--reader-muted); font-size: 12px; }
 .reader-header-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.reader-account-menu { display: none; }
+/* Keep the responsive account menu stronger than Element Plus' lazy-loaded
+   .el-dropdown { display: inline-flex } rule. */
+.reader-header-actions > .reader-account-menu { display: none; }
 .mobile-chapter-progress, .mobile-progress-label { display: none; }
 
 .reader-desktop-nav {
@@ -1636,11 +1638,13 @@ select:focus-visible {
 .comfort-option-grid button:hover { border-color: var(--brand-500); color: var(--brand-700); }
 .comfort-option-grid button.active { border-color: var(--brand-500); background: var(--brand-100); color: var(--brand-700); font-weight: 700; }
 @media (max-width: 1100px) and (min-width: 761px) {
-  .reader-comfort-button > span, .reader-admin-link, .reader-logout-button { display: none; }
-  .reader-account-menu { display: flex; }
+  .reader-comfort-button > span,
+  .reader-header-actions > .reader-admin-link,
+  .reader-header-actions > .reader-logout-button { display: none; }
+  .reader-header-actions > .reader-account-menu { display: inline-flex; }
 }
 @media (max-width: 760px) {
-  .reader-account-menu { display: none !important; }
+  .reader-header-actions > .reader-account-menu { display: none; }
   .reader-comfort-mobile { display: inline-flex; }
   .reader-header-search-trigger, .reader-theme-trigger, .reader-comfort-mobile { width: 44px; min-width: 44px; min-height: 44px; justify-content: center; padding: 0; border: 0; }
   .reader-header-search-trigger .reader-search-placeholder,
