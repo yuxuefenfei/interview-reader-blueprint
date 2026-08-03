@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.update.UpdateWrapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,8 +30,11 @@ import static com.example.interviewreader.persistence.entity.table.ReadingProgre
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentQueryService {
     private static final String LOCAL_USER_ID = AppConstants.LOCAL_USER_ID.toString();
+    private static final int MAX_SEARCH_NODE_CANDIDATES = 500;
+    private static final int MAX_SEARCH_BLOCK_CANDIDATES = 2_000;
 
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
@@ -107,56 +111,23 @@ public class DocumentQueryService {
         return progress == null ? null : getDocument(uuid(progress.getDocumentId()));
     }
 
-    @Transactional
-    public void publish(UUID documentId, UUID versionId) {
-        var targetDocument = documentMapper.selectOneById(id(documentId));
-        if (targetDocument == null) throw new ApiException(HttpStatus.NOT_FOUND, "Document not found");
-        if (DocumentStatus.isDeletionLocked(targetDocument.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
-        }
-        var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
-                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
-                .from(DOCUMENT_VERSION_ENTITY)
-                .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(versionId)))
-                .and(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId))));
-        if (version == null) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Version not found");
-        }
-        if (version.getStatus() != DocumentVersionStatus.DRAFT) {
-            throw new ApiException(HttpStatus.CONFLICT, "Only a draft version can be published");
-        }
-        var previousVersionId = previousPublishedVersionId(documentId, versionId);
-        var now = OffsetDateTime.now();
-        for (var published : publishedVersions(documentId)) {
-            if (!published.getId().equals(id(versionId))) {
-                published.setStatus(DocumentVersionStatus.RETIRED);
-                documentVersionMapper.update(published);
-            }
-        }
-        version.setStatus(DocumentVersionStatus.PUBLISHED);
-        version.setPublishedAt(now);
-        documentVersionMapper.update(version);
-
-        {
-            targetDocument.setStatus(DocumentStatus.PUBLISHED);
-            targetDocument.setCurrentVersionId(id(versionId));
-            targetDocument.setUpdatedAt(now);
-            documentMapper.update(targetDocument);
-        }
-        migrateReadingProgress(documentId, previousVersionId, versionId);
-    }
-
     public List<TocNode> toc(UUID versionId) {
-        ensurePublishedVersion(versionId);
+        ensureReadableVersion(versionId);
         var rows = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .select(
+                        CONTENT_NODE_ENTITY.ID,
+                        CONTENT_NODE_ENTITY.PARENT_ID,
+                        CONTENT_NODE_ENTITY.TITLE,
+                        CONTENT_NODE_ENTITY.LEVEL,
+                        CONTENT_NODE_ENTITY.NODE_TYPE,
+                        CONTENT_NODE_ENTITY.SEMANTIC_ROLE,
+                        CONTENT_NODE_ENTITY.ANCHOR,
+                        CONTENT_NODE_ENTITY.SOURCE_PAGE_START,
+                        CONTENT_NODE_ENTITY.SORT_ORDER)
                 .from(CONTENT_NODE_ENTITY)
                 .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(versionId)))
                 .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
-        if (rows.isEmpty()) {
-            ensureVersionExists(versionId);
-            return List.of();
-        }
+        if (rows.isEmpty()) return List.of();
         var byId = new LinkedHashMap<String, MutableTocNode>();
         var mutableRows = rows.stream().map(this::mapMutableTocNode).toList();
         mutableRows.forEach(row -> byId.put(row.id, row));
@@ -176,11 +147,20 @@ public class DocumentQueryService {
     }
 
     public NodeContent content(UUID versionId, UUID nodeId, Integer afterSeq, Integer limit) {
-        ensurePublishedVersion(versionId);
+        ensureReadableVersion(versionId);
         var node = node(versionId, nodeId);
         var safeLimit = Math.clamp(limit == null ? 50 : limit, 1, 100);
         var rows = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .select(
+                        CONTENT_BLOCK_ENTITY.ID,
+                        CONTENT_BLOCK_ENTITY.BLOCK_KEY,
+                        CONTENT_BLOCK_ENTITY.SEQ,
+                        CONTENT_BLOCK_ENTITY.BLOCK_TYPE,
+                        CONTENT_BLOCK_ENTITY.PAYLOAD,
+                        CONTENT_BLOCK_ENTITY.PLAIN_TEXT,
+                        CONTENT_BLOCK_ENTITY.SOURCE_PAGE,
+                        CONTENT_BLOCK_ENTITY.SOURCE_BBOX,
+                        CONTENT_BLOCK_ENTITY.CONFIDENCE)
                 .from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(id(versionId)))
                 .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(id(nodeId)))
@@ -201,50 +181,69 @@ public class DocumentQueryService {
         }
         var safeLimit = Math.clamp(limit == null ? 20 : limit, 1, 100);
         var needle = q.trim();
-        var searchLimit = documentId == null ? safeLimit * 4 : safeLimit * 8;
-        var blockQuery = QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_BLOCK_ENTITY)
-                .innerJoin(CONTENT_NODE_ENTITY).on(CONTENT_BLOCK_ENTITY.NODE_ID.eq(CONTENT_NODE_ENTITY.ID))
-                .innerJoin(DOCUMENT_VERSION_ENTITY).on(CONTENT_NODE_ENTITY.VERSION_ID.eq(DOCUMENT_VERSION_ENTITY.ID))
-                .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
-                .where(CONTENT_BLOCK_ENTITY.PLAIN_TEXT.like(needle))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED))
-                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
-                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .orderBy(CONTENT_BLOCK_ENTITY.VERSION_ID.asc(), CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc())
-                .limit(searchLimit);
         var nodeQuery = QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .select(
+                        CONTENT_NODE_ENTITY.ID,
+                        CONTENT_NODE_ENTITY.VERSION_ID,
+                        CONTENT_NODE_ENTITY.PARENT_ID,
+                        CONTENT_NODE_ENTITY.TITLE,
+                        CONTENT_NODE_ENTITY.PATH,
+                        CONTENT_NODE_ENTITY.SEARCH_TEXT)
                 .from(CONTENT_NODE_ENTITY)
                 .innerJoin(DOCUMENT_VERSION_ENTITY).on(CONTENT_NODE_ENTITY.VERSION_ID.eq(DOCUMENT_VERSION_ENTITY.ID))
                 .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
-                .where(CONTENT_NODE_ENTITY.TITLE.like(needle))
+                .where(CONTENT_NODE_ENTITY.SEARCH_TEXT.like(needle))
                 .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED))
                 .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
-                .orderBy(CONTENT_NODE_ENTITY.PATH.asc())
-                .limit(searchLimit);
+                .orderBy(CONTENT_NODE_ENTITY.VERSION_ID.asc(), CONTENT_NODE_ENTITY.PATH.asc())
+                .limit(MAX_SEARCH_NODE_CANDIDATES + 1);
         if (documentId != null) {
-            blockQuery.and(DOCUMENT_ENTITY.ID.eq(id(documentId)));
             nodeQuery.and(DOCUMENT_ENTITY.ID.eq(id(documentId)));
         }
-        var matchedBlocks = contentBlockMapper.selectListByQuery(blockQuery);
-        var titleMatchedNodes = contentNodeMapper.selectListByQuery(nodeQuery);
-
-        var nodeIds = new ArrayList<String>();
-        matchedBlocks.stream().map(ContentBlockEntity::getNodeId).distinct().forEach(nodeIds::add);
-        titleMatchedNodes.stream().map(ContentNodeEntity::getId).filter(id -> !nodeIds.contains(id)).forEach(nodeIds::add);
-        if (nodeIds.isEmpty()) {
+        var nodeCandidates = contentNodeMapper.selectListByQuery(nodeQuery);
+        if (nodeCandidates.size() > MAX_SEARCH_NODE_CANDIDATES) {
+            log.warn("Reader search node candidate limit reached: queryLength={}, documentScoped={}, limit={}",
+                    needle.length(), documentId != null, MAX_SEARCH_NODE_CANDIDATES);
+            nodeCandidates = nodeCandidates.subList(0, MAX_SEARCH_NODE_CANDIDATES);
+        }
+        if (nodeCandidates.isEmpty()) {
             return List.of();
         }
 
-        var nodesById = nodesById(nodeIds);
+        var nodeIds = nodeCandidates.stream().map(ContentNodeEntity::getId).toList();
+        var blockQuery = QueryWrapper.create()
+                .select(
+                        CONTENT_BLOCK_ENTITY.ID,
+                        CONTENT_BLOCK_ENTITY.NODE_ID,
+                        CONTENT_BLOCK_ENTITY.SEQ,
+                        CONTENT_BLOCK_ENTITY.PLAIN_TEXT)
+                .from(CONTENT_BLOCK_ENTITY)
+                .where(CONTENT_BLOCK_ENTITY.NODE_ID.in(nodeIds))
+                .and(CONTENT_BLOCK_ENTITY.PLAIN_TEXT.like(needle))
+                .orderBy(CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc())
+                .limit(MAX_SEARCH_BLOCK_CANDIDATES + 1);
+        var matchedBlocks = contentBlockMapper.selectListByQuery(blockQuery);
+        if (matchedBlocks.size() > MAX_SEARCH_BLOCK_CANDIDATES) {
+            log.warn("Reader search block candidate limit reached: queryLength={}, documentScoped={}, limit={}",
+                    needle.length(), documentId != null, MAX_SEARCH_BLOCK_CANDIDATES);
+            matchedBlocks = matchedBlocks.subList(0, MAX_SEARCH_BLOCK_CANDIDATES);
+        }
+
+        var nodesById = nodeCandidates.stream().collect(
+                java.util.stream.Collectors.toMap(
+                        ContentNodeEntity::getId,
+                        node -> node,
+                        (left, right) -> left,
+                        LinkedHashMap::new));
         var bodyMatchedNodeIds = matchedBlocks.stream()
                 .map(ContentBlockEntity::getNodeId)
                 .collect(java.util.stream.Collectors.toSet());
-        var missingTitleBlockNodeIds = titleMatchedNodes.stream()
+        var titleMatchedNodeIds = nodeCandidates.stream()
+                .filter(node -> containsIgnoreCase(node.getTitle(), needle))
                 .map(ContentNodeEntity::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        var missingTitleBlockNodeIds = titleMatchedNodeIds.stream()
                 .filter(nodeId -> !bodyMatchedNodeIds.contains(nodeId))
                 .toList();
         if (!missingTitleBlockNodeIds.isEmpty()) {
@@ -257,9 +256,6 @@ public class DocumentQueryService {
         var documentIds = versionsById.values().stream().map(DocumentVersionEntity::getDocumentId).distinct().toList();
         var documentsById = documentsById(documentIds);
         var nodesWithAncestors = nodesIncludingAncestors(nodesById.values());
-        var titleMatchedNodeIds = titleMatchedNodes.stream()
-                .map(ContentNodeEntity::getId)
-                .collect(java.util.stream.Collectors.toSet());
 
         var rankedHits = new ArrayList<RankedSearchHit>();
         for (var block : matchedBlocks) {
@@ -297,25 +293,16 @@ public class DocumentQueryService {
         return rankedHits.stream().limit(safeLimit).map(RankedSearchHit::hit).toList();
     }
 
-    private Map<String, ContentNodeEntity> nodesById(List<String> nodeIds) {
-        if (nodeIds.isEmpty()) {
-            return Map.of();
-        }
-        var rows = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_NODE_ENTITY)
-                .where(CONTENT_NODE_ENTITY.ID.in(nodeIds)));
-        var result = new LinkedHashMap<String, ContentNodeEntity>();
-        rows.forEach(row -> result.put(row.getId(), row));
-        return result;
-    }
-
     private List<ContentBlockEntity> firstBlocksInNodes(List<String> nodeIds) {
         if (nodeIds.isEmpty()) {
             return List.of();
         }
         var rows = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .select(
+                        CONTENT_BLOCK_ENTITY.ID,
+                        CONTENT_BLOCK_ENTITY.NODE_ID,
+                        CONTENT_BLOCK_ENTITY.SEQ,
+                        CONTENT_BLOCK_ENTITY.PLAIN_TEXT)
                 .from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.NODE_ID.in(nodeIds))
                 .orderBy(CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc()));
@@ -331,7 +318,7 @@ public class DocumentQueryService {
             return Map.of();
         }
         var rows = documentVersionMapper.selectListByQuery(QueryWrapper.create()
-                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .select(DOCUMENT_VERSION_ENTITY.ID, DOCUMENT_VERSION_ENTITY.DOCUMENT_ID)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.ID.in(versionIds))
                 .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
@@ -345,7 +332,7 @@ public class DocumentQueryService {
             return Map.of();
         }
         var rows = documentMapper.selectListByQuery(QueryWrapper.create()
-                .select(DOCUMENT_ENTITY.ALL_COLUMNS)
+                .select(DOCUMENT_ENTITY.ID, DOCUMENT_ENTITY.TITLE, DOCUMENT_ENTITY.OWNER_ID)
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.ID.in(documentIds))
                 .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
@@ -449,7 +436,16 @@ public class DocumentQueryService {
 
     private TocNode node(UUID versionId, UUID nodeId) {
         var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .select(
+                        CONTENT_NODE_ENTITY.ID,
+                        CONTENT_NODE_ENTITY.PARENT_ID,
+                        CONTENT_NODE_ENTITY.TITLE,
+                        CONTENT_NODE_ENTITY.LEVEL,
+                        CONTENT_NODE_ENTITY.NODE_TYPE,
+                        CONTENT_NODE_ENTITY.SEMANTIC_ROLE,
+                        CONTENT_NODE_ENTITY.ANCHOR,
+                        CONTENT_NODE_ENTITY.SOURCE_PAGE_START,
+                        CONTENT_NODE_ENTITY.SORT_ORDER)
                 .from(CONTENT_NODE_ENTITY)
                 .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(id(versionId)))
                 .and(CONTENT_NODE_ENTITY.ID.eq(id(nodeId))));
@@ -459,72 +455,26 @@ public class DocumentQueryService {
         return mapMutableTocNode(node).toDto();
     }
 
-    private void ensureVersionExists(UUID versionId) {
-        if (documentVersionMapper.selectOneById(id(versionId)) == null) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Version not found");
-        }
-    }
-
-    private void ensurePublishedVersion(UUID versionId) {
+    public void ensureReadableVersion(UUID versionId) {
         var version = documentVersionMapper.selectOneByQuery(QueryWrapper.create()
                 .select(DOCUMENT_VERSION_ENTITY.ID)
                 .from(DOCUMENT_VERSION_ENTITY)
+                .innerJoin(DOCUMENT_ENTITY).on(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(DOCUMENT_ENTITY.ID))
                 .where(DOCUMENT_VERSION_ENTITY.ID.eq(id(versionId)))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
+                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED))
+                .and(DOCUMENT_ENTITY.STATUS.eq(DocumentStatus.PUBLISHED))
+                .and(DOCUMENT_ENTITY.CURRENT_VERSION_ID.eq(DOCUMENT_VERSION_ENTITY.ID))
+                .and(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID)));
         if (version == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Published version not found");
         }
     }
 
-    private UUID previousPublishedVersionId(UUID documentId, UUID nextVersionId) {
-        var versions = documentVersionMapper.selectListByQuery(QueryWrapper.create()
-                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
-                .from(DOCUMENT_VERSION_ENTITY)
-                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
-        return versions.stream()
-                .filter(version -> !version.getId().equals(id(nextVersionId)))
-                .max(Comparator
-                        .comparing(DocumentVersionEntity::getPublishedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparingInt(DocumentVersionEntity::getVersionNo))
-                .map(version -> uuid(version.getId()))
-                .orElse(null);
+    public void ensureReadableNode(UUID versionId, UUID nodeId) {
+        ensureReadableVersion(versionId);
+        node(versionId, nodeId);
     }
 
-    private List<DocumentVersionEntity> publishedVersions(UUID documentId) {
-        return documentVersionMapper.selectListByQuery(QueryWrapper.create()
-                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
-                .from(DOCUMENT_VERSION_ENTITY)
-                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
-                .and(DOCUMENT_VERSION_ENTITY.STATUS.eq(DocumentVersionStatus.PUBLISHED)));
-    }
-
-    private void migrateReadingProgress(UUID documentId, UUID previousVersionId, UUID nextVersionId) {
-        if (previousVersionId == null || previousVersionId.equals(nextVersionId)) {
-            return;
-        }
-        var rows = readingProgressMapper.selectListByQuery(QueryWrapper.create()
-                .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
-                .from(READING_PROGRESS_ENTITY)
-                .where(READING_PROGRESS_ENTITY.USER_ID.eq(LOCAL_USER_ID))
-                .and(READING_PROGRESS_ENTITY.DOCUMENT_ID.eq(id(documentId))));
-        for (var row : rows) {
-            var update = UpdateWrapper.of(ReadingProgressEntity.class)
-                    .set(READING_PROGRESS_ENTITY.VERSION_ID, id(nextVersionId))
-                    .set(READING_PROGRESS_ENTITY.SECTION_ID, null)
-                    .set(READING_PROGRESS_ENTITY.BLOCK_ID, null)
-                    .set(READING_PROGRESS_ENTITY.CHAR_OFFSET, 0)
-                    .set(READING_PROGRESS_ENTITY.BLOCK_VIEWPORT_OFFSET, 0)
-                    .set(READING_PROGRESS_ENTITY.PROGRESS_RATIO, BigDecimal.ZERO)
-                    .set(READING_PROGRESS_ENTITY.REVISION, row.getRevision() + 1)
-                    .set(READING_PROGRESS_ENTITY.UPDATED_AT, OffsetDateTime.now());
-            readingProgressMapper.updateByQuery(
-                    update.toEntity(),
-                    false,
-                    QueryWrapper.create().where(READING_PROGRESS_ENTITY.ID.eq(row.getId()))
-            );
-        }
-    }
     private ReadingProgressEntity progress(UUID documentId) {
         return readingProgressMapper.selectOneByQuery(QueryWrapper.create()
                 .select(READING_PROGRESS_ENTITY.ALL_COLUMNS)
@@ -563,7 +513,11 @@ public class DocumentQueryService {
                 break;
             }
             var parents = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                    .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                    .select(
+                            CONTENT_NODE_ENTITY.ID,
+                            CONTENT_NODE_ENTITY.VERSION_ID,
+                            CONTENT_NODE_ENTITY.PARENT_ID,
+                            CONTENT_NODE_ENTITY.TITLE)
                     .from(CONTENT_NODE_ENTITY)
                     .where(CONTENT_NODE_ENTITY.ID.in(pendingParentIds))
                     .and(CONTENT_NODE_ENTITY.VERSION_ID.in(versionIds)));

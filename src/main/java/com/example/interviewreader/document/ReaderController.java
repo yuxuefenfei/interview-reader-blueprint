@@ -2,8 +2,6 @@ package com.example.interviewreader.document;
 
 import com.example.interviewreader.document.DocumentDtos.NodeContent;
 import com.example.interviewreader.document.DocumentDtos.TocNode;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
@@ -22,7 +21,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ReaderController {
     private final DocumentQueryService service;
-    private final ObjectMapper objectMapper;
 
 
     @GetMapping("/{versionId}/toc")
@@ -30,11 +28,12 @@ public class ReaderController {
             @PathVariable UUID versionId,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch
     ) {
-        var toc = service.toc(versionId);
-        var etag = etag(toc);
+        var etag = etag("toc", versionId);
         if (matches(ifNoneMatch, etag)) {
+            service.ensureReadableVersion(versionId);
             return notModified(etag);
         }
+        var toc = service.toc(versionId);
         return ResponseEntity.ok()
                 .eTag(etag)
                 .cacheControl(CacheControl.noCache())
@@ -49,11 +48,14 @@ public class ReaderController {
             @RequestParam(required = false) Integer limit,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch
     ) {
-        var content = service.content(versionId, nodeId, afterSeq, limit);
-        var etag = etag(content);
+        var normalizedAfterSeq = Math.max(afterSeq == null ? 0 : afterSeq, 0);
+        var normalizedLimit = Math.clamp(limit == null ? 50 : limit, 1, 100);
+        var etag = etag("content", versionId, nodeId, normalizedAfterSeq, normalizedLimit);
         if (matches(ifNoneMatch, etag)) {
+            service.ensureReadableNode(versionId, nodeId);
             return notModified(etag);
         }
+        var content = service.content(versionId, nodeId, afterSeq, limit);
         return ResponseEntity.ok()
                 .eTag(etag)
                 .cacheControl(CacheControl.noCache())
@@ -67,11 +69,14 @@ public class ReaderController {
                 .build();
     }
 
-    private String etag(Object body) {
+    private String etag(Object... components) {
         try {
-            var digest = MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(body));
+            var value = java.util.Arrays.stream(components)
+                    .map(String::valueOf)
+                    .collect(java.util.stream.Collectors.joining(":"));
+            var digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
             return '"' + HexFormat.of().formatHex(digest) + '"';
-        } catch (JsonProcessingException | NoSuchAlgorithmException exception) {
+        } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("Unable to build response ETag", exception);
         }
     }

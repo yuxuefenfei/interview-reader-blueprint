@@ -6,7 +6,7 @@ export const readerApi = {
   login: (username: string, password: string) => http.post<AuthSession>("/auth/login", { username, password }).then(({ data }) => data),
   logout: () => http.post<AuthSession>("/auth/logout").then(({ data }) => data),
   deletedDocuments: () => http.get<DeletedDocumentTombstone[]>("/reader/document-deletions").then(({ data }) => data),
-  documents: (query = "", cursor: string | null = null, limit = 16) => http.get<DocumentListResponse>("/reader/documents", { params: { query: query || undefined, cursor: cursor || undefined, limit } }).then(({ data }) => data),
+  documents: (query = "", cursor: string | null = null, limit = 16, signal?: AbortSignal) => http.get<DocumentListResponse>("/reader/documents", { params: { query: query || undefined, cursor: cursor || undefined, limit }, signal }).then(({ data }) => data),
   document: (documentId: string) => http.get<DocumentSummary>(`/reader/documents/${documentId}`).then(({ data }) => data),
   toc: (versionId: string) => http.get<TocNode[]>(`/reader/versions/${versionId}/toc`).then(({ data }) => data),
   content: (versionId: string, nodeId: string, afterSeq?: number, signal?: AbortSignal) => http.get<NodeContent>(`/reader/versions/${versionId}/nodes/${nodeId}/content`, { params: { afterSeq, limit: 100 }, signal }).then(({ data }) => data),

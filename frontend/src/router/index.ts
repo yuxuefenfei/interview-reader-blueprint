@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { ADMIN_MOBILE_MEDIA_QUERY } from "../shared/responsive";
+import { canUseOfflineReader } from "../offline/offlineAccess";
 
 const ReaderView = () => import("../views/ReaderView.vue");
 const AdminLayout = () => import("../layouts/AdminLayout.vue");
@@ -35,6 +36,7 @@ const requiresDesktopAdminViewport = (path: string): boolean =>
   isAdminPath(path) && !isDetachedPreviewPath(path);
 
 router.beforeEach((to) => {
+  if (requiresDesktopAdminViewport(to.path) && canUseOfflineReader()) return "/reader";
   if (requiresDesktopAdminViewport(to.path) && adminViewport.matches) return "/reader";
   return true;
 });

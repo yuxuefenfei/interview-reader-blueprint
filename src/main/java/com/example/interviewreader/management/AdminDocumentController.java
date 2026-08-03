@@ -159,12 +159,6 @@ public class AdminDocumentController {
     ) {
         return service.cleanupEmptyBlocks(versionId, request);
     }
-    /** Kept temporarily for external clients that still save a complete package. */
-    @PutMapping("/versions/{versionId}/editor")
-    public ManagementDtos.EditableVersion save(@PathVariable UUID versionId, @Valid @RequestBody ManagementDtos.SaveDraftRequest request) {
-        return service.save(versionId, request);
-    }
-
     @DeleteMapping("/versions/{versionId}/editor")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteDraft(@PathVariable UUID versionId) {

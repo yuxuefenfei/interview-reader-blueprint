@@ -1,71 +1,125 @@
-export const SOURCE_TYPES = ["PDF", "EXCEL", "JSON_PACKAGE", "MARKDOWN", "MANUAL"] as const;
-export type SourceType = typeof SOURCE_TYPES[number];
+import type {
+  AdminDocumentPage as GeneratedAdminDocumentPage,
+  AdminDocumentSummary as GeneratedAdminDocumentSummary,
+  AssetInfo as GeneratedAssetInfo,
+  AuthSession as GeneratedAuthSession,
+  BlockMutationResult as GeneratedBlockMutationResult,
+  BlockType as GeneratedBlockType,
+  ContentBlock as GeneratedContentBlock,
+  DeletedDocumentTombstone as GeneratedDeletedDocumentTombstone,
+  DeletionJob as GeneratedDeletionJob,
+  DeletionJobStatus as GeneratedDeletionJobStatus,
+  DeletionStage as GeneratedDeletionStage,
+  DocumentInfo as GeneratedDocumentInfo,
+  DocumentMetadata as GeneratedDocumentMetadata,
+  DocumentPackage as GeneratedDocumentPackage,
+  DocumentPackageBlock as GeneratedDocumentPackageBlock,
+  DocumentPackageSection as GeneratedDocumentPackageSection,
+  DocumentPage as GeneratedDocumentPage,
+  DocumentStatus as GeneratedDocumentStatus,
+  DocumentSummary as GeneratedDocumentSummary,
+  DocumentVersion as GeneratedDocumentVersion,
+  EditorBlock as GeneratedEditorBlock,
+  EditorDocument as GeneratedEditorDocument,
+  EditorNode as GeneratedEditorNode,
+  EditorSnapshot as GeneratedEditorSnapshot,
+  ExistingDocumentMatch as GeneratedExistingDocumentMatch,
+  ImageBlockUploadResult as GeneratedImageBlockUploadResult,
+  ImportDocumentPreview as GeneratedImportDocumentPreview,
+  ImportIssue as GeneratedImportIssue,
+  ImportIssueSeverity as GeneratedImportIssueSeverity,
+  ImportJob as GeneratedImportJob,
+  ImportResolution as GeneratedImportResolution,
+  ImportStage as GeneratedImportStage,
+  ImportStatus as GeneratedImportStatus,
+  MasteryState as GeneratedMasteryState,
+  NodeBlocksPage as GeneratedNodeBlocksPage,
+  NodeContent as GeneratedNodeContent,
+  NodeType as GeneratedNodeType,
+  ReadingProgress as GeneratedReadingProgress,
+  SearchHit as GeneratedSearchHit,
+  SemanticRole as GeneratedSemanticRole,
+  SourceBbox as GeneratedSourceBbox,
+  SourceType as GeneratedSourceType,
+  StructureNode as GeneratedStructureNode,
+  TocNode as GeneratedTocNode,
+  VersionInfo as GeneratedVersionInfo,
+  VersionStatus as GeneratedVersionStatus,
+  VersionSummary as GeneratedVersionSummary
+} from "../generated/api";
 
-export const NODE_TYPES = ["PART", "CHAPTER", "SECTION", "SUBSECTION", "QUESTION", "APPENDIX", "OTHER"] as const;
-export type NodeType = typeof NODE_TYPES[number];
+export const SOURCE_TYPES = ["PDF", "EXCEL", "JSON_PACKAGE", "MARKDOWN", "MANUAL"] as const satisfies readonly GeneratedSourceType[];
+export type SourceType = GeneratedSourceType;
 
-export const BLOCK_TYPES = ["paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote", "callout", "formula", "image", "divider", "table_snapshot"] as const;
-export type BlockType = typeof BLOCK_TYPES[number];
+export const NODE_TYPES = ["PART", "CHAPTER", "SECTION", "SUBSECTION", "QUESTION", "APPENDIX", "OTHER"] as const satisfies readonly GeneratedNodeType[];
+export type NodeType = GeneratedNodeType;
 
-export const SEMANTIC_ROLES = ["QUESTION", "ANSWER", "EXPLANATION", "CONCLUSION", "INTRODUCTION", "DIRECTORY", "PRINCIPLE", "PRACTICE", "PITFALL", "FOLLOW_UP"] as const;
-export type SemanticRole = typeof SEMANTIC_ROLES[number];
+export const BLOCK_TYPES = ["paragraph", "heading_note", "unordered_list", "ordered_list", "code", "table", "quote", "callout", "formula", "image", "divider", "table_snapshot"] as const satisfies readonly GeneratedBlockType[];
+export type BlockType = GeneratedBlockType;
 
-export const MASTERY_STATES = ["UNKNOWN", "HARD", "FUZZY", "KNOWN"] as const;
-export type MasteryState = typeof MASTERY_STATES[number];
+export const SEMANTIC_ROLES = ["QUESTION", "ANSWER", "EXPLANATION", "CONCLUSION", "INTRODUCTION", "DIRECTORY", "PRINCIPLE", "PRACTICE", "PITFALL", "FOLLOW_UP"] as const satisfies readonly GeneratedSemanticRole[];
+export type SemanticRole = GeneratedSemanticRole;
 
-export const VERSION_STATUSES = ["DRAFT", "PUBLISHED", "RETIRED"] as const;
-export const DOCUMENT_STATUSES = ["DRAFT", "PUBLISHED", "OFFLINE", "DELETING", "DELETE_FAILED"] as const;
-export type DocumentStatus = typeof DOCUMENT_STATUSES[number];
-export const DELETION_JOB_STATUSES = ["QUEUED", "RUNNING", "FAILED", "COMPLETED"] as const;
-export type DeletionJobStatus = typeof DELETION_JOB_STATUSES[number];
-export const DELETION_STAGES = ["QUEUED", "CLIENT_SYNC_MARKED", "DELETING_FILES", "DELETING_DATA", "COMPLETED", "FAILED"] as const;
-export type DeletionStage = typeof DELETION_STAGES[number];
-export type VersionStatus = typeof VERSION_STATUSES[number];
+export const MASTERY_STATES = ["UNKNOWN", "HARD", "FUZZY", "KNOWN"] as const satisfies readonly GeneratedMasteryState[];
+export type MasteryState = GeneratedMasteryState;
 
-export const IMPORT_STATUSES = ["UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING", "READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED"] as const;
-export type ImportStatus = typeof IMPORT_STATUSES[number];
+export const VERSION_STATUSES = ["DRAFT", "PUBLISHED", "RETIRED"] as const satisfies readonly GeneratedVersionStatus[];
+export type VersionStatus = GeneratedVersionStatus;
 
-export const IMPORT_STAGES = ["UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING", "READY", "REVIEW_REQUIRED", "REVIEWING", "FAILED", "CANCELED", "COMMITTED", "DRAFT_DISCARDED"] as const;
-export type ImportStage = typeof IMPORT_STAGES[number];
+export const DOCUMENT_STATUSES = ["DRAFT", "PUBLISHED", "OFFLINE", "DELETING", "DELETE_FAILED"] as const satisfies readonly GeneratedDocumentStatus[];
+export type DocumentStatus = GeneratedDocumentStatus;
+
+export const DELETION_JOB_STATUSES = ["QUEUED", "RUNNING", "FAILED", "COMPLETED"] as const satisfies readonly GeneratedDeletionJobStatus[];
+export type DeletionJobStatus = GeneratedDeletionJobStatus;
+
+export const DELETION_STAGES = ["QUEUED", "CLIENT_SYNC_MARKED", "DELETING_FILES", "DELETING_DATA", "COMPLETED", "FAILED"] as const satisfies readonly GeneratedDeletionStage[];
+export type DeletionStage = GeneratedDeletionStage;
+
+export const IMPORT_STATUSES = ["UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING", "READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED"] as const satisfies readonly GeneratedImportStatus[];
+export type ImportStatus = GeneratedImportStatus;
+
+export const IMPORT_STAGES = ["UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING", "READY", "REVIEW_REQUIRED", "REVIEWING", "FAILED", "CANCELED", "COMMITTED", "DRAFT_DISCARDED"] as const satisfies readonly GeneratedImportStage[];
+export type ImportStage = GeneratedImportStage;
+
+export const IMPORT_RESOLUTIONS = ["CREATE_NEW", "IMPORT_AS_NEW_VERSION"] as const satisfies readonly GeneratedImportResolution[];
+export type ImportResolution = GeneratedImportResolution;
+
+export const IMPORT_ISSUE_SEVERITIES = ["BLOCKING", "WARNING"] as const satisfies readonly GeneratedImportIssueSeverity[];
+export type ImportIssueSeverity = GeneratedImportIssueSeverity;
 
 export const TERMINAL_IMPORT_STATUSES = new Set<ImportStatus>(["READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED"]);
 
-export interface AuthSession { authenticated: boolean; username: string | null; }
-export interface DocumentSummary { id: string; code: string; title: string; description: string | null; currentVersionId: string | null; progressRatio: number; }
-export interface DocumentListResponse { items: DocumentSummary[]; nextCursor: string | null; }
-export interface TocNode { id: string; parentId: string | null; title: string; level: number; nodeType: NodeType; semanticRole: SemanticRole | null; anchor: string; sourcePageStart: number | null; children: TocNode[]; }
-export interface ContentBlock { id: string; blockKey: string; seq: number; blockType: BlockType; payload: Record<string, unknown>; plainText: string; sourcePage: number | null; sourceBbox: SourceBbox | null; confidence: number | null; }
-export interface NodeContent { node: TocNode; blocks: ContentBlock[]; nextAfterSeq: number | null; }
-export interface SearchHit { documentId: string; documentTitle: string; versionId: string; nodeId: string; blockId: string; title: string; sectionPath: string[]; snippet: string; score: number; }
-export interface ReadingProgress { versionId: string; sectionId: string | null; blockId: string | null; charOffset: number; blockViewportOffset: number; progressRatio: number; clientUpdatedAt: string | null; deviceId: string | null; revision: number; }
-export interface SourceBbox { page?: number | null; x?: number | null; y?: number | null; width?: number | null; height?: number | null; }
-export interface ImportJob { id: string; targetDocumentId: string | null; sourceType: SourceType; status: ImportStatus; currentStage: ImportStage | null; progress: number; statistics: Record<string, unknown>; errorCode: string | null; errorMessage: string | null; }
-export const IMPORT_RESOLUTIONS = ["CREATE_NEW", "IMPORT_AS_NEW_VERSION"] as const;
-export type ImportResolution = typeof IMPORT_RESOLUTIONS[number];
-export const IMPORT_ISSUE_SEVERITIES = ["BLOCKING", "WARNING"] as const;
-export type ImportIssueSeverity = typeof IMPORT_ISSUE_SEVERITIES[number];
-export interface ExistingDocumentMatch { id: string; code: string; title: string; status: DocumentStatus; }
-export interface ImportDocumentPreview { documentKey: string; title: string; description: string | null; tags: string[]; editable: boolean; matchingDocument: ExistingDocumentMatch | null; suggestedDocumentKey: string | null; duplicateTitleCount: number; }
-export interface ImportIssue { severity: ImportIssueSeverity; issueCode: string; message: string; sourcePage: number | null; sectionKey: string | null; blockKey: string | null; cellRef: string | null; }
-export interface StagedSection { sectionKey: string; parentSectionKey: string | null; level: number; nodeType: NodeType; semanticRole: SemanticRole | null; title: string; sortOrder: number; anchor: string; sourcePageStart: number | null; sourcePageEnd: number | null; sourceBbox: SourceBbox | null; contentHash: string | null; }
-export interface StagedBlock { blockKey: string; sectionKey: string; seq: number; blockType: BlockType; payload: Record<string, unknown>; plainText: string; language: string | null; sourcePage: number | null; sourceBbox: SourceBbox | null; confidence: number | null; contentHash: string | null; }
-export interface DocumentInfo { documentKey: string; title: string; description: string | null; language: string; tags: string[]; }
-export interface VersionInfo { versionKey: string; sourceType: SourceType; sourceFileName: string | null; sourceSha256: string | null; converterVersion: string | null; metadata: Record<string, unknown>; }
-export interface AssetInfo { assetKey: string; path: string; mimeType: string; sha256: string; alt: string | null; }
-export interface DocumentPackage { schemaVersion: string; document: DocumentInfo; version: VersionInfo; sections: StagedSection[]; blocks: StagedBlock[]; assets: AssetInfo[]; }
-export interface VersionSummary { id: string; versionNo: number; parentVersionId: string | null; parentVersionNo: number | null; originImportJobId: string | null; sourceType: SourceType; sourceFileName: string | null; status: VersionStatus; draftRevision: number; publishedAt: string | null; createdAt: string; }
-export interface EditableVersion { version: VersionSummary; documentPackage: DocumentPackage; }
-export interface DeletionJob { id: string; documentId: string; status: DeletionJobStatus; currentStage: DeletionStage; attemptCount: number; errorCode: string | null; errorMessage: string | null; requestedAt: string; startedAt: string | null; completedAt: string | null; updatedAt: string; }
-export interface DeletedDocumentTombstone { documentId: string; deletedAt: string; }
-export interface AdminDocumentSummary { id: string; code: string; title: string; status: DocumentStatus; currentVersionId: string | null; versionCount: number; draftCount: number; updatedAt: string; deletionJob: DeletionJob | null; }
-export interface DocumentMetadata { documentId: string; code: string; title: string; description: string | null; tags: string[]; metadataRevision: number; duplicateTitleCount: number; }
-export interface DocumentVersion { id: string; documentId: string; versionNo: number; status: VersionStatus; schemaVersion: string; }
-export interface AdminDocumentPage { items: AdminDocumentSummary[]; page: number; size: number; hasNext: boolean; }
-export interface EditorDocument { id: string; code: string; title: string; description: string | null; language: string; }
-export interface EditorNode { id: string; parentId: string | null; nodeKey: string; nodeType: NodeType; semanticRole: SemanticRole | null; title: string; level: number; sortOrder: number; anchor: string; sourcePageStart: number | null; sourcePageEnd: number | null; }
-export interface EditorSnapshot { version: VersionSummary; document: EditorDocument; nodes: EditorNode[]; }
-export interface EditorBlock { id: string; blockKey: string; seq: number; blockType: BlockType; payload: Record<string, unknown>; plainText: string; language: string | null; sourcePage: number | null; sourceBbox: SourceBbox | null; confidence: number | null; }
-export interface NodeBlocksPage { items: EditorBlock[]; nextCursor: string | null; }
-export interface StructureNode { id: string; parentId: string | null; sortOrder: number; }
-export interface BlockMutationResult { draftRevision: number; removedCount: number; }
-export interface ImageBlockUploadResult { block: EditorBlock; draftRevision: number; }
+export type AuthSession = GeneratedAuthSession;
+export type DocumentSummary = GeneratedDocumentSummary;
+export type DocumentListResponse = GeneratedDocumentPage;
+export type TocNode = GeneratedTocNode;
+export type ContentBlock = GeneratedContentBlock;
+export type NodeContent = GeneratedNodeContent;
+export type SearchHit = GeneratedSearchHit;
+export type ReadingProgress = GeneratedReadingProgress;
+export type SourceBbox = GeneratedSourceBbox;
+export type ImportJob = GeneratedImportJob;
+export type ExistingDocumentMatch = GeneratedExistingDocumentMatch;
+export type ImportDocumentPreview = GeneratedImportDocumentPreview;
+export type ImportIssue = GeneratedImportIssue;
+export type StagedSection = GeneratedDocumentPackageSection;
+export type StagedBlock = GeneratedDocumentPackageBlock;
+export type DocumentInfo = GeneratedDocumentInfo;
+export type VersionInfo = GeneratedVersionInfo;
+export type AssetInfo = GeneratedAssetInfo;
+export type DocumentPackage = GeneratedDocumentPackage;
+export type VersionSummary = GeneratedVersionSummary;
+export type DeletionJob = GeneratedDeletionJob;
+export type DeletedDocumentTombstone = GeneratedDeletedDocumentTombstone;
+export type AdminDocumentSummary = GeneratedAdminDocumentSummary;
+export type DocumentMetadata = GeneratedDocumentMetadata;
+export type DocumentVersion = GeneratedDocumentVersion;
+export type AdminDocumentPage = GeneratedAdminDocumentPage;
+export type EditorDocument = GeneratedEditorDocument;
+export type EditorNode = GeneratedEditorNode;
+export type EditorSnapshot = GeneratedEditorSnapshot;
+export type EditorBlock = GeneratedEditorBlock;
+export type NodeBlocksPage = GeneratedNodeBlocksPage;
+export type StructureNode = GeneratedStructureNode;
+export type BlockMutationResult = GeneratedBlockMutationResult;
+export type ImageBlockUploadResult = GeneratedImageBlockUploadResult;

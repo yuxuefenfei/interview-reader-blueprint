@@ -25,7 +25,13 @@ jobs:
         run: npm ci
       - name: Verify API contract
         working-directory: frontend
-        run: npm run contract:check
+        run: |
+          npm run api:generate
+          git diff --exit-code -- src/generated/api
+          npm run contract:check
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
       - name: Test frontend
         working-directory: frontend
         run: npm test

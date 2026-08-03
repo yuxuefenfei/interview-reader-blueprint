@@ -68,7 +68,10 @@ pipeline {
                 dir('frontend') {
                     sh '''
                         set -Eeuo pipefail
+                        npm run api:generate
+                        git diff --exit-code -- src/generated/api
                         npm run contract:check
+                        npm run lint
                         npm test
                         npm run build
                     '''
@@ -179,6 +182,7 @@ pipeline {
     post {
         always {
             junit(testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true)
+            archiveArtifacts(artifacts: 'target/site/jacoco/**', allowEmptyArchive: true)
         }
         success {
             echo "部署成功：${env.GIT_COMMIT}"

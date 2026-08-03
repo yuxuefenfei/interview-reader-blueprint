@@ -10,9 +10,6 @@ import com.example.interviewreader.document.SourceType;
 import com.example.interviewreader.excelpkg.ExcelPackageService;
 import com.example.interviewreader.markdownpkg.MarkdownPackageService;
 import com.example.interviewreader.pdfpkg.PdfPackageService;
-import com.example.interviewreader.persistence.entity.AssetEntity;
-import com.example.interviewreader.persistence.entity.ContentBlockEntity;
-import com.example.interviewreader.persistence.entity.ContentNodeEntity;
 import com.example.interviewreader.persistence.entity.DocumentEntity;
 import com.example.interviewreader.persistence.entity.DocumentTagEntity;
 import com.example.interviewreader.persistence.entity.DocumentVersionEntity;
@@ -20,9 +17,6 @@ import com.example.interviewreader.persistence.entity.ImportIssueEntity;
 import com.example.interviewreader.persistence.entity.ImportJobEntity;
 import com.example.interviewreader.persistence.entity.TagEntity;
 import com.example.interviewreader.persistence.mapper.AppUserMapper;
-import com.example.interviewreader.persistence.mapper.AssetMapper;
-import com.example.interviewreader.persistence.mapper.ContentBlockMapper;
-import com.example.interviewreader.persistence.mapper.ContentNodeMapper;
 import com.example.interviewreader.persistence.mapper.DocumentMapper;
 import com.example.interviewreader.persistence.mapper.DocumentTagMapper;
 import com.example.interviewreader.persistence.mapper.DocumentVersionMapper;
@@ -38,8 +32,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -56,7 +48,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import static com.example.interviewreader.persistence.entity.table.AppUserEntityTableDef.APP_USER_ENTITY;
-import static com.example.interviewreader.persistence.entity.table.ContentNodeEntityTableDef.CONTENT_NODE_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentEntityTableDef.DOCUMENT_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentTagEntityTableDef.DOCUMENT_TAG_ENTITY;
 import static com.example.interviewreader.persistence.entity.table.DocumentVersionEntityTableDef.DOCUMENT_VERSION_ENTITY;
@@ -83,9 +74,7 @@ public class ImportPackageService {
     private final ImportIssueMapper importIssueMapper;
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
-    private final ContentNodeMapper contentNodeMapper;
-    private final ContentBlockMapper contentBlockMapper;
-    private final AssetMapper assetMapper;
+    private final DocumentPackageWriter documentPackageWriter;
     private final TagMapper tagMapper;
     private final DocumentTagMapper documentTagMapper;
     private final String converterVersion;
@@ -104,9 +93,7 @@ public class ImportPackageService {
             ImportIssueMapper importIssueMapper,
             DocumentMapper documentMapper,
             DocumentVersionMapper documentVersionMapper,
-            ContentNodeMapper contentNodeMapper,
-            ContentBlockMapper contentBlockMapper,
-            AssetMapper assetMapper,
+            DocumentPackageWriter documentPackageWriter,
             TagMapper tagMapper,
             DocumentTagMapper documentTagMapper,
             ImportProperties properties
@@ -124,9 +111,7 @@ public class ImportPackageService {
         this.importIssueMapper = importIssueMapper;
         this.documentMapper = documentMapper;
         this.documentVersionMapper = documentVersionMapper;
-        this.contentNodeMapper = contentNodeMapper;
-        this.contentBlockMapper = contentBlockMapper;
-        this.assetMapper = assetMapper;
+        this.documentPackageWriter = documentPackageWriter;
         this.tagMapper = tagMapper;
         this.documentTagMapper = documentTagMapper;
         this.converterVersion = properties.converterVersion();
@@ -209,7 +194,9 @@ public class ImportPackageService {
             updateImportStage(jobId, ImportStage.VALIDATING, 75, baseStatistics);
             ensureNotCanceled(jobId);
             var statistics = new LinkedHashMap<>(baseStatistics);
-            statistics.put("removedEmptyBlockCount", normalization.issues().size());
+            statistics.put("removedEmptyBlockCount", normalization.issues().stream()
+                    .filter(issue -> "EMPTY_CONTENT_BLOCK_REMOVED".equals(issue.issueCode()))
+                    .count());
             statistics.put("issueCount", issues.size());
             statistics.put("blockingIssueCount", issues.stream().filter(issue -> issue.severity() == ImportIssueSeverity.BLOCKING).count());
             if (documentPackage != null) {
@@ -247,30 +234,6 @@ public class ImportPackageService {
                 importJobMapper.update(job);
             }
         }
-    }
-
-    @Transactional
-    public ImportJobDto cancel(UUID jobId) {
-        var dto = getImportJob(jobId);
-        if (!ImportJobStatus.isCancelable(dto.status())) {
-            throw new ApiException(HttpStatus.CONFLICT, "Only active import jobs can be canceled");
-        }
-        importJobWorker.cancel(jobId);
-        var job = requireJob(jobId);
-        if (ImportJobStatus.isCancelable(job.getStatus())) {
-            job.setStatus(ImportJobStatus.CANCELED);
-            job.setProgress(100);
-            job.setCurrentStage(ImportStage.CANCELED);
-            job.setErrorCode(null);
-            job.setErrorMessage(null);
-            job.setFinishedAt(OffsetDateTime.now());
-            importJobMapper.update(job);
-        }
-        var canceled = getImportJob(jobId);
-        if (canceled.status() != ImportJobStatus.CANCELED) {
-            throw new ApiException(HttpStatus.CONFLICT, "Only active import jobs can be canceled");
-        }
-        return canceled;
     }
 
     public ImportJobDto getImportJob(UUID jobId) {
@@ -451,9 +414,7 @@ public class ImportPackageService {
         version.setMetadata(toJson(Objects.requireNonNullElse(documentPackage.version().metadata(), Map.of())));
         documentVersionMapper.insertSelective(version);
 
-        insertSections(versionId, documentPackage);
-        insertBlocks(versionId, documentPackage);
-        insertAssets(versionId, documentPackage);
+        documentPackageWriter.writeNewVersion(versionId, documentPackage);
 
         var document = documentMapper.selectOneById(documentId);
         document.setUpdatedAt(now);
@@ -465,94 +426,6 @@ public class ImportPackageService {
         job.setCurrentStage(ImportStage.COMMITTED);
         importJobMapper.update(job);
         return new DocumentVersionDto(UUID.fromString(versionId), UUID.fromString(documentId), version.getVersionNo(), DocumentVersionStatus.DRAFT, documentPackage.schemaVersion());
-    }
-
-    private void insertSections(String versionId, DocumentPackage documentPackage) {
-        var sections = new ArrayList<>(documentPackage.sections());
-        sections.sort(Comparator
-                .comparing(DocumentPackage.SectionInfo::level)
-                .thenComparing(section -> Objects.requireNonNullElse(section.sortOrder(), 0))
-                .thenComparing(DocumentPackage.SectionInfo::sectionKey));
-        var nodeIds = new HashMap<String, String>();
-        var paths = new HashMap<String, String>();
-        var blockTextBySection = blockTextBySection(documentPackage.blocks());
-
-        for (var section : sections) {
-            var id = UUID.randomUUID().toString();
-            var parentId = isBlank(section.parentSectionKey()) ? null : nodeIds.get(section.parentSectionKey());
-            if (!isBlank(section.parentSectionKey()) && parentId == null) {
-                throw new ApiException(HttpStatus.CONFLICT, "Parent section was not inserted: " + section.parentSectionKey());
-            }
-            var parentPath = isBlank(section.parentSectionKey()) ? null : paths.get(section.parentSectionKey());
-            var pathPart = String.format("%06d", section.sortOrder());
-            var path = parentPath == null ? pathPart : parentPath + "." + pathPart;
-            var anchor = isBlank(section.anchor()) ? opaqueAnchor() : section.anchor();
-            var searchText = section.title() + "\n" + String.join("\n", blockTextBySection.getOrDefault(section.sectionKey(), List.of()));
-
-            var node = new ContentNodeEntity();
-            node.setId(id);
-            node.setVersionId(versionId);
-            node.setParentId(parentId);
-            node.setNodeKey(section.sectionKey());
-            node.setNodeType(section.nodeType());
-            node.setSemanticRole(section.semanticRole());
-            node.setTitle(section.title());
-            node.setLevel(section.level());
-            node.setPath(path);
-            node.setSortOrder(section.sortOrder());
-            node.setAnchor(anchor);
-            node.setSourcePageStart(section.sourcePageStart());
-            node.setSourcePageEnd(section.sourcePageEnd());
-            node.setSourceBbox(toJsonOrNull(section.sourceBbox()));
-            node.setContentHash(emptyToNull(section.contentHash()));
-            node.setSearchText(searchText);
-            contentNodeMapper.insertSelective(node);
-            nodeIds.put(section.sectionKey(), id);
-            paths.put(section.sectionKey(), path);
-        }
-    }
-
-    private void insertBlocks(String versionId, DocumentPackage documentPackage) {
-        var nodeIds = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                        .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                        .from(CONTENT_NODE_ENTITY)
-                        .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId)))
-                .stream()
-                .collect(HashMap<String, String>::new, (map, node) -> map.put(node.getNodeKey(), node.getId()), HashMap::putAll);
-
-        for (var block : documentPackage.blocks()) {
-            var entity = new ContentBlockEntity();
-            entity.setId(UUID.randomUUID().toString());
-            entity.setVersionId(versionId);
-            entity.setNodeId(nodeIds.get(block.sectionKey()));
-            entity.setBlockKey(block.blockKey());
-            entity.setSeq(block.seq());
-            entity.setBlockType(block.blockType());
-            entity.setPayload(toJson(block.payload()));
-            entity.setPlainText(Objects.requireNonNullElse(block.plainText(), ""));
-            entity.setLanguage(emptyToNull(block.language()));
-            entity.setSourcePage(block.sourcePage());
-            entity.setSourceBbox(toJsonOrNull(block.sourceBbox()));
-            entity.setConfidence(block.confidence());
-            entity.setContentHash(emptyToNull(block.contentHash()));
-            contentBlockMapper.insertSelective(entity);
-        }
-    }
-
-    private void insertAssets(String versionId, DocumentPackage documentPackage) {
-        for (var asset : documentPackage.assets()) {
-            var entity = new AssetEntity();
-            entity.setId(UUID.randomUUID().toString());
-            entity.setVersionId(versionId);
-            entity.setAssetKey(asset.assetKey());
-            entity.setObjectKey(asset.path());
-            entity.setOriginalName(asset.path());
-            entity.setMimeType(asset.mimeType());
-            entity.setSha256(asset.sha256().toLowerCase(Locale.ROOT));
-            entity.setSizeBytes(0);
-            entity.setMetadata(toJson(Map.of("alt", Objects.requireNonNullElse(asset.alt(), ""))));
-            assetMapper.insertSelective(entity);
-        }
     }
 
     private void upsertTags(String documentId, List<String> tags) {
@@ -583,15 +456,6 @@ public class ImportPackageService {
                 documentTagMapper.insertSelective(entity);
             }
         }
-    }
-
-    private Map<String, List<String>> blockTextBySection(List<DocumentPackage.BlockInfo> blocks) {
-        var result = new LinkedHashMap<String, List<String>>();
-        for (var block : blocks) {
-            result.computeIfAbsent(block.sectionKey(), ignored -> new ArrayList<>())
-                    .add(Objects.requireNonNullElse(block.plainText(), ""));
-        }
-        return result;
     }
 
     private static void rejectDeletionLocked(DocumentEntity document) {

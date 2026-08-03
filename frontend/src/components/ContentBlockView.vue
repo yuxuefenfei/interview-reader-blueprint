@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from "vue";
 import type { ContentBlock } from "../types/api";
 import { highlightCode } from "../utils/codeHighlight";
+import FormulaBlock from "./FormulaBlock.vue";
 import InlineMarkdown from "./InlineMarkdown.vue";
 
 const copyLabel = ref("复制代码");
@@ -42,6 +43,7 @@ let codeHighlightRequestId = 0;
 const imageAssetKey = computed(() => typeof props.block.payload.assetKey === "string" ? props.block.payload.assetKey.trim() : "");
 const imageAlt = computed(() => typeof props.block.payload.alt === "string" ? props.block.payload.alt : props.block.plainText);
 const imageCaption = computed(() => typeof props.block.payload.caption === "string" ? props.block.payload.caption : "");
+const formulaLatex = computed(() => typeof props.block.payload.latex === "string" ? props.block.payload.latex : props.block.plainText);
 const imageDecorative = computed(() => props.block.payload.decorative === true);
 const imageUrl = computed(() => {
   if (imageAssetKey.value && props.assetBaseUrl) return `${props.assetBaseUrl.replace(/\/$/, "")}/${encodeURIComponent(imageAssetKey.value)}`;
@@ -248,9 +250,7 @@ async function copyCode(block: ContentBlock): Promise<void> {
       <span><InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" :highlight="highlight" /></span>
     </aside>
 
-    <p v-else-if="block.blockType === 'formula'" class="formula">
-      {{ typeof block.payload.latex === "string" ? block.payload.latex : block.plainText }}
-    </p>
+    <FormulaBlock v-else-if="block.blockType === 'formula'" :latex="formulaLatex" />
 
     <figure v-else-if="block.blockType === 'image'" class="image-block" :class="{ unavailable: !imageUrl || imageLoadFailed }">
       <button v-if="imageUrl && !imageLoadFailed" type="button" style="width:100%;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;cursor:zoom-in" :aria-label="`查看大图：${imageAlt || '图片'}`" @click="openImagePreview">

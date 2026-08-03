@@ -31,6 +31,7 @@ vi.mock("../offline/serviceWorkerRegistration", () => ({
 
 import App from "../App.vue";
 import { BRAND_ICON_URL } from "../shared/branding";
+import { rememberOfflineReaderAccess } from "../offline/offlineAccess";
 
 const ButtonStub = defineComponent({
   emits: ["click"],
@@ -53,6 +54,13 @@ function mountApp() {
 describe("App update notification", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+      clear: () => values.clear(),
+    });
     mocks.syncDeletedDocuments.mockResolvedValue(undefined);
   });
 
@@ -92,5 +100,20 @@ describe("App update notification", () => {
     await banner.get("button").trigger("click");
     expect(mocks.activateUpdate).toHaveBeenCalledOnce();
     wrapper.unmount();
+  });
+
+  it("opens the cached reader shell when session lookup fails offline", async () => {
+    rememberOfflineReaderAccess("admin");
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    mocks.session.mockRejectedValue(new Error("offline"));
+
+    const wrapper = mountApp();
+    await flushPromises();
+
+    expect(wrapper.find(".route-content").exists()).toBe(true);
+    expect(wrapper.find(".login-page").exists()).toBe(false);
+    expect(wrapper.get(".app-status-banner").text()).toContain("离线状态");
+    wrapper.unmount();
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
   });
 });

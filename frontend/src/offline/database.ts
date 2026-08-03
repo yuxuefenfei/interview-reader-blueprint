@@ -1,7 +1,8 @@
 export const OFFLINE_DB_NAME = "interview-reader-offline";
-export const OFFLINE_DB_VERSION = 3;
+export const OFFLINE_DB_VERSION = 4;
 export const CONTENT_STORE_NAME = "node-content-cache";
 export const PROGRESS_STORE_NAME = "reading-progress-queue";
+export const BOOTSTRAP_STORE_NAME = "reader-bootstrap-cache";
 
 export function openOfflineDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -33,5 +34,9 @@ function createStores(db: IDBDatabase, upgrade: IDBTransaction | null, oldVersio
   } else if (oldVersion < 3 && upgrade) {
     const store = upgrade.objectStore(PROGRESS_STORE_NAME);
     if (!store.indexNames.contains("documentId")) store.createIndex("documentId", "documentId");
+  }
+  if (!db.objectStoreNames.contains(BOOTSTRAP_STORE_NAME)) {
+    const store = db.createObjectStore(BOOTSTRAP_STORE_NAME, { keyPath: "cacheKey" });
+    store.createIndex("documentId", "documentId");
   }
 }

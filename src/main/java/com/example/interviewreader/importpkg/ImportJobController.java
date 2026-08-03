@@ -101,8 +101,4 @@ public class ImportJobController {
         return service.commit(jobId, request);
     }
 
-    @PostMapping("/{jobId}/cancel")
-    public ImportJobDto cancel(@PathVariable UUID jobId) {
-        return service.cancel(jobId);
-    }
 }

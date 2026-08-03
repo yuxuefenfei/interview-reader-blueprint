@@ -6,7 +6,6 @@ import com.example.interviewreader.document.DocumentVersionStatus;
 import com.example.interviewreader.document.NodeType;
 import com.example.interviewreader.document.SemanticRole;
 import com.example.interviewreader.document.SourceType;
-import com.example.interviewreader.importpkg.DocumentPackage;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -42,13 +41,6 @@ public final class ManagementDtos {
             SourceType sourceType, String sourceFileName, DocumentVersionStatus status, long draftRevision,
             OffsetDateTime publishedAt, OffsetDateTime createdAt
     ) {
-    }
-
-    /** Legacy complete-package response retained for API compatibility only. */
-    public record EditableVersion(VersionSummary version, DocumentPackage documentPackage) {
-    }
-
-    public record SaveDraftRequest(long draftRevision, DocumentPackage documentPackage) {
     }
 
     public record EditorSnapshot(VersionSummary version, EditorDocument document, List<EditorNode> nodes) {

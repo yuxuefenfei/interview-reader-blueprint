@@ -243,12 +243,23 @@ class InterviewReaderApiTests {
         mockMvc.perform(put("/api/reader/reading-progress/{documentId}", imported.documentId())
                         .contentType(MediaType.APPLICATION_JSON).content(progress))
                 .andExpect(status().isOk());
+        var publishedContentEtag = mockMvc.perform(get(
+                        "/api/reader/versions/{versionId}/nodes/{nodeId}/content",
+                        imported.versionId(),
+                        position.sectionId()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader(HttpHeaders.ETAG);
 
         mockMvc.perform(post("/api/admin/documents/{documentId}/take-down", imported.documentId()))
                 .andExpect(status().isNoContent());
         mockMvc.perform(post("/api/admin/documents/{documentId}/take-down", imported.documentId()))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/reader/documents/{documentId}", imported.documentId()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/reader/versions/{versionId}/nodes/{nodeId}/content",
+                        imported.versionId(),
+                        position.sectionId())
+                        .header(HttpHeaders.IF_NONE_MATCH, publishedContentEtag))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/admin/documents/{documentId}", imported.documentId()))
                 .andExpect(status().isOk())
@@ -564,45 +575,6 @@ class InterviewReaderApiTests {
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION))
                         .contains("evil.json")
                         .doesNotContain(".."));
-    }
-
-    @Test
-    void activeImportJobCanBeCanceled() throws Exception {
-        var jobId = UUID.randomUUID();
-        jdbc.update("""
-                INSERT INTO import_job(
-                    id, owner_id, source_type, source_object_key, source_sha256, converter_version,
-                    import_fingerprint, status, progress, current_stage, statistics, started_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """,
-                jobId,
-                UUID.fromString("00000000-0000-0000-0000-000000000001"),
-                "PDF",
-                "manual/test.pdf",
-                "a".repeat(64),
-                "test-converter",
-                "b".repeat(64),
-                "EXTRACTING",
-                35,
-                "EXTRACTING",
-                "{}");
-
-        mockMvc.perform(post("/api/admin/import-jobs/{jobId}/cancel", jobId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CANCELED"))
-                .andExpect(jsonPath("$.currentStage").value("CANCELED"))
-                .andExpect(jsonPath("$.progress").value(100));
-    }
-
-    @Test
-    void completedImportJobCannotBeCanceled() throws Exception {
-        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
-        ((ObjectNode) source.get("document")).put("documentKey", "cancel-ready-" + UUID.randomUUID());
-        var job = uploadJsonPackage(objectMapper.writeValueAsBytes(source));
-
-        mockMvc.perform(post("/api/admin/import-jobs/{jobId}/cancel", UUID.fromString(job.get("id").asText())))
-                .andExpect(status().isConflict());
     }
 
     @Test

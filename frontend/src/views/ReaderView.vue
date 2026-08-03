@@ -13,6 +13,12 @@ import ReaderDocumentSelector from "../components/ReaderDocumentSelector.vue";
 import TocTree from "../components/TocTree.vue";
 import { cacheNodeContent, getCachedNodeContent } from "../offline/contentCache";
 import {
+  cacheReaderDocuments,
+  cacheReaderToc,
+  getCachedReaderDocuments,
+  getCachedReaderToc,
+} from "../offline/bootstrapCache";
+import {
   enqueueReadingProgress,
   flushReadingProgressQueue,
   shouldDiscardReadingProgress,
@@ -30,8 +36,9 @@ import {
   type ReaderTheme
 } from "../utils/readingComfort";
 import { firstReadableNode, flattenToc, isQuestionNode } from "../utils/toc";
+import { blockAtViewportAnchor, scrollTopForBlockOffset } from "../utils/readingPosition";
 
-defineProps<{ username?: string | null }>();
+const props = defineProps<{ username?: string | null; online?: boolean }>();
 const emit = defineEmits<{ logout: [] }>();
 const route = useRoute();
 const router = useRouter();
@@ -74,18 +81,28 @@ const viewportHeight = ref(currentViewportHeight());
 const chapterLoading = ref(false);
 const pendingNodeId = ref<string | null>(null);
 const loadingMore = ref(false);
+const contentLoadError = ref("");
+const contentLoadSentinel = ref<HTMLElement | null>(null);
+const documentNextCursor = ref<string | null>(null);
+const documentListLoading = ref(false);
+const documentListLoadError = ref("");
 const deviceId = getOrCreateReadingDeviceId();
 let saveTimer: number | null = null;
+let readingScrollFrame: number | null = null;
 let documentRequestId = 0;
+let documentListRequestId = 0;
 let contentRequestId = 0;
 let loadMoreRequestId = 0;
 let searchRequestId = 0;
 let searchTimer: number | null = null;
+let documentSearchTimer: number | null = null;
 let contentAbortController: AbortController | null = null;
+let documentListAbortController: AbortController | null = null;
 let loadMoreAbortController: AbortController | null = null;
 let searchAbortController: AbortController | null = null;
 let ignoredRouteDocumentId: string | null = null;
 let keepSearchHighlightAfterClose = false;
+let contentLoadObserver: IntersectionObserver | null = null;
 const completedNodes = new Set<string>();
 const contentPrefetches = new Map<string, {
   controller: AbortController;
@@ -112,10 +129,16 @@ const currentDocumentProgressRatio = computed(() => {
 });
 const navigationDocument = computed<DocumentSummary | null>(() =>
   selected.value ? { ...selected.value, progressRatio: currentDocumentProgressRatio.value } : null);
-const navigationDocuments = computed(() => documents.value.map((document) =>
-  document.id === selected.value?.id
+const navigationDocuments = computed(() => {
+  const listed = documents.value.map((document) =>
+    document.id === selected.value?.id
     ? { ...document, progressRatio: currentDocumentProgressRatio.value }
-    : document));
+    : document);
+  if (!documentQuery.value.trim() && selected.value && !listed.some((document) => document.id === selected.value?.id)) {
+    listed.unshift({ ...selected.value, progressRatio: currentDocumentProgressRatio.value });
+  }
+  return listed;
+});
 const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
 const desktopRailProgressStyle = computed(() => ({ height: `${currentDocumentProgressRatio.value * 100}%` }));
@@ -155,6 +178,12 @@ watch(() => route.params.documentId, (documentId) => {
   void openFromRoute();
 });
 watch([query, searchScope], () => scheduleSearch());
+watch(documentQuery, () => scheduleDocumentSearch());
+watch(() => content.value?.nextAfterSeq, async () => {
+  await nextTick();
+  connectContentLoadObserver();
+  requestMoreContentIfVisible();
+});
 watch(searchOpen, (open) => {
   if (open) {
     scheduleSearch();
@@ -201,10 +230,14 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   if (saveTimer !== null) window.clearTimeout(saveTimer);
+  if (readingScrollFrame !== null) window.cancelAnimationFrame(readingScrollFrame);
   if (searchTimer !== null) window.clearTimeout(searchTimer);
+  if (documentSearchTimer !== null) window.clearTimeout(documentSearchTimer);
   contentAbortController?.abort();
+  documentListAbortController?.abort();
   loadMoreAbortController?.abort();
   searchAbortController?.abort();
+  contentLoadObserver?.disconnect();
   window.removeEventListener("online", flushOfflineProgress);
   window.removeEventListener("keydown", handleGlobalShortcut);
   window.removeEventListener("resize", syncViewportHeight);
@@ -220,10 +253,62 @@ function syncViewportHeight(): void {
   viewportHeight.value = currentViewportHeight();
 }
 
-async function loadDocuments(): Promise<void> {
+function scheduleDocumentSearch(): void {
+  if (documentSearchTimer !== null) window.clearTimeout(documentSearchTimer);
+  documentSearchTimer = window.setTimeout(() => {
+    documentSearchTimer = null;
+    void loadDocuments(true);
+  }, 400);
+}
+
+async function loadDocuments(reset = true): Promise<void> {
+  if (!reset && (documentListLoading.value || !documentNextCursor.value)) return;
+  if (reset) {
+    documentListAbortController?.abort();
+    documentListRequestId += 1;
+    documentNextCursor.value = null;
+    documentListLoadError.value = "";
+  }
+  const requestId = documentListRequestId;
+  const requestedQuery = documentQuery.value.trim();
+  const requestedCursor = reset ? null : documentNextCursor.value;
+  const abortController = new AbortController();
+  documentListAbortController = abortController;
+  documentListLoading.value = true;
   try {
-    documents.value = (await readerApi.documents()).items;
-  } catch (caught) { error.value = message(caught); }
+    const page = await readerApi.documents(requestedQuery, requestedCursor, 16, abortController.signal);
+    if (requestId !== documentListRequestId || requestedQuery !== documentQuery.value.trim()) return;
+    documents.value = reset
+      ? page.items
+      : [...documents.value, ...page.items.filter((item) => !documents.value.some((existing) => existing.id === item.id))];
+    documentNextCursor.value = page.nextCursor;
+    documentListLoadError.value = "";
+    if (!requestedQuery) void cacheReaderDocuments(documents.value).catch(() => undefined);
+  } catch (caught) {
+    if (!abortController.signal.aborted && requestId === documentListRequestId) {
+      if (reset) {
+        const cachedDocuments = await getCachedReaderDocuments().catch(() => []);
+        if (cachedDocuments.length > 0) {
+          const normalizedQuery = requestedQuery.toLocaleLowerCase();
+          documents.value = normalizedQuery
+            ? cachedDocuments.filter((document) =>
+                `${document.title} ${document.code}`.toLocaleLowerCase().includes(normalizedQuery))
+            : cachedDocuments;
+          documentNextCursor.value = null;
+          documentListLoadError.value = "";
+        } else {
+          documentListLoadError.value = message(caught);
+        }
+      } else {
+        documentListLoadError.value = message(caught);
+      }
+    }
+  } finally {
+    if (requestId === documentListRequestId) {
+      documentListLoading.value = false;
+      if (documentListAbortController === abortController) documentListAbortController = null;
+    }
+  }
 }
 
 async function openFromRoute(forceRefresh = false, requestedDocumentId?: string): Promise<void> {
@@ -259,11 +344,14 @@ async function openFromRoute(forceRefresh = false, requestedDocumentId?: string)
       documents.value = documents.value.map((item) => item.id === document.id ? document : item);
     }
     selected.value = document;
+    if (!documents.value.some((item) => item.id === document.id)) {
+      void cacheReaderDocuments([...documents.value, document]).catch(() => undefined);
+    }
     if (!document.currentVersionId) return;
     const versionId = document.currentVersionId;
     const [nextToc, saved] = await Promise.all([
-      readerApi.toc(versionId),
-      readerApi.progress(document.id),
+      loadTocOfflineAware(document.id, versionId),
+      readerApi.progress(document.id).catch(() => null),
     ]);
     if (requestId !== documentRequestId || !isCurrentDocumentVersion(document.id, versionId)) return;
     toc.value = nextToc;
@@ -271,13 +359,25 @@ async function openFromRoute(forceRefresh = false, requestedDocumentId?: string)
     const initial = flattenToc(nextToc).find((node) => node.id === saved?.sectionId) || firstReadableNode(nextToc);
     if (initial) {
       ensureTocPathExpanded(initial.id, nextToc);
-      const restoredChapterProgress = saved?.sectionId === initial.id ? saved.progressRatio : 0;
-      await selectNode(initial, false, !keepDrawerOpen, restoredChapterProgress);
+      const restoredProgress = saved?.sectionId === initial.id ? saved : null;
+      await selectNode(initial, false, !keepDrawerOpen, restoredProgress);
     }
   } catch (caught) {
     if (requestId === documentRequestId) error.value = message(caught);
   } finally {
     if (requestId === documentRequestId) loading.value = false;
+  }
+}
+
+async function loadTocOfflineAware(documentId: string, versionId: string): Promise<TocNode[]> {
+  try {
+    const nextToc = await readerApi.toc(versionId);
+    void cacheReaderToc(documentId, versionId, nextToc).catch(() => undefined);
+    return nextToc;
+  } catch (caught) {
+    const cachedToc = await getCachedReaderToc(versionId);
+    if (!cachedToc) throw caught;
+    return cachedToc;
   }
 }
 
@@ -307,7 +407,7 @@ async function selectNode(
   node: TocNode,
   shouldScroll = true,
   closeDrawer = true,
-  restoredChapterProgress = 0,
+  restoredProgress: ReadingProgress | null = null,
   targetBlockId: string | null = null,
 ): Promise<void> {
   const targetNode = isReadableNode(node) ? node : firstReadableDescendant(node);
@@ -343,12 +443,24 @@ async function selectNode(
       if (!cached) throw caught;
       nextContent = cached;
     }
+    if (restoredProgress?.blockId
+        && !nextContent.blocks.some((block) => block.id === restoredProgress.blockId)
+        && nextContent.nextAfterSeq
+        && navigator.onLine !== false) {
+      nextContent = await loadThroughRestoredBlock(
+        versionId,
+        targetNode.id,
+        nextContent,
+        restoredProgress.blockId,
+        abortController.signal,
+      ).catch(() => nextContent);
+    }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
     activeNode.value = targetNode;
     content.value = nextContent;
     ensureTocPathExpanded(targetNode.id);
     if (closeDrawer) drawer.value = false;
-    chapterProgress.value = clampProgressRatio(targetNode.id === node.id ? restoredChapterProgress : 0);
+    chapterProgress.value = clampProgressRatio(targetNode.id === node.id ? restoredProgress?.progressRatio : 0);
     if (shouldScroll) {
       await nextTick();
       const targetBlock = targetBlockId
@@ -360,16 +472,34 @@ async function selectNode(
       } else {
         readingArea.value?.scrollTo({ top: 0, behavior: "auto" });
       }
-    } else if (chapterProgress.value > 0) {
+    } else if (restoredProgress?.blockId || chapterProgress.value > 0) {
       await nextTick();
       const area = readingArea.value;
       if (area) {
-        const distance = Math.max(0, area.scrollHeight - area.clientHeight);
-        area.scrollTo({ top: distance * chapterProgress.value, behavior: "auto" });
+        const restoredBlock = restoredProgress?.blockId
+          ? area.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(restoredProgress.blockId)}"]`)
+          : null;
+        if (restoredBlock && restoredProgress) {
+          const areaTop = area.getBoundingClientRect().top;
+          area.scrollTo({
+            top: scrollTopForBlockOffset(
+              area.scrollTop,
+              restoredBlock.getBoundingClientRect().top - areaTop,
+              restoredProgress.blockViewportOffset,
+            ),
+            behavior: "auto",
+          });
+        } else {
+          const distance = Math.max(0, area.scrollHeight - area.clientHeight);
+          area.scrollTo({ top: distance * chapterProgress.value, behavior: "auto" });
+        }
       }
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
+    await nextTick();
     scheduleProgress();
+    connectContentLoadObserver();
+    requestMoreContentIfVisible();
   } catch (caught) {
     if (isCurrentContentRequest(requestId, documentId, versionId)) {
       failedNodeId.value = targetNode.id;
@@ -388,7 +518,28 @@ async function selectNode(
   }
 }
 
+async function loadThroughRestoredBlock(
+  versionId: string,
+  nodeId: string,
+  initialContent: NodeContent,
+  blockId: string,
+  signal: AbortSignal,
+): Promise<NodeContent> {
+  let merged = initialContent;
+  for (let pageNumber = 0; pageNumber < 20 && merged.nextAfterSeq; pageNumber += 1) {
+    const page = await readerApi.content(versionId, nodeId, merged.nextAfterSeq, signal);
+    merged = {
+      node: initialContent.node,
+      blocks: [...merged.blocks, ...page.blocks],
+      nextAfterSeq: page.nextAfterSeq,
+    };
+    if (page.blocks.some((block) => block.id === blockId)) break;
+  }
+  return merged;
+}
+
 function handleAccountCommand(command: string): void {
+  if (props.online === false) return;
   if (command === "admin") {
     void router.push("/admin");
     return;
@@ -407,6 +558,7 @@ async function loadMoreContent(): Promise<void> {
   loadMoreAbortController = abortController;
   const requestId = ++loadMoreRequestId;
   loadingMore.value = true;
+  contentLoadError.value = "";
   try {
     const page = await readerApi.content(versionId, node.id, current.nextAfterSeq, abortController.signal);
     if (requestId !== loadMoreRequestId
@@ -423,17 +575,57 @@ async function loadMoreContent(): Promise<void> {
     if (!abortController.signal.aborted
         && requestId === loadMoreRequestId
         && isCurrentDocumentVersion(documentId, versionId)) {
-      error.value = message(caught);
+      contentLoadError.value = message(caught);
     }
   } finally {
     if (requestId === loadMoreRequestId) {
       loadingMore.value = false;
       if (loadMoreAbortController === abortController) loadMoreAbortController = null;
+      await nextTick();
+      connectContentLoadObserver();
+      requestMoreContentIfVisible();
     }
   }
 }
 
+function connectContentLoadObserver(): void {
+  contentLoadObserver?.disconnect();
+  if (typeof IntersectionObserver === "undefined" || !contentLoadSentinel.value) return;
+  contentLoadObserver = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) void loadMoreContent();
+  }, { root: readingArea.value, rootMargin: "0px 0px 240px", threshold: 0 });
+  contentLoadObserver.observe(contentLoadSentinel.value);
+}
+
+function captureContentLoadSentinel(element: unknown): void {
+  contentLoadSentinel.value = element instanceof HTMLElement ? element : null;
+  if (!contentLoadSentinel.value) return;
+  void nextTick(() => {
+    connectContentLoadObserver();
+    requestMoreContentIfVisible();
+  });
+}
+
+function requestMoreContentIfVisible(): void {
+  const area = readingArea.value;
+  const sentinel = contentLoadSentinel.value;
+  if (!area || !sentinel || loadingMore.value || contentLoadError.value || !content.value?.nextAfterSeq) return;
+  const areaRect = area.getBoundingClientRect();
+  const sentinelRect = sentinel.getBoundingClientRect();
+  if (sentinelRect.top <= areaRect.bottom + 240 && sentinelRect.bottom >= areaRect.top) {
+    void loadMoreContent();
+  }
+}
+
 function onReadingScroll(): void {
+  if (readingScrollFrame !== null) return;
+  readingScrollFrame = window.requestAnimationFrame(() => {
+    readingScrollFrame = null;
+    updateReadingProgressFromScroll();
+  });
+}
+
+function updateReadingProgressFromScroll(): void {
   const area = readingArea.value;
   if (!area) return;
   const distance = Math.max(1, area.scrollHeight - area.clientHeight);
@@ -452,13 +644,14 @@ function scheduleProgress(): void {
   const currentContent = content.value;
   if (!document || !node || !document.currentVersionId || currentContent?.node.id !== node.id) return;
   if (saveTimer !== null) window.clearTimeout(saveTimer);
+  const blockPosition = currentReadingBlockPosition();
   const firstBlock = currentContent.blocks[0] ?? null;
   const progress: ReadingProgress = {
     versionId: document.currentVersionId,
     sectionId: node.id,
-    blockId: firstBlock?.id ?? null,
+    blockId: blockPosition?.id ?? firstBlock?.id ?? null,
     charOffset: 0,
-    blockViewportOffset: 0,
+    blockViewportOffset: blockPosition?.top ?? 0,
     progressRatio: chapterProgress.value,
     clientUpdatedAt: new Date().toISOString(),
     deviceId,
@@ -468,6 +661,23 @@ function scheduleProgress(): void {
     saveTimer = null;
     void saveProgressOfflineAware(document.id, progress);
   }, 700);
+}
+
+function currentReadingBlockPosition(): { id: string; top: number } | null {
+  const area = readingArea.value;
+  if (!area) return null;
+  const areaTop = area.getBoundingClientRect().top;
+  const blocks = [...area.querySelectorAll<HTMLElement>("[data-block-id]")].map((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      id: element.dataset.blockId ?? "",
+      top: rect.top - areaTop,
+      bottom: rect.bottom - areaTop,
+    };
+  }).filter((block) => block.id);
+  const anchor = Math.min(72, Math.max(24, area.clientHeight * 0.12));
+  const block = blockAtViewportAnchor(blocks, anchor);
+  return block ? { id: block.id, top: block.top } : null;
 }
 
 async function saveProgressOfflineAware(documentId: string, progress: ReadingProgress): Promise<void> {
@@ -516,6 +726,8 @@ function cancelLoadMore(): void {
   loadMoreAbortController = null;
   loadMoreRequestId += 1;
   loadingMore.value = false;
+  contentLoadError.value = "";
+  contentLoadObserver?.disconnect();
 }
 
 function isCurrentDocumentVersion(documentId: string, versionId: string): boolean {
@@ -800,7 +1012,7 @@ async function jump(hit: SearchHit): Promise<void> {
   const node = flattenToc(toc.value).find((item) => item.id === hit.nodeId);
   if (node) {
     searchHighlight.value = query.value.trim();
-    await selectNode(node, true, true, 0, hit.blockId);
+    await selectNode(node, true, true, null, hit.blockId);
     keepSearchHighlightAfterClose = true;
   }
   searchOpen.value = false;
@@ -897,9 +1109,9 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         >
           <el-icon><Reading /></el-icon>
         </button>
-        <el-button class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button>
-        <el-button class="reader-logout-button" text @click="emit('logout')">退出</el-button>
-        <el-dropdown class="reader-account-menu" trigger="click" placement="bottom-end" @command="handleAccountCommand">
+        <el-button v-if="props.online !== false" class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button>
+        <el-button v-if="props.online !== false" class="reader-logout-button" text @click="emit('logout')">退出</el-button>
+        <el-dropdown v-if="props.online !== false" class="reader-account-menu" trigger="click" placement="bottom-end" @command="handleAccountCommand">
           <button class="reader-theme-trigger" type="button" aria-label="账户菜单" title="账户菜单">
             <el-icon><User /></el-icon>
             <span>账户</span>
@@ -978,7 +1190,11 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
             :selected-document-id="selected?.id || null"
             :pending-document-id="pendingDocumentId"
             :error="documentSwitchError"
+            :loading="documentListLoading"
+            :has-more="!!documentNextCursor"
+            :load-error="documentListLoadError"
             @select="selectDocumentFromNavigation($event, 'desktop')"
+            @load-more="loadDocuments(false)"
           />
         </div>
       </template>
@@ -997,9 +1213,11 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <template v-else-if="content">
         <article :key="content.node.id" class="reader-article" :data-node-id="content.node.id">
           <h1>{{ content.node.title }}</h1>
-          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :wrap-code="comfort.codeWrap" show-code-wrap-toggle :asset-base-url="selected ? `/assets/versions/${selected.currentVersionId}` : undefined" @update:wrap-code="comfort.codeWrap = $event" />
-          <div v-if="content.nextAfterSeq" class="reader-load-more">
-            <el-button :loading="loadingMore" @click="loadMoreContent">加载更多内容</el-button>
+          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :wrap-code="comfort.codeWrap" show-code-wrap-toggle :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" @update:wrap-code="comfort.codeWrap = $event" />
+          <div v-if="content.nextAfterSeq" :ref="captureContentLoadSentinel" class="reader-load-more">
+            <span v-if="loadingMore" role="status">正在载入后续内容…</span>
+            <button v-else-if="contentLoadError" type="button" @click="loadMoreContent">载入失败，点击重试</button>
+            <span v-else class="sr-only">继续阅读时将自动载入后续内容</span>
           </div>
         </article>
         <nav class="chapter-pagination" aria-label="章节翻页">
@@ -1063,7 +1281,11 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
               :selected-document-id="selected?.id || null"
               :pending-document-id="pendingDocumentId"
               :error="documentSwitchError"
+              :loading="documentListLoading"
+              :has-more="!!documentNextCursor"
+              :load-error="documentListLoadError"
               @select="selectDocumentFromNavigation($event, 'mobile')"
+              @load-more="loadDocuments(false)"
             />
           </div>
         </template>

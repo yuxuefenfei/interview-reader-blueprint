@@ -260,7 +260,7 @@ function message(value: unknown): string { return toUserMessage(value, "导入�
                 <el-radio value="CREATE_NEW">创建新文档（标识：{{ preview.suggestedDocumentKey }}）</el-radio>
               </el-radio-group>
             </div>
-            <div v-if="metadataEditable" class="import-metadata-actions"><el-button :loading="metadataSaving" data-testid="save-import-metadata" @click="saveStagedMetadata">保存资料</el-button></div>
+            <div v-if="metadataEditable" class="import-metadata-actions"><el-button :loading="metadataSaving" data-testid="save-import-metadata" @click="saveStagedMetadata()">保存资料</el-button></div>
           </section>
 
           <div class="job-actions"><el-button v-if="job.status === 'READY'" type="success" :icon="CircleCheck" :loading="committing" :disabled="!preview" data-testid="commit-import" @click="commit">生成可编辑草稿</el-button><el-button v-if="job.status === 'REVIEW_REQUIRED'" type="warning" disabled>请处理校验问题后重试</el-button></div>

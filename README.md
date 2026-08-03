@@ -139,7 +139,6 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - `POST /api/admin/documents/{documentId}/versions/{sourceVersionId}/revisions`
 - `POST /api/admin/documents/{documentId}/versions/{versionId}/publish`
 - `GET /api/admin/versions/{versionId}/editor`
-- `PUT /api/admin/versions/{versionId}/editor`（兼容整包保存）
 - `DELETE /api/admin/versions/{versionId}/editor`
 - `GET /api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks?cursor=...&limit=40`
 - `POST /api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks`
@@ -161,7 +160,6 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - `GET /api/admin/import-jobs/{jobId}/normalized-package`
 - `PATCH /api/admin/import-jobs/{jobId}/normalized-package/sections/{sectionKey}`
 - `PATCH /api/admin/import-jobs/{jobId}/normalized-package/blocks/{blockKey}`
-- `POST /api/admin/import-jobs/{jobId}/cancel`
 - `POST /api/admin/import-jobs/{jobId}/commit`
 - `POST /api/admin/exports`
 

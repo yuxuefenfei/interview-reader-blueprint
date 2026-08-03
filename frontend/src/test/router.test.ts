@@ -79,6 +79,23 @@ describe("responsive admin routing", () => {
     expect(router.currentRoute.value.fullPath).toBe("/admin/documents");
   });
 
+  it("keeps an authenticated offline cold start inside the reader on desktop", async () => {
+    const values = new Map([["reader.offlineAccess.v1", JSON.stringify({ username: "admin" })]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    });
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    const { router } = await loadRouter(false);
+
+    await router.push("/admin/documents");
+
+    expect(router.currentRoute.value.fullPath).toBe("/reader");
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    vi.unstubAllGlobals();
+  });
+
   it("leaves the reader unchanged when a narrow viewport becomes wide", async () => {
     const { media, router } = await loadRouter(true);
     await router.push("/reader");

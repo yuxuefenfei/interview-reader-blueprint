@@ -93,7 +93,8 @@ let blockRequestId = 0;
 let discardingDraft = false;
 let clearPreviewDrag: (() => void) | null = null;
 let detachedPreviewChannel: BroadcastChannel | null = null;
-let detachedPreviewPublishTimer: number | null = null;
+let detachedPreviewPublishFrame: number | null = null;
+let detachedPreviewConnected = false;
 let detachedPreviewWindow: Window | null = null;
 let previewPopupCloseWatchTimer: number | null = null;
 const blockSaveQueue = createSerializedSaveQueue<BlockSaveTask>(700, ({ snapshot, quiet }) => persistBlockSnapshot(snapshot, quiet));
@@ -220,8 +221,14 @@ onMounted(() => {
   detachedPreviewChannel = new BroadcastChannel(detachedPreviewChannelName(versionId));
   detachedPreviewChannel.onmessage = (event: MessageEvent<unknown>) => {
     if (!isDetachedPreviewMessage(event.data)) return;
-    if (event.data.type === "preview-state-request") publishDetachedPreview();
-    if (event.data.type === "preview-dismissed") restoreEmbeddedPreview();
+    if (event.data.type === "preview-state-request") {
+      detachedPreviewConnected = true;
+      publishDetachedPreview(true);
+    }
+    if (event.data.type === "preview-dismissed") {
+      detachedPreviewConnected = false;
+      restoreEmbeddedPreview();
+    }
   };
   window.addEventListener("beforeunload", warnBeforeUnload);
   void load();
@@ -230,15 +237,30 @@ onBeforeRouteLeave(async () => discardingDraft || await flushPendingBlockSave())
 onBeforeUnmount(() => {
   blockSaveQueue.cancelPending();
   window.removeEventListener("beforeunload", warnBeforeUnload);
-  if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
-  detachedPreviewPublishTimer = null;
+  if (detachedPreviewPublishFrame !== null) window.cancelAnimationFrame(detachedPreviewPublishFrame);
+  detachedPreviewPublishFrame = null;
   stopWatchingPreviewPopup();
   clearPreviewDrag?.();
   detachedPreviewChannel?.close();
   detachedPreviewChannel = null;
 });
 
-function publishDetachedPreview(): void {
+function publishDetachedPreview(immediate = false): void {
+  if (!detachedPreviewConnected) return;
+  if (immediate) {
+    if (detachedPreviewPublishFrame !== null) window.cancelAnimationFrame(detachedPreviewPublishFrame);
+    detachedPreviewPublishFrame = null;
+    postDetachedPreview();
+    return;
+  }
+  if (detachedPreviewPublishFrame !== null) return;
+  detachedPreviewPublishFrame = window.requestAnimationFrame(() => {
+    detachedPreviewPublishFrame = null;
+    postDetachedPreview();
+  });
+}
+
+function postDetachedPreview(): void {
   const currentNode = previewNode.value;
   const channel = detachedPreviewChannel;
   if (!editor.value || !currentNode || !channel) return;
@@ -248,11 +270,7 @@ function publishDetachedPreview(): void {
       versionId,
       document: { title: editor.value.document.title },
       node: { ...currentNode },
-      blocks: previewBlocks.value.map((block) => ({
-        ...block,
-        payload: JSON.parse(JSON.stringify(block.payload)) as Record<string, unknown>,
-        sourceBbox: block.sourceBbox ? JSON.parse(JSON.stringify(block.sourceBbox)) : null
-      })),
+      blocks: visiblePreviewBlocks.value,
       activeBlockId: activeBlockId.value,
       updatedAt: Date.now()
     };
@@ -265,10 +283,11 @@ function publishDetachedPreview(): void {
 function openPreviewPopup(): void {
   if (!editor.value || !selectedNode.value) return;
   if (detachedPreviewWindow && !detachedPreviewWindow.closed) {
+    detachedPreviewConnected = true;
     previewVisible.value = false;
     detachedPreviewWindow.focus();
     watchPreviewPopupClose();
-    publishDetachedPreview();
+    publishDetachedPreview(true);
     return;
   }
   const href = router.resolve({ path: `/admin/versions/${versionId}/preview`, query: { nodeId: selectedNode.value.id } }).href;
@@ -278,14 +297,10 @@ function openPreviewPopup(): void {
     return;
   }
   detachedPreviewWindow = previewWindow;
+  detachedPreviewConnected = false;
   previewVisible.value = false;
   watchPreviewPopupClose();
   previewWindow.focus();
-  if (detachedPreviewPublishTimer !== null) window.clearTimeout(detachedPreviewPublishTimer);
-  detachedPreviewPublishTimer = window.setTimeout(() => {
-    detachedPreviewPublishTimer = null;
-    publishDetachedPreview();
-  }, 120);
 }
 
 function showEmbeddedPreview(): void {
@@ -296,6 +311,7 @@ function showEmbeddedPreview(): void {
 
 function restoreEmbeddedPreview(): void {
   stopWatchingPreviewPopup();
+  detachedPreviewConnected = false;
   detachedPreviewWindow = null;
   previewVisible.value = true;
 }
@@ -878,7 +894,7 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
       <aside ref="treePanelRef" class="editor-tree-panel" v-loading="structureSaving">
         <div class="panel-title"><div><strong>文档结构</strong><span>{{ editor.nodes.length }} 个节点</span></div><el-icon><FolderOpened /></el-icon></div>
         <el-input v-model="treeFilter" class="tree-search" name="editor-node-search" autocomplete="off" clearable placeholder="搜索节点…" :prefix-icon="Search" />
-        <el-tree :data="filteredTreeData" node-key="id" :props="{ label: 'title', children: 'children' }" highlight-current :default-expanded-keys="defaultExpandedKeys" :draggable="!treeFilter" expand-on-click-node :current-node-key="selectedId" :allow-drop="() => true" @node-click="selectNode" @node-drop="persistStructure">
+        <el-tree :data="filteredTreeData" node-key="id" :props="{ label: 'title', children: 'children' }" highlight-current :default-expanded-keys="defaultExpandedKeys" :draggable="!treeFilter" expand-on-click-node :current-node-key="selectedId ?? undefined" :allow-drop="() => true" @node-click="selectNode" @node-drop="persistStructure">
           <template #default="{ data }"><span class="editor-tree-label" :data-node-id="data.id"><span>{{ data.title }}</span></span></template>
         </el-tree>
       </aside>

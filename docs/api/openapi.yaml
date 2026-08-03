@@ -403,23 +403,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EditorSnapshot" }
-    put:
-      summary: Save a draft document package with draftRevision optimistic concurrency
-      parameters:
-        - $ref: "#/components/parameters/VersionId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/SaveDraftRequest" }
-      responses:
-        default: { $ref: "#/components/responses/Problem" }
-        "200":
-          description: Successful response
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EditableVersion" }
-        "409": { $ref: "#/components/responses/Problem" }
     delete:
       summary: Delete an unpublished draft
       parameters:
@@ -782,18 +765,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentVersion" }
-  /admin/import-jobs/{jobId}/cancel:
-    post:
-      summary: Cancel an active import job
-      parameters:
-        - $ref: "#/components/parameters/JobId"
-      responses:
-        default: { $ref: "#/components/responses/Problem" }
-        "200":
-          description: Successful response
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ImportJob" }
   /admin/exports:
     post:
       summary: Export a selected document version
@@ -1312,12 +1283,6 @@ components:
         sections: { type: array, items: { $ref: "#/components/schemas/DocumentPackageSection" } }
         blocks: { type: array, items: { $ref: "#/components/schemas/DocumentPackageBlock" } }
         assets: { type: array, items: { $ref: "#/components/schemas/AssetInfo" } }
-    EditableVersion:
-      type: object
-      required: [version, documentPackage]
-      properties:
-        version: { $ref: "#/components/schemas/VersionSummary" }
-        documentPackage: { $ref: "#/components/schemas/DocumentPackage" }
     ImportJob:
       type: object
       required: [id, targetDocumentId, sourceType, status, currentStage, progress, statistics, errorCode, errorMessage]
@@ -1434,12 +1399,6 @@ components:
       required: [draftRevision]
       properties:
         draftRevision: { type: integer, minimum: 0 }
-    SaveDraftRequest:
-      type: object
-      required: [draftRevision, documentPackage]
-      properties:
-        draftRevision: { type: integer, minimum: 0 }
-        documentPackage: { $ref: "#/components/schemas/DocumentPackage" }
     ExportRequest:
       type: object
       required: [documentId, versionId, format]

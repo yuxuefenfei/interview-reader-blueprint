@@ -3,21 +3,18 @@ package com.example.interviewreader.management;
 import com.example.interviewreader.common.ApiException;
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.config.UploadProperties;
-import com.example.interviewreader.document.DocumentQueryService;
 import com.example.interviewreader.document.DocumentVersionStatus;
 import com.example.interviewreader.document.BlockType;
 import com.example.interviewreader.document.NodeType;
 import com.example.interviewreader.importpkg.DocumentBlockContent;
-import com.example.interviewreader.importpkg.DocumentPackage;
-import com.example.interviewreader.importpkg.DocumentPackageValidator;
-import com.example.interviewreader.importpkg.ImportIssueSeverity;
+import com.example.interviewreader.importpkg.DocumentPackageWriter;
 import com.example.interviewreader.importpkg.ImportJobStatus;
 import com.example.interviewreader.importpkg.ImportStage;
 import com.example.interviewreader.importpkg.SourceFileStorage;
+import com.example.interviewreader.exportpkg.DocumentPackageExportService;
 import com.example.interviewreader.persistence.entity.*;
 import com.example.interviewreader.persistence.mapper.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -55,9 +52,10 @@ public class VersionRevisionService {
     private final ContentBlockMapper contentBlockMapper;
     private final AssetMapper assetMapper;
     private final ImportJobMapper importJobMapper;
-    private final DocumentPackageValidator validator;
     private final DocumentDeletionJobMapper deletionJobMapper;
-    private final DocumentQueryService documentQueryService;
+    private final DocumentPublishingService documentPublishingService;
+    private final DocumentPackageExportService documentPackageExportService;
+    private final DocumentPackageWriter documentPackageWriter;
     private final ObjectMapper objectMapper;
     private final SourceFileStorage storage;
     private final UploadProperties uploadProperties;
@@ -85,7 +83,7 @@ public class VersionRevisionService {
         var pageItems = hasNext ? documents.subList(0, safeSize) : documents;
         var ids = pageItems.stream().map(DocumentEntity::getId).toList();
         var versions = ids.isEmpty() ? List.<DocumentVersionEntity>of() : documentVersionMapper.selectListByQuery(QueryWrapper.create()
-                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                .select(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID, DOCUMENT_VERSION_ENTITY.STATUS)
                 .from(DOCUMENT_VERSION_ENTITY)
                 .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.in(ids)));
         var byDocument = new HashMap<String, List<DocumentVersionEntity>>();
@@ -138,33 +136,11 @@ public class VersionRevisionService {
         draft.setLanguage(source.getLanguage());
         draft.setMetadata(source.getMetadata());
         documentVersionMapper.insertSelective(draft);
-        replaceContent(draft.getId(), packageFor(source));
+        documentPackageWriter.writeNewVersion(
+                draft.getId(),
+                documentPackageExportService.exportJsonPackage(documentId, sourceVersionId));
         touchDocument(source.getDocumentId());
         return summary(draft);
-    }
-
-    public ManagementDtos.EditableVersion editor(UUID versionId) {
-        var version = requireDraft(versionId);
-        return new ManagementDtos.EditableVersion(summary(version), packageFor(version));
-    }
-
-    @Transactional
-    public ManagementDtos.EditableVersion save(UUID versionId, ManagementDtos.SaveDraftRequest request) {
-        var version = requireDraft(versionId);
-        if (request == null || request.documentPackage() == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Document package is required");
-        }
-        if (request.draftRevision() != version.getDraftRevision()) {
-            throw new ApiException(HttpStatus.CONFLICT, "Draft was updated by another session");
-        }
-        var packageWithStableAnchors = withStableAnchors(version.getId(), request.documentPackage());
-        var issues = validator.validate(packageWithStableAnchors);
-        if (issues.stream().anyMatch(issue -> issue.severity() == ImportIssueSeverity.BLOCKING)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Draft contains blocking structure errors");
-        }
-        replaceContent(version.getId(), packageWithStableAnchors);
-        advanceDraft(version);
-        return new ManagementDtos.EditableVersion(summary(version), packageFor(version));
     }
 
     @Transactional
@@ -353,6 +329,7 @@ public class VersionRevisionService {
         if (block == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "内容块不存在。");
         }
+        var previousImageAssetKey = imageAssetKey(block);
         block.setBlockType(requiredBlockType(request.blockType()));
         block.setPayload(json(request.payload() == null ? Map.of("text", Objects.requireNonNullElse(request.plainText(), "")) : request.payload()));
         block.setPlainText(Objects.requireNonNullElse(request.plainText(), ""));
@@ -360,7 +337,9 @@ public class VersionRevisionService {
         contentBlockMapper.update(block);
         refreshNodeSearchText(version.getId(), block.getNodeId());
         advanceDraft(version);
-        cleanupUnusedEditorImages(version.getId());
+        if (!Objects.equals(previousImageAssetKey, imageAssetKey(block))) {
+            cleanupUnusedEditorImages(version.getId());
+        }
         return editorBlock(block);
     }
 
@@ -439,7 +418,7 @@ public class VersionRevisionService {
         requireRevision(version, request.draftRevision());
         requireNode(version.getId(), nodeId);
         var latest = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .select(CONTENT_BLOCK_ENTITY.SEQ)
                 .from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.getId()))
                 .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(id(nodeId)))
@@ -469,7 +448,11 @@ public class VersionRevisionService {
         var version = requireDraft(versionId);
         requireRevision(version, draftRevision);
         var block = contentBlockMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .select(
+                        CONTENT_BLOCK_ENTITY.ID,
+                        CONTENT_BLOCK_ENTITY.NODE_ID,
+                        CONTENT_BLOCK_ENTITY.BLOCK_TYPE,
+                        CONTENT_BLOCK_ENTITY.PAYLOAD)
                 .from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.getId()))
                 .and(CONTENT_BLOCK_ENTITY.ID.eq(id(blockId))));
@@ -480,7 +463,9 @@ public class VersionRevisionService {
         resequenceBlocks(version.getId(), block.getNodeId());
         refreshNodeSearchText(version.getId(), block.getNodeId());
         advanceDraft(version);
-        cleanupUnusedEditorImages(version.getId());
+        if (imageAssetKey(block) != null) {
+            cleanupUnusedEditorImages(version.getId());
+        }
         return new ManagementDtos.BlockMutationResult(version.getDraftRevision(), 1);
     }
 
@@ -492,10 +477,16 @@ public class VersionRevisionService {
         }
         requireRevision(version, request.draftRevision());
         var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .select(
+                        CONTENT_BLOCK_ENTITY.ID,
+                        CONTENT_BLOCK_ENTITY.NODE_ID,
+                        CONTENT_BLOCK_ENTITY.BLOCK_TYPE,
+                        CONTENT_BLOCK_ENTITY.PAYLOAD,
+                        CONTENT_BLOCK_ENTITY.PLAIN_TEXT)
                 .from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.getId())));
         var affectedNodeIds = new HashSet<String>();
+        var removedImageReference = false;
         var removedCount = 0;
         for (var block : blocks) {
             if (DocumentBlockContent.isMeaningful(block.getBlockType(), block.getPlainText(), treeOrNull(block.getPayload()))) {
@@ -503,6 +494,7 @@ public class VersionRevisionService {
             }
             contentBlockMapper.deleteById(block.getId());
             affectedNodeIds.add(block.getNodeId());
+            removedImageReference |= imageAssetKey(block) != null;
             removedCount++;
         }
         if (removedCount > 0) {
@@ -511,14 +503,15 @@ public class VersionRevisionService {
                 refreshNodeSearchText(version.getId(), nodeId);
             });
             advanceDraft(version);
-            cleanupUnusedEditorImages(version.getId());
+            if (removedImageReference) {
+                cleanupUnusedEditorImages(version.getId());
+            }
         }
         return new ManagementDtos.BlockMutationResult(version.getDraftRevision(), removedCount);
     }
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
-        DocumentLifecycleService.rejectLocked(requireDocumentForUpdate(documentId));
-        documentQueryService.publish(documentId, versionId);
+        documentPublishingService.publish(documentId, versionId);
     }
 
     private ManagementDtos.EditorNode editorNode(ContentNodeEntity node) {
@@ -679,6 +672,15 @@ public class VersionRevisionService {
         return metadata != null && metadata.path("editorImage").asBoolean(false);
     }
 
+    private String imageAssetKey(ContentBlockEntity block) {
+        if (block == null || block.getBlockType() != BlockType.IMAGE) {
+            return null;
+        }
+        var payload = treeOrNull(block.getPayload());
+        var assetKey = payload == null ? "" : payload.path("assetKey").asText("").trim();
+        return assetKey.isBlank() ? null : assetKey;
+    }
+
     private void deleteObjectOnRollback(String objectKey) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -764,7 +766,7 @@ public class VersionRevisionService {
 
     private void resequenceBlocks(String versionId, String nodeId) {
         var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .select(CONTENT_BLOCK_ENTITY.ID, CONTENT_BLOCK_ENTITY.SEQ)
                 .from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
                 .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
@@ -773,14 +775,18 @@ public class VersionRevisionService {
             var block = blocks.get(index);
             var sequence = (index + 1) * 10;
             if (block.getSeq() != sequence) {
-                block.setSeq(sequence);
-                contentBlockMapper.update(block);
+                var update = UpdateWrapper.of(ContentBlockEntity.class)
+                        .set(CONTENT_BLOCK_ENTITY.SEQ, sequence);
+                contentBlockMapper.updateByQuery(update.toEntity(), false, QueryWrapper.create()
+                        .where(CONTENT_BLOCK_ENTITY.ID.eq(block.getId()))
+                        .and(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
+                        .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId)));
             }
         }
     }
     private void refreshNodeSearchText(String versionId, String nodeId) {
         var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                .select(CONTENT_NODE_ENTITY.ID, CONTENT_NODE_ENTITY.TITLE)
                 .from(CONTENT_NODE_ENTITY)
                 .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId))
                 .and(CONTENT_NODE_ENTITY.ID.eq(nodeId)));
@@ -788,14 +794,17 @@ public class VersionRevisionService {
             return;
         }
         var text = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
+                .select(CONTENT_BLOCK_ENTITY.PLAIN_TEXT)
                 .from(CONTENT_BLOCK_ENTITY)
                 .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
                 .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
                 .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()))
                 .stream().map(block -> Objects.requireNonNullElse(block.getPlainText(), "")).collect(java.util.stream.Collectors.joining("\n"));
-        node.setSearchText(node.getTitle() + (text.isBlank() ? "" : "\n" + text));
-        contentNodeMapper.update(node);
+        var update = UpdateWrapper.of(ContentNodeEntity.class)
+                .set(CONTENT_NODE_ENTITY.SEARCH_TEXT, node.getTitle() + (text.isBlank() ? "" : "\n" + text));
+        contentNodeMapper.updateByQuery(update.toEntity(), false, QueryWrapper.create()
+                .where(CONTENT_NODE_ENTITY.ID.eq(nodeId))
+                .and(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId)));
     }
     private void requireRevision(DocumentVersionEntity version, long requestedRevision) {
         if (requestedRevision != version.getDraftRevision()) {
@@ -865,113 +874,6 @@ public class VersionRevisionService {
         }
         return value;
     }
-    private DocumentPackage packageFor(DocumentVersionEntity version) {
-        var document = requireDocument(uuid(version.getDocumentId()));
-        var nodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_NODE_ENTITY)
-                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.getId()))
-                .orderBy(CONTENT_NODE_ENTITY.PATH.asc()));
-        var nodeKeys = nodes.stream().collect(java.util.stream.Collectors.toMap(ContentNodeEntity::getId, ContentNodeEntity::getNodeKey));
-        var sections = nodes.stream().map(node -> new DocumentPackage.SectionInfo(
-                node.getNodeKey(), node.getParentId() == null ? null : nodeKeys.get(node.getParentId()), node.getLevel(), node.getNodeType(),
-                node.getSemanticRole(), node.getTitle(), node.getSortOrder(), node.getAnchor(), node.getSourcePageStart(), node.getSourcePageEnd(),
-                treeOrNull(node.getSourceBbox()), node.getContentHash())).toList();
-        var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_BLOCK_ENTITY)
-                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(version.getId()))
-                .orderBy(CONTENT_BLOCK_ENTITY.NODE_ID.asc(), CONTENT_BLOCK_ENTITY.SEQ.asc()))
-                .stream().map(block -> new DocumentPackage.BlockInfo(
-                        block.getBlockKey(), nodeKeys.get(block.getNodeId()), block.getSeq(), block.getBlockType(), tree(block.getPayload()), block.getPlainText(),
-                        block.getLanguage(), block.getSourcePage(), treeOrNull(block.getSourceBbox()), block.getConfidence(), block.getContentHash())).toList();
-        var assets = assetMapper.selectListByQuery(QueryWrapper.create()
-                .select(ASSET_ENTITY.ALL_COLUMNS)
-                .from(ASSET_ENTITY)
-                .where(ASSET_ENTITY.VERSION_ID.eq(version.getId()))
-                .orderBy(ASSET_ENTITY.ASSET_KEY.asc()))
-                .stream().map(asset -> new DocumentPackage.AssetInfo(asset.getAssetKey(), asset.getObjectKey(), asset.getMimeType(), asset.getSha256(), alt(asset.getMetadata()))).toList();
-        return new DocumentPackage(version.getSchemaVersion(),
-                new DocumentPackage.DocumentInfo(document.getCode(), document.getTitle(), document.getDescription(), version.getLanguage(), List.of()),
-                new DocumentPackage.VersionInfo("v" + version.getVersionNo(), version.getSourceType(), version.getSourceFileName(),
-                        version.getSourceFileSha256(), version.getConverterVersion(), map(version.getMetadata())),
-                sections, blocks, assets);
-    }
-
-    private void replaceContent(String versionId, DocumentPackage documentPackage) {
-        deleteContent(versionId);
-        var sections = new ArrayList<>(documentPackage.sections());
-        sections.sort(Comparator.comparing(DocumentPackage.SectionInfo::level)
-                .thenComparing(section -> Objects.requireNonNullElse(section.sortOrder(), 0))
-                .thenComparing(DocumentPackage.SectionInfo::sectionKey));
-        var nodeIds = new HashMap<String, String>();
-        var paths = new HashMap<String, String>();
-        var textBySection = new HashMap<String, List<String>>();
-        documentPackage.blocks().forEach(block -> textBySection.computeIfAbsent(block.sectionKey(), ignored -> new ArrayList<>()).add(block.plainText()));
-        for (var section : sections) {
-            var node = new ContentNodeEntity();
-            node.setId(UUID.randomUUID().toString());
-            node.setVersionId(versionId);
-            node.setParentId(section.parentSectionKey() == null ? null : nodeIds.get(section.parentSectionKey()));
-            if (section.parentSectionKey() != null && node.getParentId() == null) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Unknown parent section: " + section.parentSectionKey());
-            }
-            node.setNodeKey(section.sectionKey());
-            node.setNodeType(section.nodeType());
-            node.setSemanticRole(section.semanticRole());
-            node.setTitle(section.title());
-            node.setLevel(section.level());
-            node.setSortOrder(section.sortOrder());
-            var parentPath = section.parentSectionKey() == null ? null : paths.get(section.parentSectionKey());
-            node.setPath(parentPath == null ? String.format("%06d", node.getSortOrder()) : parentPath + "." + String.format("%06d", node.getSortOrder()));
-            node.setAnchor(blankToNull(section.anchor()) == null ? opaqueAnchor() : section.anchor());
-            node.setSourcePageStart(section.sourcePageStart());
-            node.setSourcePageEnd(section.sourcePageEnd());
-            node.setSourceBbox(jsonOrNull(section.sourceBbox()));
-            node.setContentHash(blankToNull(section.contentHash()));
-            node.setSearchText(section.title() + "\n" + String.join("\n", textBySection.getOrDefault(section.sectionKey(), List.of())));
-            contentNodeMapper.insertSelective(node);
-            nodeIds.put(section.sectionKey(), node.getId());
-            paths.put(section.sectionKey(), node.getPath());
-        }
-        for (var block : documentPackage.blocks()) {
-            var nodeId = nodeIds.get(block.sectionKey());
-            if (nodeId == null) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Unknown block section: " + block.sectionKey());
-            }
-            var entity = new ContentBlockEntity();
-            entity.setId(UUID.randomUUID().toString());
-            entity.setVersionId(versionId);
-            entity.setNodeId(nodeId);
-            entity.setBlockKey(block.blockKey());
-            entity.setSeq(block.seq());
-            entity.setBlockType(block.blockType());
-            entity.setPayload(json(block.payload()));
-            entity.setPlainText(Objects.requireNonNullElse(block.plainText(), ""));
-            entity.setLanguage(blankToNull(block.language()));
-            entity.setSourcePage(block.sourcePage());
-            entity.setSourceBbox(jsonOrNull(block.sourceBbox()));
-            entity.setConfidence(block.confidence());
-            entity.setContentHash(blankToNull(block.contentHash()));
-            contentBlockMapper.insertSelective(entity);
-        }
-        for (var asset : documentPackage.assets()) {
-            var entity = new AssetEntity();
-            entity.setId(UUID.randomUUID().toString());
-            entity.setVersionId(versionId);
-            entity.setAssetKey(asset.assetKey());
-            entity.setObjectKey(asset.path());
-            entity.setOriginalName(asset.path());
-            entity.setMimeType(asset.mimeType());
-            entity.setSha256(asset.sha256());
-            entity.setSizeBytes(0);
-            entity.setMetadata(json(Map.of(
-                    "alt", Objects.requireNonNullElse(asset.alt(), ""),
-                    "editorImage", asset.assetKey() != null && asset.assetKey().startsWith("editor-image-"))));
-            assetMapper.insertSelective(entity);
-        }
-    }
-
     private void resetImportJobs(String versionId) {
         var jobs = importJobMapper.selectListByQuery(QueryWrapper.create()
                 .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
@@ -1092,19 +994,6 @@ public class VersionRevisionService {
         return value == null || value.isBlank() ? null : tree(value);
     }
 
-    private Map<String, Object> map(String value) {
-        if (value == null || value.isBlank()) {
-            return Map.of();
-        }
-        return objectMapper.convertValue(tree(value), new TypeReference<>() {
-        });
-    }
-
-    private String alt(String metadata) {
-        var value = treeOrNull(metadata);
-        return value == null ? "" : value.path("alt").asText("");
-    }
-
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -1113,36 +1002,8 @@ public class VersionRevisionService {
         }
     }
 
-    private String jsonOrNull(JsonNode value) {
-        return value == null || value.isNull() ? null : json(value);
-    }
-
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
-    }
-
-    private DocumentPackage withStableAnchors(String versionId, DocumentPackage documentPackage) {
-        if (documentPackage.sections() == null) {
-            return documentPackage;
-        }
-        var existingAnchors = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                        .select(CONTENT_NODE_ENTITY.NODE_KEY, CONTENT_NODE_ENTITY.ANCHOR)
-                        .from(CONTENT_NODE_ENTITY)
-                        .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId)))
-                .stream()
-                .collect(java.util.stream.Collectors.toMap(ContentNodeEntity::getNodeKey, ContentNodeEntity::getAnchor));
-        var sections = documentPackage.sections().stream()
-                .map(section -> section == null ? null : new DocumentPackage.SectionInfo(
-                        section.sectionKey(), section.parentSectionKey(), section.level(), section.nodeType(), section.semanticRole(),
-                        section.title(), section.sortOrder(), existingAnchors.getOrDefault(section.sectionKey(), opaqueAnchor()),
-                        section.sourcePageStart(), section.sourcePageEnd(), section.sourceBbox(), section.contentHash()))
-                .toList();
-        return new DocumentPackage(documentPackage.schemaVersion(), documentPackage.document(), documentPackage.version(),
-                sections, documentPackage.blocks(), documentPackage.assets());
-    }
-
-    private static String opaqueAnchor() {
-        return "sec_" + UUID.randomUUID();
     }
 
     private static String id(UUID value) {

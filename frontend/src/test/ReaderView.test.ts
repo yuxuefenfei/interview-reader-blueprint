@@ -43,7 +43,7 @@ vi.mock("element-plus/es/components/message/index", () => ({ ElMessage: messages
 vi.mock("../components/ContentBlockView.vue", () => ({
   default: defineComponent({
     props: { block: { type: Object, required: true } },
-    template: '<div class="mock-content">{{ block.plainText }}</div>',
+    template: '<div class="mock-content" :data-block-id="block.id">{{ block.plainText }}</div>',
   }),
 }));
 vi.mock("../components/TocTree.vue", () => ({
@@ -223,6 +223,94 @@ describe("ReaderView request coordination", () => {
       })
     );
     expect(wrapper.text()).not.toContain("阅读章节不属于目标版本");
+    wrapper.unmount();
+  });
+
+  it("saves the content block crossing the viewport anchor instead of the first block", async () => {
+    const currentDocument = document("document-a", "version-a");
+    const currentNode = node("node-a");
+    api.documents.mockResolvedValue({ items: [currentDocument], nextCursor: null });
+    api.toc.mockResolvedValue([currentNode]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockResolvedValue({
+      node: currentNode,
+      blocks: [block("block-a"), { ...block("block-b"), seq: 2 }],
+      nextAfterSeq: null,
+    });
+    api.saveProgress.mockImplementation(async (_documentId: string, value) => value);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this instanceof HTMLElement && this.dataset.blockId === "block-a") {
+        return { top: -120, bottom: -20, left: 0, right: 100, width: 100, height: 100, x: 0, y: -120, toJSON() {} };
+      }
+      if (this instanceof HTMLElement && this.dataset.blockId === "block-b") {
+        return { top: -20, bottom: 180, left: 0, right: 100, width: 100, height: 200, x: 0, y: -20, toJSON() {} };
+      }
+      return { top: 0, bottom: 600, left: 0, right: 800, width: 800, height: 600, x: 0, y: 0, toJSON() {} };
+    });
+
+    const wrapper = mountReader();
+    await flushPromises();
+    await wrapper.get(".reader-content").trigger("scroll");
+    await vi.advanceTimersByTimeAsync(17);
+    await vi.advanceTimersByTimeAsync(701);
+
+    expect(api.saveProgress).toHaveBeenCalledWith(
+      "document-a",
+      expect.objectContaining({ blockId: "block-b", blockViewportOffset: -20, charOffset: 0 }),
+    );
+    wrapper.unmount();
+  });
+
+  it("debounces remote document searches and restarts cursor pagination", async () => {
+    const currentNode = node("node-a");
+    const page = [
+      document("document-a", "version-a"),
+      ...Array.from({ length: 8 }, (_, index) => document(`document-${index + 2}`, `version-${index + 2}`)),
+    ];
+    api.documents.mockResolvedValue({ items: page, nextCursor: null });
+    api.toc.mockResolvedValue([currentNode]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockResolvedValue(content(currentNode, "block-a"));
+    api.saveProgress.mockImplementation(async (_documentId: string, value) => value);
+
+    const wrapper = mountReader();
+    await flushPromises();
+    await wrapper.get(".reader-desktop-nav-expand").trigger("click");
+    await nextTick();
+    await wrapper.get(".reader-document-selector").trigger("click");
+    await nextTick();
+    const filter = wrapper.get('.reader-document-filter input[type="search"]');
+    await filter.setValue("并发");
+    await vi.advanceTimersByTimeAsync(399);
+    expect(api.documents).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+
+    expect(api.documents).toHaveBeenLastCalledWith("并发", null, 16, expect.any(AbortSignal));
+    wrapper.unmount();
+  });
+
+  it("automatically appends the next block page when the continuation sentinel is visible", async () => {
+    const currentDocument = document("document-a", "version-a");
+    const currentNode = node("node-a");
+    api.documents.mockResolvedValue({ items: [currentDocument], nextCursor: null });
+    api.toc.mockResolvedValue([currentNode]);
+    api.progress.mockResolvedValue(null);
+    api.content.mockImplementation((_versionId: string, _nodeId: string, afterSeq?: number) =>
+      Promise.resolve(afterSeq
+        ? { node: currentNode, blocks: [{ ...block("block-b"), seq: 101 }], nextAfterSeq: null }
+        : { node: currentNode, blocks: [block("block-a")], nextAfterSeq: 100 }));
+    api.saveProgress.mockImplementation(async (_documentId: string, value) => value);
+
+    const wrapper = mountReader();
+    for (let turn = 0; turn < 3; turn += 1) {
+      await flushPromises();
+      await nextTick();
+    }
+
+    expect(api.content).toHaveBeenCalledWith("version-a", "node-a", 100, expect.any(AbortSignal));
+    expect(wrapper.text()).toContain("block-b");
+    expect(wrapper.text()).not.toContain("加载更多内容");
     wrapper.unmount();
   });
 

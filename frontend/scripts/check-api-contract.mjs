@@ -60,29 +60,16 @@ for (const [constantName, schemaName] of [
   compareSets(`backend ${constantName}`, new Set(readJavaSet(javaContract, constantName)), `OpenAPI ${schemaName}`, schemaValues);
 }
 
-const interfaceSchemas = {
-  AuthSession: "AuthSession", DocumentSummary: "DocumentSummary", DocumentListResponse: "DocumentPage",
-  TocNode: "TocNode", ContentBlock: "ContentBlock", NodeContent: "NodeContent", SearchHit: "SearchHit",
-  ReadingProgress: "ReadingProgress", ImportJob: "ImportJob", ImportIssue: "ImportIssue",
-  ExistingDocumentMatch: "ExistingDocumentMatch", ImportDocumentPreview: "ImportDocumentPreview", DocumentMetadata: "DocumentMetadata", DocumentVersion: "DocumentVersion",
-  StagedSection: "DocumentPackageSection", StagedBlock: "DocumentPackageBlock", DocumentInfo: "DocumentInfo",
-  VersionInfo: "VersionInfo", AssetInfo: "AssetInfo", DocumentPackage: "DocumentPackage",
-  VersionSummary: "VersionSummary", EditableVersion: "EditableVersion", AdminDocumentSummary: "AdminDocumentSummary",
-  AdminDocumentPage: "AdminDocumentPage", EditorDocument: "EditorDocument", EditorNode: "EditorNode",
-  EditorSnapshot: "EditorSnapshot", EditorBlock: "EditorBlock", NodeBlocksPage: "NodeBlocksPage",
-  StructureNode: "StructureNode", BlockMutationResult: "BlockMutationResult", ImageBlockUploadResult: "ImageBlockUploadResult"
-};
-for (const [interfaceName, schemaName] of Object.entries(interfaceSchemas)) {
-  const fields = readTsInterface(tsSource, interfaceName);
-  const schema = document.components.schemas[schemaName];
-  if (!schema) {
-    failures.push(`OpenAPI schema ${schemaName} is missing`);
-    continue;
+const generatedTypesPath = path.join(frontendRoot, "src", "generated", "api", "types.gen.ts");
+if (!fs.existsSync(generatedTypesPath)) {
+  failures.push("Generated OpenAPI TypeScript types are missing; run npm run api:generate");
+} else {
+  const generatedTypes = fs.readFileSync(generatedTypesPath, "utf8");
+  for (const schemaName of Object.keys(document.components?.schemas ?? {})) {
+    if (!generatedTypes.includes(`export type ${schemaName} =`)) {
+      failures.push(`Generated TypeScript schema ${schemaName} is missing`);
+    }
   }
-  compareSets(`frontend ${interfaceName} fields`, new Set(fields.keys()), `OpenAPI ${schemaName} fields`, new Set(Object.keys(schema.properties ?? {})));
-  const required = new Set(schema.required ?? []);
-  const frontendRequired = new Set([...fields].filter(([, optional]) => !optional).map(([name]) => name));
-  compareSets(`frontend ${interfaceName} required fields`, frontendRequired, `OpenAPI ${schemaName} required fields`, required);
 }
 
 const responsiveSource = fs.readFileSync(path.join(frontendRoot, "src", "shared", "responsive.ts"), "utf8");
@@ -177,9 +164,4 @@ function readJavaSet(source, name) {
       .map((line) => line.match(/^\s*([A-Z][A-Z0-9_]*)\s*(?:\(\s*"([^"]+)"[^)]*\))?\s*,?\s*$/))
       .filter(Boolean)
       .map((match) => match[2] ?? match[1]);
-}
-function readTsInterface(source, name) {
-  const body = source.match(new RegExp(`export interface ${name} \\{([^}]*)\\}`))?.[1];
-  if (!body) throw new Error(`Cannot read TypeScript interface ${name}`);
-  return new Map([...body.matchAll(/(?:^|;)\s*([A-Za-z][A-Za-z0-9]*)(\?)?:/g)].map((match) => [match[1], Boolean(match[2])]));
 }

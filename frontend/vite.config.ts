@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
+import Components from "unplugin-vue-components/vite";
+import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 import { DEFAULT_API_PROXY_TARGET, FRONTEND_DEV_PORT } from "./src/shared/runtimeConfig";
 
 const vueUsePureAnnotationCompatibility = {
@@ -24,7 +26,16 @@ export default defineConfig(({ mode }) => {
 
   return {
     define: { __APP_BUILD_ID__: JSON.stringify(buildId) },
-    plugins: [vueUsePureAnnotationCompatibility, vue()],
+    plugins: [
+      vueUsePureAnnotationCompatibility,
+      Components({
+        dts: "src/generated/components.d.ts",
+        // Component styles belong to the production chunks. Unit tests stub the
+        // widgets and must not ask Node's native ESM loader to execute CSS files.
+        resolvers: [ElementPlusResolver({ importStyle: mode === "test" ? false : "css" })]
+      }),
+      vue()
+    ],
     server: {
       port: FRONTEND_DEV_PORT,
       proxy: {
@@ -45,7 +56,8 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: "jsdom",
-      globals: true
+      globals: true,
+      pool: "threads"
     }
   };
 });

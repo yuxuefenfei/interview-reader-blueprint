@@ -6,6 +6,11 @@ import { readerApi } from "./api/reader";
 import { syncDeletedDocuments } from "./offline/deletionSync";
 import { activateServiceWorkerUpdate, SERVICE_WORKER_UPDATE_EVENT } from "./offline/serviceWorkerRegistration";
 import { BRAND_ICON_URL } from "./shared/branding";
+import {
+  clearOfflineReaderAccess,
+  offlineReaderAccessHint,
+  rememberOfflineReaderAccess,
+} from "./offline/offlineAccess";
 
 const router = useRouter();
 const ready = ref(false);
@@ -25,7 +30,18 @@ onMounted(async () => {
     const session = await readerApi.session();
     authenticated.value = session.authenticated;
     username.value = session.username;
-    if (session.authenticated) void syncDeletedDocuments().catch(() => undefined);
+    if (session.authenticated) {
+      rememberOfflineReaderAccess(session.username);
+      void syncDeletedDocuments().catch(() => undefined);
+    } else {
+      clearOfflineReaderAccess();
+    }
+  } catch {
+    const offlineAccess = navigator.onLine === false ? offlineReaderAccessHint() : null;
+    if (offlineAccess) {
+      authenticated.value = true;
+      username.value = offlineAccess.username;
+    }
   } finally {
     ready.value = true;
   }
@@ -43,6 +59,7 @@ async function login(): Promise<void> {
     const session = await readerApi.login(form.value.username, form.value.password);
     authenticated.value = session.authenticated;
     username.value = session.username;
+    rememberOfflineReaderAccess(session.username);
     void syncDeletedDocuments().catch(() => undefined);
     form.value.password = "";
     await router.replace("/reader");
@@ -54,9 +71,11 @@ async function login(): Promise<void> {
 }
 
 async function logout(): Promise<void> {
+  if (!online.value) return;
   await readerApi.logout().catch(() => undefined);
   authenticated.value = false;
   username.value = null;
+  clearOfflineReaderAccess();
   await router.replace("/reader");
 }
 
@@ -101,7 +120,7 @@ function applyUpdate(): void {
     </form>
   </section>
   <div v-else id="main-content" class="route-content" tabindex="-1">
-    <router-view :username="username" @logout="logout" />
+    <router-view :username="username" :online="online" @logout="logout" />
   </div>
   <div v-if="!online" class="app-status-banner" role="status">当前处于离线状态；已缓存内容仍可阅读，进度会在联网后同步。</div>
   <div v-if="ready && authenticated && updateAvailable" class="app-update-banner" role="status">

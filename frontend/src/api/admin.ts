@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { AdminDocumentPage, AdminDocumentSummary, BlockMutationResult, DeletionJob, DocumentMetadata, DocumentVersion, EditableVersion, EditorBlock, EditorSnapshot, ImageBlockUploadResult, ImportDocumentPreview, ImportIssue, ImportJob, ImportResolution, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
+import type { AdminDocumentPage, AdminDocumentSummary, BlockMutationResult, DeletionJob, DocumentMetadata, DocumentVersion, EditorBlock, EditorSnapshot, ImageBlockUploadResult, ImportDocumentPreview, ImportIssue, ImportJob, ImportResolution, NodeBlocksPage, StructureNode, VersionSummary } from "../types/api";
 
 export const adminApi = {
   documents: (query = "", page = 1, size = 20) => http.get<AdminDocumentPage>("/admin/documents", { params: { query: query || undefined, page, size } }).then(({ data }) => data),
@@ -25,12 +25,10 @@ export const adminApi = {
   uploadBlockImage: (versionId: string, blockId: string, draftRevision: number, file: File, alt: string, decorative: boolean, caption: string) => { const body = new FormData(); body.set("file", file); body.set("draftRevision", String(draftRevision)); body.set("alt", alt); body.set("decorative", String(decorative)); if (caption.trim()) body.set("caption", caption.trim()); return http.post<ImageBlockUploadResult>(`/admin/versions/${versionId}/editor/blocks/${blockId}/image`, body).then(({ data }) => data); },
   deleteBlock: (versionId: string, blockId: string, draftRevision: number) => http.delete<BlockMutationResult>(`/admin/versions/${versionId}/editor/blocks/${blockId}`, { params: { draftRevision } }).then(({ data }) => data),
   cleanupEmptyBlocks: (versionId: string, draftRevision: number) => http.post<BlockMutationResult>(`/admin/versions/${versionId}/editor/blocks/cleanup-empty`, { draftRevision }).then(({ data }) => data),
-  saveEditor: (versionId: string, draftRevision: number, documentPackage: EditableVersion["documentPackage"]) => http.put<EditableVersion>(`/admin/versions/${versionId}/editor`, { draftRevision, documentPackage }).then(({ data }) => data),
   upload: (file: File, targetDocumentId?: string) => { const body = new FormData(); body.set("file", file); if (targetDocumentId) body.set("targetDocumentId", targetDocumentId); return http.post<ImportJob>("/admin/import-jobs", body).then(({ data }) => data); },
   importJob: (jobId: string) => http.get<ImportJob>(`/admin/import-jobs/${jobId}`).then(({ data }) => data),
   importIssues: (jobId: string) => http.get<ImportIssue[]>(`/admin/import-jobs/${jobId}/issues`).then(({ data }) => data),
   importDocumentMetadata: (jobId: string) => http.get<ImportDocumentPreview>(`/admin/import-jobs/${jobId}/document-metadata`).then(({ data }) => data),
   updateImportDocumentMetadata: (jobId: string, metadata: Pick<ImportDocumentPreview, "title" | "description" | "tags">) => http.patch<ImportDocumentPreview>(`/admin/import-jobs/${jobId}/document-metadata`, metadata).then(({ data }) => data),
-  commitImport: (jobId: string, resolution?: ImportResolution) => http.post<DocumentVersion>(`/admin/import-jobs/${jobId}/commit`, resolution ? { resolution } : undefined).then(({ data }) => data),
-  cancelImport: (jobId: string) => http.post(`/admin/import-jobs/${jobId}/cancel`).then(({ data }) => data)
+  commitImport: (jobId: string, resolution?: ImportResolution) => http.post<DocumentVersion>(`/admin/import-jobs/${jobId}/commit`, resolution ? { resolution } : undefined).then(({ data }) => data)
 };
