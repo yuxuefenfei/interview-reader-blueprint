@@ -122,7 +122,7 @@ describe("ImportCenterView", () => {
 
     await wrapper.get('[data-testid="commit-import"]').trigger("click");
     await flushPromises();
-    expect(mocks.messageWarning).toHaveBeenCalledWith("标识已匹配已有文档，请明确选择导入方式");
+    expect(mocks.messageWarning).toHaveBeenCalledWith("文档标识已匹配已有文档，请明确选择导入方式");
     expect(mocks.updateImportDocumentMetadata).not.toHaveBeenCalled();
     expect(mocks.commitImport).not.toHaveBeenCalled();
   });

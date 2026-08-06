@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CopyDocument } from "@element-plus/icons-vue";
+import { Check, CopyDocument } from "@element-plus/icons-vue";
 import { onBeforeUnmount, ref } from "vue";
 
 const props = withDefaults(defineProps<{
@@ -7,7 +7,7 @@ const props = withDefaults(defineProps<{
   label?: string;
 }>(), {
   value: "",
-  label: "只读标识",
+  label: "文档标识",
 });
 
 const copyLabel = ref("复制标识");
@@ -52,9 +52,10 @@ async function copyIdentifier(): Promise<void> {
     <el-tooltip :content="copyLabel" placement="top">
       <el-button
         class="readonly-identifier-copy"
+        :class="{ 'is-copied': copyLabel === '已复制' }"
         text
         circle
-        :icon="CopyDocument"
+        :icon="copyLabel === '已复制' ? Check : CopyDocument"
         :disabled="!value"
         :aria-label="copyLabel"
         @click="copyIdentifier"
@@ -66,42 +67,40 @@ async function copyIdentifier(): Promise<void> {
 
 <style scoped>
 .readonly-identifier {
-  width: 100%;
-  min-height: 42px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 8px 8px 12px;
-  border: 1px solid var(--line-200);
-  border-radius: var(--radius-sm);
-  background: #f7f9fa;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--ink-700);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-.readonly-identifier:focus-within {
-  border-color: var(--brand-500);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-500), transparent 86%);
 }
 .readonly-identifier code {
   min-width: 0;
-  flex: 1;
-  padding: 2px 0;
-  color: #294054;
-  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, "Microsoft YaHei UI", "Microsoft YaHei", monospace;
-  font-size: 13px;
+  flex: 0 1 auto;
+  color: #27364a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
   font-variant-ligatures: none;
-  letter-spacing: .01em;
-  line-height: 1.55;
+  letter-spacing: 0;
+  line-height: 1.6;
   overflow-wrap: anywhere;
   user-select: text;
 }
 .readonly-identifier-copy {
+  width: 28px;
+  min-height: 28px;
+  height: 28px;
   flex: 0 0 auto;
-  color: var(--ink-500);
+  color: var(--ink-300);
 }
 .readonly-identifier-copy:hover,
 .readonly-identifier-copy:focus-visible {
   color: var(--brand-500);
   background: var(--brand-050);
+}
+.readonly-identifier-copy.is-copied {
+  color: var(--brand-500);
 }
 </style>

@@ -189,7 +189,7 @@ async function commit(): Promise<void> {
   const currentPreview = preview.value;
   if (!currentJob || !currentPreview || committing.value) return;
   if (currentPreview.matchingDocument && !resolution.value) {
-    ElMessage.warning("标识已匹配已有文档，请明确选择导入方式");
+    ElMessage.warning("文档标识已匹配已有文档，请明确选择导入方式");
     return;
   }
   if (metadataEditable.value && !(await saveStagedMetadata(false))) return;
@@ -243,21 +243,21 @@ function message(value: unknown): string { return toUserMessage(value, "导入�
           <div v-if="issues.length" class="issue-list"><el-alert v-for="issue in issues" :key="`${issue.issueCode}-${issue.blockKey}`" :title="issueMessage(issue)" :type="issue.severity === 'BLOCKING' ? 'error' : 'warning'" :closable="false" show-icon /></div>
 
           <section v-if="preview" class="import-document-preview" aria-labelledby="import-document-heading">
-            <div class="import-document-preview-heading"><div><strong id="import-document-heading">{{ metadataEditable ? '新文档资料' : '来源文档资料' }}</strong><span>{{ metadataEditable ? '提交前可校正显示资料，标识创建后保持只读。' : '本次只导入内容版本，不会覆盖目标文档资料。' }}</span></div><el-tag :type="metadataEditable ? 'success' : 'info'" effect="plain">{{ metadataEditable ? '可编辑' : '仅参考' }}</el-tag></div>
+            <div class="import-document-preview-heading"><div><strong id="import-document-heading">{{ metadataEditable ? '新文档资料' : '来源文档资料' }}</strong><span>{{ metadataEditable ? '提交前可校正显示资料，文档标识创建后不可修改。' : '本次只导入内容版本，不会覆盖目标文档资料。' }}</span></div><el-tag :type="metadataEditable ? 'success' : 'info'" effect="plain">{{ metadataEditable ? '可编辑' : '仅参考' }}</el-tag></div>
             <el-alert v-if="selectedTarget" :title="`目标文档：${selectedTarget.title} · ${selectedTarget.code}`" type="info" :closable="false" show-icon description="来源标题、描述和标签不会写入目标文档。" />
             <el-form label-position="top" class="import-metadata-form">
               <el-form-item label="标题" required><el-input v-model="metadataForm.title" name="import-title" autocomplete="off" maxlength="500" show-word-limit :disabled="!metadataEditable" /></el-form-item>
-              <el-form-item label="只读标识"><ReadonlyIdentifier :value="readonlyDocumentKey" /></el-form-item>
+              <el-form-item label="文档标识"><ReadonlyIdentifier :value="readonlyDocumentKey" /><span class="form-help">文档创建后不可修改。</span></el-form-item>
               <el-form-item label="描述"><el-input v-model="metadataForm.description" name="import-description" autocomplete="off" type="textarea" :rows="3" maxlength="5000" show-word-limit :disabled="!metadataEditable" /></el-form-item>
               <el-form-item label="标签"><el-select v-model="metadataForm.tags" name="import-tags" multiple filterable allow-create default-first-option :multiple-limit="20" :disabled="!metadataEditable" placeholder="输入标签后按回车…"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select></el-form-item>
             </el-form>
             <el-alert v-if="fallbackTitle && metadataEditable" title="未能从文档内容或文件名识别有效标题，请确认后再提交。" type="warning" :closable="false" show-icon />
-            <el-alert v-if="preview.duplicateTitleCount > 0 && metadataEditable" :title="`已有 ${preview.duplicateTitleCount} 个同名文档；允许继续创建，请结合只读标识区分。`" type="warning" :closable="false" show-icon />
+            <el-alert v-if="preview.duplicateTitleCount > 0 && metadataEditable" :title="`已有 ${preview.duplicateTitleCount} 个同名文档；允许继续创建，请结合文档标识区分。`" type="warning" :closable="false" show-icon />
             <div v-if="preview.matchingDocument && preview.editable" class="import-resolution-panel">
-              <el-alert :title="`标识已匹配：${preview.matchingDocument.title} · ${preview.matchingDocument.code}`" type="warning" :closable="false" show-icon description="系统不会静默合并，请明确选择本次导入方式。" />
+              <el-alert :title="`文档标识已匹配：${preview.matchingDocument.title} · ${preview.matchingDocument.code}`" type="warning" :closable="false" show-icon description="系统不会静默合并，请明确选择本次导入方式。" />
               <el-radio-group v-model="resolution">
                 <el-radio value="IMPORT_AS_NEW_VERSION" :disabled="matchingDocumentLocked">导入为匹配文档的新版本</el-radio>
-                <el-radio value="CREATE_NEW">创建新文档（标识：{{ preview.suggestedDocumentKey }}）</el-radio>
+                <el-radio value="CREATE_NEW">创建新文档（文档标识：{{ preview.suggestedDocumentKey }}）</el-radio>
               </el-radio-group>
             </div>
             <div v-if="metadataEditable" class="import-metadata-actions ui-action-row"><el-button :loading="metadataSaving" data-testid="save-import-metadata" @click="saveStagedMetadata()">保存资料</el-button></div>

@@ -40,6 +40,8 @@ describe("ReadonlyIdentifier", () => {
 
     expect(writeText).toHaveBeenCalledWith(value);
     expect(wrapper.get(".tooltip-stub").attributes("data-content")).toBe("已复制");
+    expect(wrapper.get("button").classes()).toContain("is-copied");
+    expect(wrapper.get("button").attributes("aria-label")).toBe("已复制");
     wrapper.unmount();
   });
 });
