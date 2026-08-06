@@ -969,7 +969,9 @@ components:
         sectionId: { $ref: "#/components/schemas/NullableUuid" }
         blockId: { $ref: "#/components/schemas/NullableUuid" }
         charOffset: { type: integer, minimum: 0 }
-        blockViewportOffset: { type: integer, minimum: 0 }
+        blockViewportOffset:
+          type: integer
+          description: 内容块顶部相对阅读视口顶部的像素偏移；内容块顶部已滚出视口时为负数。
         progressRatio:
           type: number
           minimum: 0

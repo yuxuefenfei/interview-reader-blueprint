@@ -83,7 +83,7 @@ public final class DocumentDtos {
             UUID sectionId,
             UUID blockId,
             @Min(0) int charOffset,
-            @Min(0) int blockViewportOffset,
+            int blockViewportOffset,
             @NotNull @DecimalMin("0.0") @DecimalMax("1.0") BigDecimal progressRatio,
             OffsetDateTime clientUpdatedAt,
             @Size(max = 200) String deviceId,

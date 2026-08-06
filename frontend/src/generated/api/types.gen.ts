@@ -137,6 +137,9 @@ export type ReadingProgress = {
     sectionId: NullableUuid;
     blockId: NullableUuid;
     charOffset: number;
+    /**
+     * 内容块顶部相对阅读视口顶部的像素偏移；内容块顶部已滚出视口时为负数。
+     */
     blockViewportOffset: number;
     /**
      * 当前章节内的滚动进度比例，用于恢复阅读位置。

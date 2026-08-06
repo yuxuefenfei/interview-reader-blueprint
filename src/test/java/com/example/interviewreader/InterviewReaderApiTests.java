@@ -198,7 +198,7 @@ class InterviewReaderApiTests {
                   "versionId": "%s",
                   "sectionId": "%s",
                   "charOffset": 3,
-                  "blockViewportOffset": 64,
+                  "blockViewportOffset": -20,
                   "progressRatio": 0.42,
                   "deviceId": "test"
                 }
@@ -211,6 +211,7 @@ class InterviewReaderApiTests {
 
         mockMvc.perform(get("/api/reader/reading-progress/{documentId}", imported.documentId()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockViewportOffset").value(-20))
                 .andExpect(jsonPath("$.progressRatio").value(0.42));
         mockMvc.perform(get("/api/reader/documents/{documentId}", imported.documentId()))
                 .andExpect(status().isOk())
