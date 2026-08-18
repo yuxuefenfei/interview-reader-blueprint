@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminPageHeader: typeof import('./../components/AdminPageHeader.vue')['default']
+    CodeBlockView: typeof import('./../components/CodeBlockView.vue')['default']
     ContentBlockView: typeof import('./../components/ContentBlockView.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
@@ -44,6 +45,7 @@ declare module 'vue' {
     ElUpload: typeof import('element-plus/es')['ElUpload']
     FormulaBlock: typeof import('./../components/FormulaBlock.vue')['default']
     InlineMarkdown: typeof import('./../components/InlineMarkdown.vue')['default']
+    MermaidDiagram: typeof import('./../components/MermaidDiagram.vue')['default']
     ReaderComfortSettings: typeof import('./../components/ReaderComfortSettings.vue')['default']
     ReaderDocumentList: typeof import('./../components/ReaderDocumentList.vue')['default']
     ReaderDocumentSelector: typeof import('./../components/ReaderDocumentSelector.vue')['default']

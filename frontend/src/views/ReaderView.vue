@@ -26,7 +26,11 @@ import {
 } from "../offline/progressQueue";
 import type { DocumentSummary, NodeContent, ReadingProgress, SearchHit, TocNode } from "../types/api";
 import { getOrCreateReadingDeviceId } from "../utils/readingDevice";
-import { clampProgressRatio, documentReadingPositionRatio } from "../utils/readingProgress";
+import {
+  clampProgressRatio,
+  documentReadingPositionRatio,
+  viewportReadingProgress,
+} from "../utils/readingProgress";
 import {
   comfortStyle,
   loadReaderComfort,
@@ -497,7 +501,7 @@ async function selectNode(
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
     await nextTick();
-    scheduleProgress();
+    syncReadingProgressFromViewport();
     connectContentLoadObserver();
     requestMoreContentIfVisible();
   } catch (caught) {
@@ -582,6 +586,7 @@ async function loadMoreContent(): Promise<void> {
       loadingMore.value = false;
       if (loadMoreAbortController === abortController) loadMoreAbortController = null;
       await nextTick();
+      syncReadingProgressFromViewport();
       connectContentLoadObserver();
       requestMoreContentIfVisible();
     }
@@ -621,15 +626,21 @@ function onReadingScroll(): void {
   if (readingScrollFrame !== null) return;
   readingScrollFrame = window.requestAnimationFrame(() => {
     readingScrollFrame = null;
-    updateReadingProgressFromScroll();
+    syncReadingProgressFromViewport();
   });
 }
 
-function updateReadingProgressFromScroll(): void {
+function syncReadingProgressFromViewport(): void {
   const area = readingArea.value;
   if (!area) return;
-  const distance = Math.max(1, area.scrollHeight - area.clientHeight);
-  chapterProgress.value = Math.min(1, Math.max(0, area.scrollTop / distance));
+  if (area.clientHeight > 0) {
+    chapterProgress.value = viewportReadingProgress(
+      area.scrollTop,
+      area.scrollHeight,
+      area.clientHeight,
+      content.value?.nextAfterSeq != null,
+    );
+  }
   const nodeId = activeNode.value?.id;
   if (nodeId && chapterProgress.value >= .995 && !completedNodes.has(nodeId)) {
     completedNodes.add(nodeId);
@@ -1213,7 +1224,7 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
       <template v-else-if="content">
         <article :key="content.node.id" class="reader-article" :data-node-id="content.node.id">
           <h1>{{ content.node.title }}</h1>
-          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :wrap-code="comfort.codeWrap" show-code-wrap-toggle :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" @update:wrap-code="comfort.codeWrap = $event" />
+          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :wrap-code="comfort.codeWrap" show-code-wrap-toggle :diagram-theme="theme" :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" @update:wrap-code="comfort.codeWrap = $event" />
           <div v-if="content.nextAfterSeq" :ref="captureContentLoadSentinel" class="reader-load-more">
             <span v-if="loadingMore" role="status">正在载入后续内容…</span>
             <button v-else-if="contentLoadError" type="button" @click="loadMoreContent">载入失败，点击重试</button>

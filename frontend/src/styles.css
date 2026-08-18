@@ -674,26 +674,36 @@ select:focus-visible {
 .reader-list li { margin: 6px 0; }
 
 /* Code block */
-.code-block { margin: 24px 0; border: 1px solid var(--reader-line); border-radius: var(--radius-sm); overflow: hidden; background: var(--reader-code-bg); }
+.code-block { margin: 24px 0; border: 1px solid var(--reader-line, var(--line-200)); border-radius: var(--radius-sm); overflow: hidden; background: var(--reader-code-bg, var(--surface-2)); }
 .code-block figcaption {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; border-bottom: 1px solid var(--reader-line);
-  color: var(--reader-muted); font-size: 12px; font-weight: 700; text-transform: lowercase;
+  min-width: 0; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--reader-line, var(--line-200));
+  color: var(--reader-muted, var(--ink-500)); font-size: 12px; font-weight: 700; text-transform: lowercase;
 }
 .code-copy {
   display: grid; place-items: center; width: 28px; height: 28px;
   border: 0; border-radius: var(--radius-sm);
-  background: transparent; color: var(--reader-muted);
+  background: transparent; color: var(--reader-muted, var(--ink-500));
   transition: background-color 120ms, color 120ms;
 }
 .code-copy:hover { background: var(--brand-100); color: var(--brand-700); }
+.code-copy.active { background: color-mix(in srgb, var(--reader-accent, var(--brand-500)), transparent 86%); color: var(--reader-accent, var(--brand-700)); }
+.code-toolbar-button { width: auto; padding: 0 8px; white-space: nowrap; }
+.code-block-actions { min-width: 0; max-width: 100%; overflow-x: auto; }
 .code-copy svg { width: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+.diagram-notice {
+  margin: 0; padding: 10px 14px;
+  border-bottom: 1px solid var(--reader-line, var(--line-200));
+  background: color-mix(in srgb, var(--reader-accent, var(--brand-500)), transparent 94%);
+  color: var(--reader-muted, var(--ink-500)); font-size: 13px; line-height: 1.5;
+}
+.mermaid-component-loading { display: grid; min-height: 96px; place-items: center; margin: 0; color: var(--reader-muted, var(--ink-500)); font-size: 13px; }
 .code-block pre, .table-snapshot pre, .fallback-block {
   margin: 0; overflow-x: auto; padding: 18px;
   white-space: pre; font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 14px; line-height: 1.7;
 }
-.code-block .hljs { color: var(--reader-text); }
+.code-block .hljs { color: var(--reader-text, var(--ink-900)); }
 .code-block .hljs-comment,
 .code-block .hljs-quote { color: var(--code-comment); font-style: italic; }
 .code-block .hljs-keyword,

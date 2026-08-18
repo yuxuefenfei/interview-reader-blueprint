@@ -3,6 +3,7 @@ import {
   clampProgressRatio,
   documentReadingPositionRatio,
   formatProgressPercent,
+  viewportReadingProgress,
 } from "../utils/readingProgress";
 
 describe("reading progress presentation", () => {
@@ -21,5 +22,15 @@ describe("reading progress presentation", () => {
     expect(formatProgressPercent(0.004)).toBe("<1%");
     expect(formatProgressPercent(0.999)).toBe("99%");
     expect(formatProgressPercent(1)).toBe("100%");
+  });
+
+  it("completes a final page whose content does not fill the viewport", () => {
+    expect(viewportReadingProgress(0, 480, 600, false)).toBe(1);
+    expect(viewportReadingProgress(200, 800, 600, false)).toBe(1);
+  });
+
+  it("does not complete while another content page remains", () => {
+    expect(viewportReadingProgress(0, 480, 600, true)).toBe(0);
+    expect(viewportReadingProgress(200, 800, 600, true)).toBe(0.99);
   });
 });

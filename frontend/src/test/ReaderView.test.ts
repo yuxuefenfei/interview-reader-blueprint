@@ -303,6 +303,12 @@ describe("ReaderView request coordination", () => {
     api.saveProgress.mockImplementation(async (_documentId: string, value) => value);
 
     const wrapper = mountReader();
+    const readingArea = wrapper.get(".reader-content").element;
+    Object.defineProperties(readingArea, {
+      clientHeight: { configurable: true, value: 600 },
+      scrollHeight: { configurable: true, value: 480 },
+      scrollTop: { configurable: true, value: 0, writable: true },
+    });
     for (let turn = 0; turn < 3; turn += 1) {
       await flushPromises();
       await nextTick();
@@ -311,6 +317,12 @@ describe("ReaderView request coordination", () => {
     expect(api.content).toHaveBeenCalledWith("version-a", "node-a", 100, expect.any(AbortSignal));
     expect(wrapper.text()).toContain("block-b");
     expect(wrapper.text()).not.toContain("加载更多内容");
+    expect(wrapper.get(".mobile-progress-label").text()).toBe("100%");
+    await vi.advanceTimersByTimeAsync(701);
+    expect(api.saveProgress).toHaveBeenLastCalledWith(
+      "document-a",
+      expect.objectContaining({ progressRatio: 1 }),
+    );
     wrapper.unmount();
   });
 

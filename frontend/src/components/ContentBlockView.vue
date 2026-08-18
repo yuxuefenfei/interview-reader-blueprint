@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from "vue";
 import type { ContentBlock } from "../types/api";
-import { highlightCode } from "../utils/codeHighlight";
+import type { ReaderTheme } from "../utils/readingComfort";
+import CodeBlockView from "./CodeBlockView.vue";
 import FormulaBlock from "./FormulaBlock.vue";
 import InlineMarkdown from "./InlineMarkdown.vue";
-
-const copyLabel = ref("复制代码");
-let copyLabelTimer: number | null = null;
 
 const props = defineProps<{
   block: ContentBlock;
@@ -14,6 +12,7 @@ const props = defineProps<{
   highlight?: string;
   wrapCode?: boolean;
   showCodeWrapToggle?: boolean;
+  diagramTheme?: ReaderTheme;
 }>();
 const emit = defineEmits<{ "update:wrapCode": [value: boolean] }>();
 
@@ -34,12 +33,8 @@ const imageLightboxToolbarStyle: CSSProperties = { justifyContent: "flex-end", m
 const imageLightboxButtonStyle: CSSProperties = { minHeight: "36px", padding: "0 11px", border: "1px solid rgba(255, 255, 255, .42)", borderRadius: "var(--radius-sm)", background: "rgba(255, 255, 255, .1)", color: "inherit", font: "inherit" };
 const imageLightboxStageStyle: CSSProperties = { minWidth: "0", minHeight: "0", overflow: "auto", display: "grid", placeItems: "center", padding: "16px" };
 const imageLightboxImageStyle = computed<CSSProperties>(() => ({ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", transformOrigin: "center", transition: "transform 140ms ease-out", transform: `scale(${imagePreviewScale.value})` }));
-const codeBlockStyle = computed<CSSProperties | undefined>(() => props.wrapCode ? { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } : undefined);
 const codeText = computed(() => codeTextFromPayload(props.block.payload, props.block.plainText));
 const codeLanguageName = computed(() => codeLanguage(props.block.payload, props.block));
-const highlightedCode = ref<string | null>(null);
-const codeHighlightPending = ref(false);
-let codeHighlightRequestId = 0;
 const imageAssetKey = computed(() => typeof props.block.payload.assetKey === "string" ? props.block.payload.assetKey.trim() : "");
 const imageAlt = computed(() => typeof props.block.payload.alt === "string" ? props.block.payload.alt : props.block.plainText);
 const imageCaption = computed(() => typeof props.block.payload.caption === "string" ? props.block.payload.caption : "");
@@ -57,26 +52,8 @@ watch(imageUrl, () => {
   imageRetryKey.value = 0;
   closeImagePreview();
 });
-watch([codeText, codeLanguageName], async ([text, language]) => {
-  const requestId = ++codeHighlightRequestId;
-  highlightedCode.value = null;
-  codeHighlightPending.value = true;
-  try {
-    const highlighted = await highlightCode(text, language);
-    if (requestId === codeHighlightRequestId) highlightedCode.value = highlighted;
-  } catch {
-    if (requestId === codeHighlightRequestId) highlightedCode.value = null;
-  } finally {
-    if (requestId === codeHighlightRequestId) codeHighlightPending.value = false;
-  }
-}, { immediate: true });
-
 onBeforeUnmount(() => {
-  codeHighlightRequestId += 1;
   document.removeEventListener("keydown", handleImagePreviewKeydown);
-  if (copyLabelTimer !== null) {
-    window.clearTimeout(copyLabelTimer);
-  }
 });
 
 function textFromPayload(payload: Record<string, unknown>, fallback: string): string {
@@ -158,36 +135,6 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
   return typeof payload.language === "string" ? payload.language : block.blockType === "code" ? "text" : "";
 }
 
-async function copyCode(block: ContentBlock): Promise<void> {
-  const text = codeTextFromPayload(block.payload, block.plainText);
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      document.body.append(textArea);
-      textArea.select();
-      const copied = document.execCommand("copy");
-      textArea.remove();
-      if (!copied) {
-        throw new Error("Clipboard unavailable");
-      }
-    }
-    copyLabel.value = "已复制";
-  } catch {
-    copyLabel.value = "复制失败";
-  }
-  if (copyLabelTimer !== null) {
-    window.clearTimeout(copyLabelTimer);
-  }
-  copyLabelTimer = window.setTimeout(() => {
-    copyLabel.value = "复制代码";
-    copyLabelTimer = null;
-  }, 1_600);
-}
 </script>
 
 <template>
@@ -208,18 +155,16 @@ async function copyCode(block: ContentBlock): Promise<void> {
       <li v-for="item in itemsFromPayload(block.payload)" :key="item"><InlineMarkdown :text="item" :highlight="highlight" /></li>
     </ol>
 
-    <figure v-else-if="block.blockType === 'code'" class="code-block">
-      <figcaption>
-        <span>{{ codeLanguageName }}</span>
-        <div class="ui-action-row ui-action-row--compact ui-action-row--nowrap">
-          <button v-if="showCodeWrapToggle" class="code-copy" type="button" style="width:auto;padding:0 8px" :aria-pressed="!!wrapCode" :aria-label="wrapCode ? '关闭代码自动换行' : '启用代码自动换行'" :title="wrapCode ? '关闭自动换行' : '自动换行'" @click="emit('update:wrapCode', !wrapCode)">换行</button>
-          <button class="code-copy" type="button" :aria-label="copyLabel" :title="copyLabel" @click="copyCode(block)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1 2-2v-8a2 2 0 0 1 2-2Z" /></svg>
-          </button>
-        </div>
-      </figcaption>
-      <pre :style="codeBlockStyle" :aria-busy="codeHighlightPending"><code v-if="highlightedCode !== null" class="hljs" v-html="highlightedCode"></code><code v-else>{{ codeText }}</code></pre>
-    </figure>
+    <CodeBlockView
+      v-else-if="block.blockType === 'code'"
+      :block-id="block.id"
+      :code="codeText"
+      :language="codeLanguageName"
+      :theme="diagramTheme"
+      :wrap="wrapCode"
+      :show-wrap-toggle="showCodeWrapToggle"
+      @update:wrap="emit('update:wrapCode', $event)"
+    />
 
     <div v-else-if="block.blockType === 'table'" class="table-wrap">
       <table>

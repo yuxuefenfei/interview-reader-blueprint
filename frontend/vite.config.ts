@@ -46,6 +46,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "../target/frontend-static",
       emptyOutDir: true,
+      manifest: true,
       rollupOptions: {
         output: {
           manualChunks: {

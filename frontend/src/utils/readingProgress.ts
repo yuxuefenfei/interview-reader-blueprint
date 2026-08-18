@@ -2,6 +2,25 @@ export function clampProgressRatio(value: number | null | undefined): number {
   return Math.min(1, Math.max(0, typeof value === "number" && Number.isFinite(value) ? value : 0));
 }
 
+export function viewportReadingProgress(
+  scrollTop: number,
+  scrollHeight: number,
+  clientHeight: number,
+  hasMoreContent: boolean,
+): number {
+  const viewportHeight = Math.max(0, clientHeight);
+  const contentHeight = Math.max(0, scrollHeight);
+  const normalizedScrollTop = Math.max(0, scrollTop);
+  const scrollDistance = Math.max(0, contentHeight - viewportHeight);
+  const contentBottomIsVisible = normalizedScrollTop + viewportHeight >= contentHeight - 1;
+
+  if (!hasMoreContent && contentBottomIsVisible) return 1;
+  if (scrollDistance === 0) return 0;
+
+  const ratio = clampProgressRatio(normalizedScrollTop / scrollDistance);
+  return hasMoreContent ? Math.min(0.99, ratio) : ratio;
+}
+
 export function documentReadingPositionRatio(
   readableIndex: number,
   readableCount: number,
