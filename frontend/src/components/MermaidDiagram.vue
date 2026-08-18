@@ -120,12 +120,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mermaid-diagram {
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
   min-height: 96px;
+  overflow: hidden;
   background: var(--reader-surface, var(--surface-1));
 }
 
 .mermaid-canvas {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   max-height: min(72vh, 720px);
   overflow: auto;
   padding: 18px;

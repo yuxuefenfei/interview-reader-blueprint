@@ -674,7 +674,7 @@ select:focus-visible {
 .reader-list li { margin: 6px 0; }
 
 /* Code block */
-.code-block { margin: 24px 0; border: 1px solid var(--reader-line, var(--line-200)); border-radius: var(--radius-sm); overflow: hidden; background: var(--reader-code-bg, var(--surface-2)); }
+.code-block { width: 100%; min-width: 0; max-width: 100%; contain: inline-size; margin: 24px 0; border: 1px solid var(--reader-line, var(--line-200)); border-radius: var(--radius-sm); overflow: hidden; background: var(--reader-code-bg, var(--surface-2)); }
 .code-block figcaption {
   display: flex; align-items: center; justify-content: space-between;
   min-width: 0; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--reader-line, var(--line-200));
