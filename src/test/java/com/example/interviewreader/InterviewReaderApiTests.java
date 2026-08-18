@@ -758,6 +758,12 @@ class InterviewReaderApiTests {
                 }
                 ```
 
+                ```mermaid
+                flowchart TD
+                    A[main] --> B[SpringApplication.run]
+                    B --> C[ApplicationReadyEvent]
+                ```
+
                 | 概念 | 说明 |
                 | --- | --- |
                 | HashMap | 非线程安全 |
@@ -786,8 +792,11 @@ class InterviewReaderApiTests {
                 .andExpect(jsonPath("$.blocks[1].payload.items[0]").value("结构修改可能破坏链表或树结构"))
                 .andExpect(jsonPath("$.blocks[2].blockType").value("code"))
                 .andExpect(jsonPath("$.blocks[2].payload.text").value("if (a < b) {\n    return a;\n}"))
-                .andExpect(jsonPath("$.blocks[3].blockType").value("table"))
-                .andExpect(jsonPath("$.blocks[3].payload.rows[0][0]").value("HashMap"));
+                .andExpect(jsonPath("$.blocks[3].blockType").value("code"))
+                .andExpect(jsonPath("$.blocks[3].payload.language").value("mermaid"))
+                .andExpect(jsonPath("$.blocks[3].payload.text").value("flowchart TD\n    A[main] --> B[SpringApplication.run]\n    B --> C[ApplicationReadyEvent]"))
+                .andExpect(jsonPath("$.blocks[4].blockType").value("table"))
+                .andExpect(jsonPath("$.blocks[4].payload.rows[0][0]").value("HashMap"));
 
         var exported = exportJsonPackage(imported);
         assertThat(exported.get("version").get("sourceType").asText()).isEqualTo("MARKDOWN");
