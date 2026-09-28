@@ -460,7 +460,6 @@ public class VersionRevisionService {
             throw new ApiException(HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "内容块不存在。");
         }
         contentBlockMapper.deleteById(block.getId());
-        resequenceBlocks(version.getId(), block.getNodeId());
         refreshNodeSearchText(version.getId(), block.getNodeId());
         advanceDraft(version);
         if (imageAssetKey(block) != null) {
@@ -499,7 +498,6 @@ public class VersionRevisionService {
         }
         if (removedCount > 0) {
             affectedNodeIds.forEach(nodeId -> {
-                resequenceBlocks(version.getId(), nodeId);
                 refreshNodeSearchText(version.getId(), nodeId);
             });
             advanceDraft(version);
@@ -764,26 +762,6 @@ public class VersionRevisionService {
         String extension() { return extension; }
     }
 
-    private void resequenceBlocks(String versionId, String nodeId) {
-        var blocks = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.ID, CONTENT_BLOCK_ENTITY.SEQ)
-                .from(CONTENT_BLOCK_ENTITY)
-                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
-                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
-                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc(), CONTENT_BLOCK_ENTITY.ID.asc()));
-        for (var index = 0; index < blocks.size(); index++) {
-            var block = blocks.get(index);
-            var sequence = (index + 1) * 10;
-            if (block.getSeq() != sequence) {
-                var update = UpdateWrapper.of(ContentBlockEntity.class)
-                        .set(CONTENT_BLOCK_ENTITY.SEQ, sequence);
-                contentBlockMapper.updateByQuery(update.toEntity(), false, QueryWrapper.create()
-                        .where(CONTENT_BLOCK_ENTITY.ID.eq(block.getId()))
-                        .and(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
-                        .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId)));
-            }
-        }
-    }
     private void refreshNodeSearchText(String versionId, String nodeId) {
         var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
                 .select(CONTENT_NODE_ENTITY.ID, CONTENT_NODE_ENTITY.TITLE)

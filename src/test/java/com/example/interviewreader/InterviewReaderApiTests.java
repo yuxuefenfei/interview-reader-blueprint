@@ -1607,6 +1607,64 @@ class InterviewReaderApiTests {
         assertThat(Files.exists(Path.of("target/test-import-sources").toAbsolutePath().normalize().resolve(objectKey))).isFalse();
     }
 
+    @Test
+    void deletingBlocksPreservesSequenceGapsAndPagination() throws Exception {
+        var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("docs/import/examples/document-package.example.json")));
+        ((ObjectNode) source.get("document")).put("documentKey", "delete-sequence-gap-" + UUID.randomUUID());
+        var blocks = (ArrayNode) source.get("blocks");
+        var template = (ObjectNode) blocks.get(0).deepCopy();
+        blocks.removeAll();
+        for (var seq = 1; seq <= 12; seq++) {
+            var item = template.deepCopy();
+            item.put("blockKey", "block-" + seq);
+            item.put("seq", seq);
+            ((ObjectNode) item.get("payload")).put("text", "正文 " + seq);
+            item.put("plainText", "正文 " + seq);
+            blocks.add(item);
+        }
+        var imported = importAndCommit(objectMapper.writeValueAsBytes(source));
+        var editor = getJson("/api/admin/versions/{versionId}/editor", imported.versionId());
+        var nodeId = UUID.fromString(editor.get("nodes").get(1).get("id").asText());
+        var firstPage = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", imported.versionId(), nodeId)
+                        .param("limit", "1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var secondPage = objectMapper.readTree(mockMvc.perform(get("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", imported.versionId(), nodeId)
+                        .param("limit", "1")
+                        .param("cursor", firstPage.get("nextCursor").asText()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var blockId = UUID.fromString(secondPage.get("items").get(0).get("id").asText());
+
+        mockMvc.perform(delete("/api/admin/versions/{versionId}/editor/blocks/{blockId}", imported.versionId(), blockId)
+                        .param("draftRevision", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftRevision").value(1))
+                .andExpect(jsonPath("$.removedCount").value(1));
+        var expectedSeq = List.of(1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+        assertThat(jdbc.queryForList("SELECT seq FROM content_block WHERE version_id = ? AND node_id = ? ORDER BY seq",
+                Integer.class, imported.versionId().toString(), nodeId.toString())).containsExactlyElementsOf(expectedSeq);
+        mockMvc.perform(get("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", imported.versionId(), nodeId)
+                        .param("limit", "1")
+                        .param("cursor", firstPage.get("nextCursor").asText()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].seq").value(3));
+
+        mockMvc.perform(post("/api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks", imported.versionId(), nodeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"draftRevision\":1,\"blockType\":\"paragraph\",\"payload\":{\"text\":\"\"},\"plainText\":\"\",\"language\":null}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.seq").value(22));
+        mockMvc.perform(post("/api/admin/versions/{versionId}/editor/blocks/cleanup-empty", imported.versionId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"draftRevision\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftRevision").value(3))
+                .andExpect(jsonPath("$.removedCount").value(1));
+        assertThat(jdbc.queryForList("SELECT seq FROM content_block WHERE version_id = ? AND node_id = ? ORDER BY seq",
+                Integer.class, imported.versionId().toString(), nodeId.toString())).containsExactlyElementsOf(expectedSeq);
+    }
+
     private ImportResult importAndCommit(byte[] jsonPackage) throws Exception {
         var job = uploadJsonPackage(jsonPackage);
         return commitReadyJob(job, "CREATE_NEW");

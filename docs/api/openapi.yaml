@@ -570,7 +570,7 @@ paths:
         "404": { $ref: "#/components/responses/Problem" }
   /admin/versions/{versionId}/editor/blocks/cleanup-empty:
     post:
-      summary: Delete empty blocks and resequence affected nodes
+      summary: Delete empty blocks without changing remaining block sequence values
       parameters:
         - $ref: "#/components/parameters/VersionId"
       requestBody:

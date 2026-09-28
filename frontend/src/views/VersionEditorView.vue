@@ -138,7 +138,7 @@ const defaultExpandedKeys = computed(() => treeData.value.slice(0, 2).map((node)
 const filteredTreeData = computed(() => filterTree(treeData.value, treeFilter.value));
 const previewHeading = computed(() => previewMode.value === "node"
   ? previewNode.value?.title ?? "当前节点"
-  : activeBlock.value ? `块 #${activeBlock.value.seq} · ${zh(activeBlock.value.blockType)}` : "当前内容块");
+  : activeBlock.value ? `当前内容块 · ${zh(activeBlock.value.blockType)}` : "当前内容块");
 const nodePath = computed(() => {
   if (!editor.value || !selectedNode.value) return "";
   const byId = new Map(editor.value.nodes.map((node) => [node.id, node]));
@@ -842,7 +842,7 @@ async function deleteActiveBlock(): Promise<void> {
 async function cleanupEmptyBlocks(): Promise<void> {
   if (!editor.value) return;
   try {
-    await ElMessageBox.confirm("将删除当前草稿中所有没有有效内容的块，并重新排列块序号。", "清理空内容块", { type: "warning", confirmButtonText: "清理", cancelButtonText: "取消" });
+    await ElMessageBox.confirm("将删除当前草稿中所有没有有效内容的块。", "清理空内容块", { type: "warning", confirmButtonText: "清理", cancelButtonText: "取消" });
     if (!await flushPendingBlockSave()) return;
     cleaningEmptyBlocks.value = true;
     const result = await adminApi.cleanupEmptyBlocks(versionId, editor.value.version.draftRevision);
@@ -909,14 +909,14 @@ function message(value: unknown): string { return toUserMessage(value, "操作�
           <div class="editor-content-workbench">
             <aside ref="blockListRef" class="editor-block-list" aria-label="内容块列表">
               <el-empty v-if="!nodeLoading && !blocks.length" :description="emptyBlockDescription"><el-button type="primary" :icon="Plus" :loading="creatingBlock" @click="addBlock">新增第一段正文</el-button></el-empty>
-              <button v-for="block in blocks" :key="block.id" type="button" class="block-list-item" :class="{ active: activeBlockId === block.id, dirty: isBlockDirty(block) }" :aria-current="activeBlockId === block.id ? 'true' : undefined" :data-block-id="block.id" @click="activateBlock(block.id)"><span class="block-list-meta"><el-tag size="small">{{ zh(block.blockType) }}</el-tag><small>块 #{{ block.seq }}</small><i v-if="isBlockDirty(block)">未保存</i><i v-else-if="isBlankBlock(block)" class="block-empty-flag">待填写</i></span><strong>{{ blockSummary(block) }}</strong></button>
+              <button v-for="block in blocks" :key="block.id" type="button" class="block-list-item" :class="{ active: activeBlockId === block.id, dirty: isBlockDirty(block) }" :aria-current="activeBlockId === block.id ? 'true' : undefined" :data-block-id="block.id" @click="activateBlock(block.id)"><span class="block-list-meta"><el-tag size="small">{{ zh(block.blockType) }}</el-tag><i v-if="isBlockDirty(block)">未保存</i><i v-else-if="isBlankBlock(block)" class="block-empty-flag">待填写</i></span><strong>{{ blockSummary(block) }}</strong></button>
               <el-button v-if="nextCursor" plain :loading="nodeLoading" @click="loadBlocks(true)">加载更多内容块</el-button>
             </aside>
 
             <section class="block-detail-panel">
               <el-empty v-if="!activeBlock" description="从左侧选择一个内容块开始编辑" :image-size="72" />
               <template v-else>
-                <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span>块 #{{ activeBlock.seq }}<template v-if="activeBlock.sourcePage"> · 来源第 {{ activeBlock.sourcePage }} 页</template></span></div><div class="block-detail-actions ui-action-row"><el-button type="danger" plain :icon="Delete" :loading="deletingBlockId === activeBlock.id" @click="deleteActiveBlock">删除</el-button></div></header>
+                <header><div><el-tag>{{ zh(activeBlock.blockType) }}</el-tag><span v-if="activeBlock.sourcePage">来源第 {{ activeBlock.sourcePage }} 页</span></div><div class="block-detail-actions ui-action-row"><el-button type="danger" plain :icon="Delete" :loading="deletingBlockId === activeBlock.id" @click="deleteActiveBlock">删除</el-button></div></header>
                 <div class="block-edit-controls"><el-select v-model="activeBlock.blockType" aria-label="内容块类型" @change="scheduleBlockSave"><el-option v-for="type in blockTypes" :key="type" :label="zh(type)" :value="type" /></el-select><el-input v-if="activeBlock.blockType === 'code'" v-model="activeBlock.language" name="block-code-language" autocomplete="off" spellcheck="false" clearable placeholder="例如：Java…" @input="scheduleBlockSave" /></div>
                 <template v-if="activeBlock.blockType === 'image'">
                   <div class="image-block-editor">
