@@ -9,7 +9,7 @@
 | API 契约 | 前后端共同遵守的 OpenAPI 定义 | [OpenAPI 契约](api/openapi.yaml) |
 | 数据库 | MySQL 数据库结构的权威 Flyway 迁移 | [初始迁移](../src/main/resources/db/migration/mysql/V1__initial_schema.sql) |
 | 运维 | 生产部署、备份恢复、监控和故障处理 | [生产运行手册](operations/runbook.md) |
-| 架构 | 独立升级控制台的发布、备份与回滚设计 | [系统升级控制台设计](architecture/system-upgrade.md) |
+| 架构 | 独立升级控制台的实现、发布、备份与回滚流程 | [系统升级控制台](architecture/system-upgrade.md) |
 
 ## 导入资料
 

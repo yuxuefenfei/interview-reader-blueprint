@@ -24,3 +24,9 @@ interview-reader:
     secure-cookie: true
     allowed-origins: ${INTERVIEW_READER_ALLOWED_ORIGINS}
     trust-forwarded-client-ip: true
+
+management:
+  endpoint:
+    health:
+      show-components: always
+      show-details: always

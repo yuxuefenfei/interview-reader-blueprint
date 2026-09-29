@@ -36,9 +36,48 @@ jobs:
         working-directory: frontend
         run: npm test
       - name: Build frontend
+        env:
+          VITE_UPGRADE_CONSOLE_URL: ${{ vars.UPGRADE_CONSOLE_URL }}
         working-directory: frontend
         run: npm run build
       - name: Test backend
         run: ./mvnw --batch-mode -DskipFrontend=true test
+      - name: Stamp production revision
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: printf '%s\n' "$GITHUB_SHA" > src/main/resources/release-commit.txt
       - name: Package application
         run: ./mvnw --batch-mode -DskipFrontend=true -DskipTests package
+      - name: Test and package upgrade console
+        run: ./mvnw --batch-mode -f upgrade-console/pom.xml package
+      - name: Prepare production artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          jars=(target/interview-reader-*.jar)
+          test "${#jars[@]}" -eq 1
+          cp "${jars[0]}" target/interview-reader.jar
+          cd target
+          sha256sum interview-reader.jar > production-jar.sha256
+      - name: Publish production JAR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-jar
+          path: target/interview-reader.jar
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish production checksum
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-jar-sha256
+          path: target/production-jar.sha256
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish upgrade console JAR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgrade-console-jar
+          path: upgrade-console/target/interview-reader-upgrade-console-*.jar
+          if-no-files-found: error
+          retention-days: 90

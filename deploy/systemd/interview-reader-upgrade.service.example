@@ -1,0 +1,21 @@
+[Unit]
+Description=Interview Reader upgrade console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ireader
+Group=ireader
+WorkingDirectory=/opt/ireader-upgrade
+EnvironmentFile=/opt/ireader-upgrade/conf/console.env
+ExecStart=/usr/local/jdk/default/bin/java -Dfile.encoding=UTF-8 -jar /opt/ireader-upgrade/upgrade-console.jar
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target

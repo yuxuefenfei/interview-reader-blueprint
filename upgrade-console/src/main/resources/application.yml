@@ -1,0 +1,33 @@
+server:
+  address: 127.0.0.1
+  port: ${UPGRADE_CONSOLE_PORT:28081}
+  forward-headers-strategy: none
+  max-http-request-header-size: 16KB
+spring:
+  application:
+    name: interview-reader-upgrade-console
+  servlet:
+    multipart:
+      max-file-size: 150MB
+      max-request-size: 151MB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+upgrade:
+  app-dir: ${UPGRADE_APP_DIR:/opt/ireader}
+  data-dir: ${UPGRADE_DATA_DIR:/opt/ireader/data}
+  state-dir: ${UPGRADE_STATE_DIR:/opt/ireader-upgrade/state}
+  db-defaults-file: ${UPGRADE_DB_DEFAULTS_FILE:}
+  db-name: ${UPGRADE_DB_NAME:}
+  mysql-bin: ${UPGRADE_MYSQL_BIN:/usr/bin/mysql}
+  mysqldump-bin: ${UPGRADE_MYSQLDUMP_BIN:/usr/bin/mysqldump}
+  github-owner: ${UPGRADE_GITHUB_OWNER:yuxuefenfei}
+  github-repo: ${UPGRADE_GITHUB_REPO:interview-reader-blueprint}
+  github-token: ${UPGRADE_GITHUB_TOKEN:}
+  admin-user: ${UPGRADE_ADMIN_USER:upgrade-admin}
+  admin-password: ${UPGRADE_ADMIN_PASSWORD:}
+  public-origin: ${UPGRADE_PUBLIC_ORIGIN:}
+  internal-token: ${UPGRADE_INTERNAL_TOKEN:}
+  main-port: ${UPGRADE_MAIN_PORT:28080}

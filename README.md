@@ -1,6 +1,6 @@
 # Interview Reader
 
-Interview Reader 是 Spring Boot + Vue 模块化单体。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
+Interview Reader 由 Spring Boot + Vue 主应用和可独立运行的系统升级控制台组成。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
 
 ## 环境
 
@@ -69,6 +69,16 @@ PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度�
 
 当前代码没有引入服务端缓存，因此未加入 Redis 依赖；后续只有出现跨请求/跨实例缓存需求时再接入单实例 Redis。
 
+## 独立系统升级控制台
+
+`upgrade-console/` 单独构建、运行和保存状态；主 JAR 停机时仍可查看健康检查结果与升级进度。主后台菜单在配置 `VITE_UPGRADE_CONSOLE_URL` 后打开独立 HTTPS 站点。控制台核对 GitHub Actions 正式 JAR，按停写、排空、备份、进程停止、切换和就绪检查的顺序执行升级，验证失败时恢复同批次数据库、文件和旧 JAR。
+
+```powershell
+.\mvnw.cmd -f upgrade-console/pom.xml test
+.\mvnw.cmd -f upgrade-console/pom.xml package
+```
+
+生产接入需要先安装新的主应用门禁和脚本、配置独立控制台的凭据与目录，并在隔离环境演练；仓库代码完成不表示现网已启用。配置与权限见[生产运行手册](docs/operations/runbook.md)，状态机和接口见[系统升级控制台](docs/architecture/system-upgrade.md)。
 ## 生产 MySQL Profile
 
 应用必须显式选择 `dev`、`test` 或 `prod` profile；未指定时会拒绝启动。生产运行使用 `prod`，数据库和登录凭据均必须通过环境变量显式提供。以下命令仅演示本地启动；当前生产使用 [daemon.sh](deploy/daemon.sh) 管理固定名称的 `interview-reader.jar`，实际目录和权限见[生产运行手册](docs/operations/runbook.md)。

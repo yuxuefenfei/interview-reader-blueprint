@@ -1,6 +1,7 @@
 package com.example.interviewreader.management;
 
 import com.example.interviewreader.persistence.DocumentDeletionPersistence;
+import com.example.interviewreader.upgrade.MaintenanceGate;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
@@ -10,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Semaphore;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -21,15 +23,18 @@ public class DocumentDeletionWorker {
     private final Semaphore permits;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final Map<UUID, Future<?>> futures = new ConcurrentHashMap<>();
+    private final AtomicInteger running = new AtomicInteger();
     private final DocumentDeletionProcessor processor;
     private final DocumentDeletionPersistence deletionPersistence;
+    private final MaintenanceGate maintenanceGate;
 
     public DocumentDeletionWorker(DocumentDeletionProperties properties, DocumentDeletionProcessor processor,
-                                  DocumentDeletionPersistence deletionPersistence, MeterRegistry meterRegistry) {
+                                  DocumentDeletionPersistence deletionPersistence, MaintenanceGate maintenanceGate, MeterRegistry meterRegistry) {
         this.enabled = properties.workerEnabled();
         this.permits = new Semaphore(properties.maxConcurrency());
         this.processor = processor;
         this.deletionPersistence = deletionPersistence;
+        this.maintenanceGate = maintenanceGate;
         Gauge.builder("interview.reader.deletion.jobs.submitted", futures, Map::size)
                 .description("已提交且尚未结束的永久删除任务数")
                 .register(meterRegistry);
@@ -39,8 +44,14 @@ public class DocumentDeletionWorker {
     }
 
     @EventListener(ApplicationReadyEvent.class)
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 5000)
     public void resumeDurableJobs() {
+        if (maintenanceGate.closed()) return;
         deletionPersistence.findRecoverableJobs().forEach(job -> submit(UUID.fromString(job.getId())));
+    }
+
+    public int pendingCount() {
+        return Math.max(futures.size(), running.get());
     }
 
     public void submit(UUID jobId) {
@@ -48,21 +59,25 @@ public class DocumentDeletionWorker {
             processor.process(jobId);
             return;
         }
-        futures.computeIfAbsent(jobId, id -> executor.submit(() -> {
+        var future = new java.util.concurrent.FutureTask<Void>(() -> {
+            running.incrementAndGet();
             var acquired = false;
             try {
                 permits.acquire();
                 acquired = true;
-                processor.process(id);
+                processor.process(jobId);
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
             } finally {
                 if (acquired) permits.release();
-                futures.remove(id);
+                running.decrementAndGet();
             }
-        }));
+            return null;
+        }) {
+            @Override protected void done() { futures.remove(jobId, this); }
+        };
+        if (futures.putIfAbsent(jobId, future) == null) executor.execute(future);
     }
-
     @PreDestroy
     void close() {
         executor.close();

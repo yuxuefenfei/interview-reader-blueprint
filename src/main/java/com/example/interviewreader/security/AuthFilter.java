@@ -128,6 +128,7 @@ public class AuthFilter extends OncePerRequestFilter {
                 || isSpaRoute(path)
                 || path.startsWith("/assets/")
                 || PUBLIC_HEALTH_ENDPOINTS.contains(path)
+                || path.equals("/internal/upgrade/status")
                 || (path.equals("/api/auth/session") && method.equals("GET"))
                 || (path.equals("/api/auth/login") && method.equals("POST"));
     }

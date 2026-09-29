@@ -1,0 +1,36 @@
+# 升级控制台独立站点示例。用实际域名、证书与内网地址替换占位值。
+upstream interview_reader_upgrade {
+    server 127.0.0.1:28081;
+    keepalive 8;
+}
+server {
+    listen 80;
+    server_name upgrade.example.com;
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name upgrade.example.com;
+    ssl_certificate /etc/nginx/certs/upgrade.example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/upgrade.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 151m;
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 180s;
+    proxy_read_timeout 180s;
+    add_header Cache-Control "no-store" always;
+
+    # 必须替换为实际 VPN 或内网网段；不可直接开放到公网。
+    allow 127.0.0.1;
+    allow 10.0.0.0/8;
+    deny all;
+
+    location /actuator/ { return 404; }
+    location / {
+        proxy_pass http://interview_reader_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+    }
+}

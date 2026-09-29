@@ -4,6 +4,7 @@ declare const __APP_BUILD_ID__: string;
 
 interface ImportMetaEnv {
   readonly VITE_API_PROXY_TARGET?: string;
+  readonly VITE_UPGRADE_CONSOLE_URL?: string;
 }
 
 interface ImportMeta {

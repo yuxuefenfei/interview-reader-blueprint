@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, Document, Upload, Reading, SwitchButton } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, Document, Upload, Reading, SwitchButton, Setting } from "@element-plus/icons-vue";
 import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ADMIN_BRAND_ICON_URL } from "../shared/branding";
@@ -7,6 +7,14 @@ import { ADMIN_BRAND_ICON_URL } from "../shared/branding";
 defineProps<{ username?: string | null }>();
 const emit = defineEmits<{ logout: [] }>();
 const router = useRouter();
+const upgradeConsoleUrl = (() => {
+  try {
+    const url = new URL(import.meta.env.VITE_UPGRADE_CONSOLE_URL?.trim() || "");
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : "";
+  } catch {
+    return "";
+  }
+})();
 const collapsedPreference = localStorage.getItem("admin.sidebar.collapsed");
 const collapsed = ref(collapsedPreference === null ? false : collapsedPreference === "true");
 
@@ -31,6 +39,11 @@ watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", Stri
           <router-link to="/admin/imports" aria-label="导入中心" active-class="router-link-active" exact-active-class="router-link-active">
             <el-icon><Upload /></el-icon><span>导入中心</span>
           </router-link>
+        </el-tooltip>
+        <el-tooltip :content="upgradeConsoleUrl ? '在独立控制台打开系统升级' : '升级控制台地址未配置'" placement="right" :disabled="!collapsed">
+          <a :href="upgradeConsoleUrl || undefined" target="_blank" rel="noopener noreferrer" aria-label="系统升级" :aria-disabled="!upgradeConsoleUrl" title="系统升级">
+            <el-icon><Setting /></el-icon><span>系统升级</span>
+          </a>
         </el-tooltip>
       </nav>
       <div class="admin-sidebar-foot">

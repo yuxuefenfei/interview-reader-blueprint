@@ -9,3 +9,4 @@ frontend/dist/
 /.playwright-mcp/*
 frontend/.env.local
 application.env
+src/main/resources/release-commit.txt

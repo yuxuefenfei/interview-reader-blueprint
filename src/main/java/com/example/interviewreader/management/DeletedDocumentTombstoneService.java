@@ -2,6 +2,7 @@ package com.example.interviewreader.management;
 
 import com.example.interviewreader.common.AppConstants;
 import com.example.interviewreader.persistence.DocumentDeletionPersistence;
+import com.example.interviewreader.upgrade.MaintenanceGate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class DeletedDocumentTombstoneService {
     private static final int MAX_TOMBSTONES_PER_SYNC = 1000;
     private final DocumentDeletionPersistence deletionPersistence;
     private final DocumentDeletionProperties properties;
+    private final MaintenanceGate maintenanceGate;
 
     public List<ManagementDtos.DeletedDocumentTombstone> recent() {
         var cutoff = OffsetDateTime.now().minus(properties.tombstoneRetention());
@@ -28,6 +30,12 @@ public class DeletedDocumentTombstoneService {
 
     @Scheduled(cron = "0 17 3 * * *")
     public void purgeExpired() {
-        deletionPersistence.deleteExpiredJobs(OffsetDateTime.now().minus(properties.tombstoneRetention()));
+        maintenanceGate.enterWrite();
+        try {
+            if (maintenanceGate.closed()) return;
+            deletionPersistence.deleteExpiredJobs(OffsetDateTime.now().minus(properties.tombstoneRetention()));
+        } finally {
+            maintenanceGate.leaveWrite();
+        }
     }
 }

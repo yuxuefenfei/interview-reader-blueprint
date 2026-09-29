@@ -152,6 +152,7 @@ start_app() {
 }
 
 stop_app() {
+  local graceful_only="${1:-false}"
   if ! is_running; then
     log "${APP_NAME} 未运行"
     rm -f -- "${PID_FILE}"
@@ -173,6 +174,11 @@ stop_app() {
     fi
     sleep 1
   done
+
+  if [[ "${graceful_only}" == "true" ]]; then
+    log "优雅停止超时；升级已中止，保留维护状态，pid=${pid}" >&2
+    return 1
+  fi
 
   log "优雅停止超时，发送 SIGKILL，pid=${pid}"
   kill -KILL "${pid}" 2>/dev/null || true
@@ -216,6 +222,9 @@ main() {
     stop)
       stop_app
       ;;
+    stop-gracefully)
+      stop_app true
+      ;;
     restart)
       stop_app
       sleep 2
@@ -225,7 +234,7 @@ main() {
       status_app
       ;;
     *)
-      echo "Usage: $0 {start|stop|restart|status}" >&2
+      echo "Usage: $0 {start|stop|stop-gracefully|restart|status}" >&2
       exit 2
       ;;
   esac
