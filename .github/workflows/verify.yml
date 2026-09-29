@@ -47,6 +47,8 @@ jobs:
         run: printf '%s\n' "$GITHUB_SHA" > src/main/resources/release-commit.txt
       - name: Package application
         run: ./mvnw --batch-mode -DskipFrontend=true -DskipTests package
+      - name: Verify packaged Vue entry
+        run: unzip -p target/interview-reader-*.jar BOOT-INF/classes/static/index.html | grep 'src="/assets/index-'
       - name: Test and package upgrade console
         run: ./mvnw --batch-mode -f upgrade-console/pom.xml package
       - name: Prepare production artifact

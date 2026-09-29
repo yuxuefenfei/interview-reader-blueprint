@@ -54,6 +54,9 @@ server {
         proxy_pass http://interview_reader_api;
     }
 
+    # 只开放指定健康检查路径；其他 Actuator 路径一律隐藏。
+    location /actuator/ { return 404; }
+
     # 健康检查仅限本机或内网监控网段访问。按实际监控网络调整。
     location ~ ^/actuator/health(?:/(?:liveness|readiness))?$ {
         allow 127.0.0.1;
