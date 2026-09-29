@@ -2,3 +2,4 @@
 /.mvn/wrapper/maven-wrapper.properties text eol=lf
 /mvnw.cmd text eol=crlf
 /deploy/daemon.sh text eol=lf
+/deploy/conf/application.env.example text eol=lf

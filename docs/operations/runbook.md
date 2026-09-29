@@ -25,9 +25,9 @@
 
 从仓库安装脚本时，应保留 LF 行尾并赋予可执行权限；例如部署在 /opt/ireader 时执行 `sudo install -o root -g ireader -m 0750 deploy/daemon.sh /opt/ireader/daemon.sh`。实际位置不同则替换目标路径。
 
-脚本固定读取同目录的 interview-reader.jar，且拒绝符号链接。data、logs、tmp 必须事先存在并允许 ireader 写入；JAR 必须是 ireader 可读的普通文件。脚本以 data 为工作目录启动，因此 data/target/pdfbox-font-cache 是 PDFBox 的可重建缓存。截图里 data 根目录和 import-sources 下的哈希目录仍需逐项核对用途，当前不能当作冗余文件删除。
+脚本固定读取同目录的 interview-reader.jar，且拒绝符号链接。data、logs、tmp 必须事先存在并允许 ireader 写入；JAR 必须是 ireader 可读的普通文件。脚本以 data 为工作目录启动，因此 data/target/pdfbox-font-cache 是 PDFBox 的可重建缓存。
 
-脚本必须由 ireader 用户执行。conf/application.env 必须由 root 持有、不能是符号链接，也不能被组或其他用户写入；脚本以 ireader 身份 source 它，因此还要授予 ireader 只读权限，例如 root:ireader、0640，并限制 conf 目录的读取权限。不得把密码或现网配置提交到仓库。
+脚本必须由 ireader 用户执行。conf/application.env 必须由 root 持有、不能是符号链接，也不能被组或其他用户写入；脚本以 ireader 身份 source 它，因此还要授予 ireader 只读权限，例如 root:ireader、0640，并限制 conf 目录的读取权限（750）。不得把密码或现网配置提交到仓库。
 
 ## 2. 启停与检查
 
@@ -51,6 +51,19 @@ curl -fsS http://127.0.0.1:28080/actuator/health/readiness
 主应用要求 Java 21、prod Profile，默认监听 127.0.0.1:28080。发布前核对脚本选中的 Java 版本。公网入口必须经过 Nginx/TLS。脚本通过 JAVA_BIN 选择 Java，HTTP_PORT 默认 28080，并用 --server.port 覆盖应用的 SERVER_PORT 环境变量。反向代理模板见 [Nginx 示例](../../deploy/nginx/interview-reader.conf.example)；它只代理当前主应用，独立升级站点需另行配置。
 
 ## 3. 配置
+
+脱敏模板见 [application.env.example](../../deploy/conf/application.env.example)。在服务器上填写数据库、登录和允许来源的实际值；不要将真实配置提交到仓库，也不要用模板覆盖已有的生产配置。
+
+已在服务器创建并填写实际文件后，设置权限（以下命令不复制或覆盖配置内容）：
+
+```bash
+sudo chown root:ireader /opt/ireader/conf
+sudo chmod 0750 /opt/ireader/conf
+sudo chown root:ireader /opt/ireader/conf/application.env
+sudo chmod 0640 /opt/ireader/conf/application.env
+sudo -u ireader test -x /opt/ireader/conf
+sudo -u ireader test -r /opt/ireader/conf/application.env && echo 'ireader 可读取配置'
+```
 
 conf/application.env 至少提供：
 
