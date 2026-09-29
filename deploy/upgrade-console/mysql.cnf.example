@@ -2,5 +2,11 @@
 # 需要针对指定数据库的导出、DROP/CREATE 与恢复权限；不要使用数据库超级用户。
 [client]
 host=127.0.0.1
-user=
+port=3306
+protocol=tcp
+user=ireader_upgrade
 password=
+
+[mysqldump]
+no-tablespaces
+set-gtid-purged=OFF
