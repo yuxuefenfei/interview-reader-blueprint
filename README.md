@@ -1,6 +1,6 @@
 # Interview Reader
 
-基于 [`docs/architecture/system-design.md`](docs/architecture/system-design.md) 设计方案落地的 Spring Boot + Vue 模块化单体。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
+Interview Reader 是 Spring Boot + Vue 模块化单体。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
 
 ## 环境
 
@@ -71,7 +71,7 @@ PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度�
 
 ## 生产 MySQL Profile
 
-应用必须显式选择 `dev`、`test` 或 `prod` profile；未指定时会拒绝启动。生产运行使用 `prod`，数据库和登录凭据均必须通过环境变量显式提供。`SERVER_PORT`、`UPLOAD_MAX_SIZE`、`INTERVIEW_READER_CONVERTER_VERSION` 与 `INTERVIEW_READER_STORAGE_DIR` 可覆盖非敏感运行参数，未设置时使用仓库中的安全默认值：
+应用必须显式选择 `dev`、`test` 或 `prod` profile；未指定时会拒绝启动。生产运行使用 `prod`，数据库和登录凭据均必须通过环境变量显式提供。以下命令仅演示本地启动；当前生产使用 [daemon.sh](deploy/daemon.sh) 管理固定名称的 `interview-reader.jar`，实际目录和权限见[生产运行手册](docs/operations/runbook.md)。
 
 ```powershell
 $env:DATABASE_URL='jdbc:mysql://localhost:3306/interview_reader?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC'

@@ -1,5 +1,0 @@
--- The executable Flyway schema lives at:
--- src/main/resources/db/migration/mysql/V1__initial_schema.sql
---
--- Keep this documentation pointer instead of a duplicated SQL body so the
--- runtime migration remains the single source of truth.
