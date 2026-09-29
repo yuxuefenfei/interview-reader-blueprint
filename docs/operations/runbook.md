@@ -122,7 +122,9 @@ conf/application.env 至少提供：
 
 配置模板见 [console.env.example](../../deploy/upgrade-console/console.env.example)、[mysql.cnf.example](../../deploy/upgrade-console/mysql.cnf.example)、[systemd 单元](../../deploy/systemd/interview-reader-upgrade.service.example)与 [Nginx 模板](../../deploy/nginx/interview-reader-upgrade.conf.example)。`UPGRADE_PUBLIC_ORIGIN` 必须与实际 HTTPS 站点 Origin 完全一致。`UPGRADE_DB_NAME` 是要备份和恢复的数据库名；控制台会校验主应用连接与备份凭据连接的 MySQL 库名和 server_uuid，任何不一致都会阻断发布；MySQL 凭据仅用于该库，需有导出、DROP/CREATE 和恢复所需权限。`UPGRADE_INTERNAL_TOKEN` 与主应用同值，建议由 `openssl rand -hex 32` 生成，不要记录在终端共享日志或仓库中。
 
-首次安装时，从成功的 main 分支 Actions 运行下载 `production-jar` 与 `upgrade-console-jar`，在维护窗口安装主 JAR 和更新后的 `daemon.sh`，再部署独立站点。控制台 JAR 需固定保存为 `/opt/ireader-upgrade/upgrade-console.jar`，例如将下载且核对过的文件以 `sudo install -o root -g ireader -m 0640 <下载的控制台JAR> /opt/ireader-upgrade/upgrade-console.jar` 安装。更新主 `application.env` 中的两个 `UPGRADE_*` 值后重启主服务，确认内部状态接口和健康检查可用，再启用控制台。首次引导仍需人工维护窗口；后续发布由页面统一执行。
+正式发布先等待目标提交的 main `verify` 运行成功，再在该提交创建并推送 `vX.Y.Z` 标签。`publish-release` 工作流会从该运行下载同一批 JAR，校验后发布 Release；备注中的 Actions 运行 ID 用于升级控制台上传主 JAR。Release 只提供下载渠道，控制台仍依赖原 Actions 校验产物；该产物过期后，即使 Release 附件仍在，当前控制台也不能将它作为新的升级版本上传。
+
+首次安装时，优先从正式版本的 GitHub Release 下载 `interview-reader.jar`、`upgrade-console.jar` 与 `SHA256SUMS` 并运行 `sha256sum -c SHA256SUMS`；尚未发布正式版本时，从成功的 main 分支 Actions 运行下载 `production-jar` 与 `upgrade-console-jar`，在维护窗口安装主 JAR 和更新后的 `daemon.sh`，再部署独立站点。控制台 JAR 需固定保存为 `/opt/ireader-upgrade/upgrade-console.jar`，例如将下载且核对过的文件以 `sudo install -o root -g ireader -m 0640 <下载的控制台JAR> /opt/ireader-upgrade/upgrade-console.jar` 安装。更新主 `application.env` 中的两个 `UPGRADE_*` 值后重启主服务，确认内部状态接口和健康检查可用，再启用控制台。首次引导仍需人工维护窗口；后续发布由页面统一执行。
 
 实际配置文件写好后，设置最小权限并核对：
 

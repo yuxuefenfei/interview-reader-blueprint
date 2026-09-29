@@ -21,6 +21,8 @@
 
 `.github/workflows/verify.yml` 在 main 分支通过前后端检查后，归档正式主 JAR、对应 SHA-256 清单和独立控制台 JAR。上传主 JAR 时必须提供 Actions 运行 ID；控制台从 GitHub API 核对运行已成功结束、由 main 分支 push 触发、工作流名为 `verify`，再读取该运行的校验产物，比对服务端计算的 SHA-256。正式主 JAR 同时嵌入该运行的提交号，控制台在新进程就绪后核对提交号才开放写入。开始发布前会再次执行相同核验。过期、失败、非 main 或内容不符的产物不能发布。本地打包 JAR 不能单独作为正式发布来源。
 
+正式版本在上述 `verify` 运行成功后，为同一提交推送 `vX.Y.Z` 标签。`publish-release` 工作流从该运行下载同一批主 JAR、控制台 JAR 和校验文件，核对主 JAR 的 SHA-256 后发布 Release 附件及 `SHA256SUMS`，并在备注中记录 Actions 运行 ID。Release 只改变下载位置；控制台仍按原 Actions 运行 ID 和校验产物验收。Actions 校验产物过期后，该 Release 附件不能作为新的升级上传来源。
+
 控制台使用独立管理员密码和 HTTPS Origin 校验，不复用主站会话。Nginx 示例限制 VPN/内网访问，控制台本身只监听 `127.0.0.1`。主应用的 `/internal/upgrade/status` 只接受本机请求和不少于 32 字符的共享令牌，报告维护门禁、在途写请求、导入与删除任务及即时指标。主站和升级站点不能共用根作用域 Service Worker。
 
 ## 3. 健康面板与升级门禁

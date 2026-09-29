@@ -1,0 +1,37 @@
+name: publish-release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish verified main build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Use a vX.Y.Z tag"; exit 1; }
+
+          run_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/verify.yml/runs?branch=main&event=push&status=success&head_sha=$GITHUB_SHA&per_page=100" | jq -r --arg sha "$GITHUB_SHA" '.workflow_runs | map(select(.head_sha == $sha and .head_branch == "main" and .event == "push" and .conclusion == "success")) | .[0].id // empty')"
+          [[ -n "$run_id" ]] || { echo "::error::No successful main verify run for $GITHUB_SHA"; exit 1; }
+
+          mkdir dist
+          gh run download "$run_id" -R "$GITHUB_REPOSITORY" -n production-jar -D dist
+          gh run download "$run_id" -R "$GITHUB_REPOSITORY" -n production-jar-sha256 -D dist
+          gh run download "$run_id" -R "$GITHUB_REPOSITORY" -n upgrade-console-jar -D dist
+          (cd dist && sha256sum -c production-jar.sha256)
+          console_jars=(dist/interview-reader-upgrade-console-*.jar)
+          [[ "${#console_jars[@]}" -eq 1 ]] || { echo "::error::Expected one upgrade console JAR"; exit 1; }
+          mv "${console_jars[0]}" dist/upgrade-console.jar
+          (cd dist && sha256sum interview-reader.jar upgrade-console.jar > SHA256SUMS)
+
+          printf 'Source: [verify run #%s](https://github.com/%s/actions/runs/%s)\nCommit: %s\nUpgrade console run ID: %s\n' "$run_id" "$GITHUB_REPOSITORY" "$run_id" "$GITHUB_SHA" "$run_id" > release-notes.md
+          gh release create "$GITHUB_REF_NAME" dist/interview-reader.jar dist/upgrade-console.jar dist/SHA256SUMS -R "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes-file release-notes.md
