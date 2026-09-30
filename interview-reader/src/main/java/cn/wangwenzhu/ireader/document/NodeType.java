@@ -9,7 +9,9 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 文档目录节点类型，对应数据库与 API 中的稳定编码。 */
+/**
+ * 文档目录节点类型，对应数据库与 API 中的稳定编码。
+ */
 public enum NodeType {
     PART("PART"),
     CHAPTER("CHAPTER"),
@@ -25,12 +27,6 @@ public enum NodeType {
         this.code = code;
     }
 
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
     @JsonCreator
     public static NodeType fromCode(String value) {
         var normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
@@ -42,5 +38,11 @@ public enum NodeType {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(NodeType::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
     }
 }

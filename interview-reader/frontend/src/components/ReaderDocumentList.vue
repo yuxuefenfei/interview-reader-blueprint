@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {nextTick, onBeforeUnmount, onMounted, ref, watch} from "vue";
 import type {DocumentSummary} from "../types/api";
 import {formatProgressPercent} from "../utils/readingProgress";
@@ -18,7 +18,7 @@ const emit = defineEmits<{
   loadMore: [];
 }>();
 
-const query = defineModel<string>("query", { default: "" });
+const query = defineModel<string>("query", {default: ""});
 const loadSentinel = ref<HTMLElement | null>(null);
 let loadObserver: IntersectionObserver | null = null;
 
@@ -29,8 +29,8 @@ function requestMoreIfVisible(): void {
   const sentinelRect = sentinel.getBoundingClientRect();
   const rootRect = root?.getBoundingClientRect();
   const visible = rootRect
-    ? sentinelRect.top <= rootRect.bottom + 120 && sentinelRect.bottom >= rootRect.top
-    : sentinelRect.top <= window.innerHeight + 120;
+      ? sentinelRect.top <= rootRect.bottom + 120 && sentinelRect.bottom >= rootRect.top
+      : sentinelRect.top <= window.innerHeight + 120;
   if (visible) emit("loadMore");
 }
 
@@ -40,7 +40,7 @@ function connectLoadObserver(): void {
   const root = loadSentinel.value.closest(".reader-desktop-document-browser, .reader-mobile-document-browser");
   loadObserver = new IntersectionObserver((entries) => {
     if (entries.some((entry) => entry.isIntersecting)) requestMoreIfVisible();
-  }, { root, rootMargin: "0px 0px 160px", threshold: 0 });
+  }, {root, rootMargin: "0px 0px 160px", threshold: 0});
   loadObserver.observe(loadSentinel.value);
 }
 
@@ -63,19 +63,19 @@ onBeforeUnmount(() => loadObserver?.disconnect());
   <div class="reader-document-browser">
     <label v-if="documents.length > 8" class="reader-document-filter">
       <span class="sr-only">筛选文档</span>
-      <input v-model="query" type="search" placeholder="筛选文档…" autocomplete="off" />
+      <input v-model="query" autocomplete="off" placeholder="筛选文档…" type="search"/>
     </label>
     <p v-if="error" class="reader-document-switch-error" role="alert">{{ error }}</p>
-    <div class="reader-document-list" aria-label="文档列表">
+    <div aria-label="文档列表" class="reader-document-list">
       <button
-        v-for="document in documents"
-        :key="document.id"
-        class="reader-document-option"
-        :class="{ active: document.id === selectedDocumentId }"
-        type="button"
-        :aria-current="document.id === selectedDocumentId ? 'page' : undefined"
-        :disabled="pendingDocumentId !== null"
-        @click="emit('select', document)"
+          v-for="document in documents"
+          :key="document.id"
+          :aria-current="document.id === selectedDocumentId ? 'page' : undefined"
+          :class="{ active: document.id === selectedDocumentId }"
+          :disabled="pendingDocumentId !== null"
+          class="reader-document-option"
+          type="button"
+          @click="emit('select', document)"
       >
         <strong :title="document.title">{{ document.title }}</strong>
         <small v-if="document.id === selectedDocumentId">当前</small>
@@ -90,7 +90,7 @@ onBeforeUnmount(() => loadObserver?.disconnect());
         <button type="button" @click="emit('loadMore')">重试</button>
       </div>
       <div v-else-if="loading" class="reader-document-load-state" role="status">正在加载文档…</div>
-      <div v-if="hasMore" ref="loadSentinel" class="reader-document-load-sentinel" aria-hidden="true"></div>
+      <div v-if="hasMore" ref="loadSentinel" aria-hidden="true" class="reader-document-load-sentinel"></div>
     </div>
   </div>
 </template>

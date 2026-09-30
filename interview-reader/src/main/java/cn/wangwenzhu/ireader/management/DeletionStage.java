@@ -6,7 +6,9 @@ import com.mybatisflex.annotation.EnumValue;
 
 import java.util.Arrays;
 
-/** 文档永久删除阶段，枚举名与数据库及 API 中的稳定编码一致。 */
+/**
+ * 文档永久删除阶段，枚举名与数据库及 API 中的稳定编码一致。
+ */
 public enum DeletionStage {
     QUEUED("QUEUED"),
     CLIENT_SYNC_MARKED("CLIENT_SYNC_MARKED"),
@@ -21,17 +23,17 @@ public enum DeletionStage {
         this.code = code;
     }
 
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
     @JsonCreator
     public static DeletionStage fromCode(String value) {
         return Arrays.stream(values())
                 .filter(stage -> stage.code.equals(value))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown deletion stage: " + value));
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
     }
 }

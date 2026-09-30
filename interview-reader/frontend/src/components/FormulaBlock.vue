@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {computed, onBeforeUnmount, ref, watch} from "vue";
 
 const props = defineProps<{
@@ -20,7 +20,7 @@ watch(normalizedLatex, async (latex) => {
 
   rendering.value = true;
   try {
-    const [{ default: katex }] = await Promise.all([
+    const [{default: katex}] = await Promise.all([
       import("katex"),
       import("katex/dist/katex.min.css"),
     ]);
@@ -37,7 +37,7 @@ watch(normalizedLatex, async (latex) => {
   } finally {
     if (requestId === renderRequestId) rendering.value = false;
   }
-}, { immediate: true });
+}, {immediate: true});
 
 onBeforeUnmount(() => {
   renderRequestId += 1;
@@ -45,14 +45,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="formula" :aria-busy="rendering">
+  <div :aria-busy="rendering" class="formula">
     <div v-if="renderedFormula" class="formula-rendered" v-html="renderedFormula"></div>
     <p v-else-if="renderFailed" class="formula-fallback" role="status">
       <span>公式暂时无法渲染</span>
       <code>{{ normalizedLatex }}</code>
     </p>
     <p v-else-if="!normalizedLatex" class="formula-fallback">公式内容为空</p>
-    <span v-else class="formula-loading" aria-label="正在渲染公式"></span>
+    <span v-else aria-label="正在渲染公式" class="formula-loading"></span>
   </div>
 </template>
 

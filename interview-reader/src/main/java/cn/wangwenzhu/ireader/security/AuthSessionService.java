@@ -69,7 +69,9 @@ public class AuthSessionService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /** 定期清理无人再次访问的过期会话，避免长期运行进程持续保留失效令牌。 */
+    /**
+     * 定期清理无人再次访问的过期会话，避免长期运行进程持续保留失效令牌。
+     */
     @Scheduled(fixedDelayString = "${interview-reader.security.session-cleanup-interval}")
     void sweepExpired() {
         var now = Instant.now(clock);
@@ -77,7 +79,9 @@ public class AuthSessionService {
     }
 
 
-    /** 到期时刻本身即不再有效，避免查询路径与定时清理对边界的解释不同。 */
+    /**
+     * 到期时刻本身即不再有效，避免查询路径与定时清理对边界的解释不同。
+     */
     private boolean isExpired(Session session, Instant now) {
         return !session.expiresAt().isAfter(now);
     }

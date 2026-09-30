@@ -4,7 +4,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
-/** 原始文件导入时统一生成稳定、可读的文档名称与标识。 */
+/**
+ * 原始文件导入时统一生成稳定、可读的文档名称与标识。
+ */
 public final class ImportDocumentNaming {
     private static final int GENERATED_KEY_MAX_LENGTH = 80;
 

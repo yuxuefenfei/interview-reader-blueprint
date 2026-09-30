@@ -10,7 +10,7 @@
 1. [为什么要从“启动流程”理解 Spring 设计模式](#1-为什么要从启动流程理解-spring-设计模式)
 2. [先建立全局认知：Spring Boot 启动主链路](#2-先建立全局认知spring-boot-启动主链路)
 3. [设计模式总览：它们分别出现在启动流程哪里](#3-设计模式总览它们分别出现在启动流程哪里)
-4. [模板方法模式：ApplicationContext.refresh() 为什么是 Spring 容器的骨架](#4-模板方法模式applicationcontextrefresh-为什么是-spring-容器的骨架)
+4. [模板方法模式：ApplicationContext.refresh () 为什么是 Spring 容器的骨架](#4-模板方法模式applicationcontextrefresh-为什么是-spring-容器的骨架)
 5. [工厂模式：BeanFactory、FactoryBean、ObjectFactory 到底是什么关系](#5-工厂模式beanfactoryfactorybeanobjectfactory-到底是什么关系)
 6. [策略模式：Spring 为什么能替换实例化、候选解析、事件派发等算法](#6-策略模式spring-为什么能替换实例化候选解析事件派发等算法)
 7. [观察者模式：SpringApplicationEvent 与 ApplicationEvent 如何贯穿启动流程](#7-观察者模式springapplicationevent-与-applicationevent-如何贯穿启动流程)
@@ -41,7 +41,7 @@
 - refresh：模板方法模式；
 - BeanPostProcessor：责任链模式。
 
-这些答案本身并不完全错，但问题在于：**彼此之间是割裂的**。
+这些答案本身并不完全错，但问题在于： **彼此之间是割裂的**。
 
 高级开发真正应该理解的是：
 
@@ -79,6 +79,7 @@ Spring 的启动过程
 一个典型 Spring Boot 应用：
 
 ```java
+
 @SpringBootApplication
 public class DemoApplication {
     public static void main(String[] args) {
@@ -171,20 +172,20 @@ ApplicationFailedEvent
 
 # 3. 设计模式总览：它们分别出现在启动流程哪里
 
-| 设计思想 / 模式 | Spring 中典型实现 | 启动阶段 | 解决的问题 |
-|---|---|---|---|
-| 模板方法 | `AbstractApplicationContext.refresh()` | 容器刷新 | 固定总体流程，允许子类扩展局部步骤 |
-| 工厂模式 | `BeanFactory`、`FactoryBean`、`ObjectFactory` | Bean 创建 | 集中对象创建，隐藏创建复杂度 |
-| 策略模式 | `InstantiationStrategy`、`AutowireCandidateResolver`、`ApplicationContextFactory` | 多阶段 | 替换不同算法而不改变主流程 |
-| 观察者模式 | `ApplicationEventPublisher`、`ApplicationListener` | Boot 启动和 Context 生命周期 | 解耦状态变化和监听行为 |
-| Processor 链 / 责任链思想 | `BeanFactoryPostProcessor`、`BeanPostProcessor` | BeanDefinition 和 Bean 生命周期 | 让第三方在统一扩展点插入处理逻辑 |
-| 代理模式 | JDK Proxy、CGLIB、`AbstractAutoProxyCreator` | Bean 初始化后 | 事务、缓存、AOP 等横切增强 |
-| 注册表 | `DefaultSingletonBeanRegistry` | Bean 创建与获取 | 管理 singleton 生命周期与缓存 |
-| 适配器模式 | `ApplicationListenerMethodAdapter`、`DisposableBeanAdapter` | 事件与销毁 | 将不同形式的用户 API 适配为容器内部统一调用方式 |
-| Builder | `SpringApplicationBuilder` | Boot 启动入口 | 流式构造复杂 SpringApplication |
-| Facade | `SpringApplication`、`ApplicationContext` | 启动入口/容器使用 | 对复杂子系统提供统一入口 |
-| Callback / SPI | `ApplicationContextInitializer`、`EnvironmentPostProcessor` | Context 创建前 | 为 Boot 和三方框架提供早期扩展能力 |
-| 条件策略 | `Condition`、`@Conditional*` | 配置类解析 | 根据运行环境动态决定 BeanDefinition 是否生效 |
+| 设计思想 / 模式           | Spring 中典型实现                                                                 | 启动阶段                        | 解决的问题                                      |
+|---------------------------|-----------------------------------------------------------------------------------|---------------------------------|-------------------------------------------------|
+| 模板方法                  | `AbstractApplicationContext.refresh()`                                            | 容器刷新                        | 固定总体流程，允许子类扩展局部步骤              |
+| 工厂模式                  | `BeanFactory`、`FactoryBean`、`ObjectFactory`                                     | Bean 创建                       | 集中对象创建，隐藏创建复杂度                    |
+| 策略模式                  | `InstantiationStrategy`、`AutowireCandidateResolver`、`ApplicationContextFactory` | 多阶段                          | 替换不同算法而不改变主流程                      |
+| 观察者模式                | `ApplicationEventPublisher`、`ApplicationListener`                                | Boot 启动和 Context 生命周期    | 解耦状态变化和监听行为                          |
+| Processor 链 / 责任链思想 | `BeanFactoryPostProcessor`、`BeanPostProcessor`                                   | BeanDefinition 和 Bean 生命周期 | 让第三方在统一扩展点插入处理逻辑                |
+| 代理模式                  | JDK Proxy、CGLIB、`AbstractAutoProxyCreator`                                      | Bean 初始化后                   | 事务、缓存、AOP 等横切增强                      |
+| 注册表                    | `DefaultSingletonBeanRegistry`                                                    | Bean 创建与获取                 | 管理 singleton 生命周期与缓存                   |
+| 适配器模式                | `ApplicationListenerMethodAdapter`、`DisposableBeanAdapter`                       | 事件与销毁                      | 将不同形式的用户 API 适配为容器内部统一调用方式 |
+| Builder                   | `SpringApplicationBuilder`                                                        | Boot 启动入口                   | 流式构造复杂 SpringApplication                  |
+| Facade                    | `SpringApplication`、`ApplicationContext`                                         | 启动入口/容器使用               | 对复杂子系统提供统一入口                        |
+| Callback / SPI            | `ApplicationContextInitializer`、`EnvironmentPostProcessor`                       | Context 创建前                  | 为 Boot 和三方框架提供早期扩展能力              |
+| 条件策略                  | `Condition`、`@Conditional*`                                                      | 配置类解析                      | 根据运行环境动态决定 BeanDefinition 是否生效    |
 
 需要注意：
 
@@ -200,7 +201,7 @@ ApplicationFailedEvent
 
 ---
 
-# 4. 模板方法模式：ApplicationContext.refresh() 为什么是 Spring 容器的骨架
+# 4. 模板方法模式：ApplicationContext.refresh () 为什么是 Spring 容器的骨架
 
 ## 4.1 模板方法模式是什么
 
@@ -218,13 +219,17 @@ abstract class AbstractTask {
         step3();
     }
 
-    protected void step1() {}
+    protected void step1() {
+    }
+
     protected abstract void step2();
-    protected void step3() {}
+
+    protected void step3() {
+    }
 }
 ```
 
-## 4.2 Spring 中最经典的例子：AbstractApplicationContext.refresh()
+## 4.2 Spring 中最经典的例子：AbstractApplicationContext.refresh ()
 
 `AbstractApplicationContext` 的源码注释本身就明确指出其使用了 Template Method 思想。
 
@@ -260,7 +265,7 @@ public void refresh() {
 
 这个方法非常重要，因为它体现了 Spring 容器启动的“骨架”。
 
-## 4.3 为什么 refresh() 适合模板方法
+## 4.3 为什么 refresh () 适合模板方法
 
 Spring 必须保证下面顺序成立：
 
@@ -305,7 +310,9 @@ protected void onRefresh() {
 
 ## 4.4 面试回答模板
 
-> Spring 中模板方法最典型的是 `AbstractApplicationContext.refresh()`。它固定了容器刷新的主流程，例如准备 BeanFactory、调用 BeanFactoryPostProcessor、注册 BeanPostProcessor、初始化事件广播器、实例化剩余 singleton、发布 refresh 完成事件。具体 ApplicationContext 子类可以通过 `postProcessBeanFactory()`、`onRefresh()` 等扩展点定制局部步骤。这样既保证容器启动顺序稳定，又保留扩展能力。
+> Spring 中模板方法最典型的是 `AbstractApplicationContext.refresh()`。它固定了容器刷新的主流程，例如准备 BeanFactory、调用
+> BeanFactoryPostProcessor、注册 BeanPostProcessor、初始化事件广播器、实例化剩余 singleton、发布 refresh 完成事件。具体
+> ApplicationContext 子类可以通过 `postProcessBeanFactory()`、`onRefresh()` 等扩展点定制局部步骤。这样既保证容器启动顺序稳定，又保留扩展能力。
 
 ---
 
@@ -404,8 +411,8 @@ context.getBean("&connectionFactoryBean");
 
 关键区别：
 
-| 概念 | 本质 |
-|---|---|
+| 概念        | 本质                                |
+|-------------|-------------------------------------|
 | BeanFactory | Spring IoC 容器本身，是 Bean 的工厂 |
 | FactoryBean | 一个特殊 Bean，用来创建某种复杂对象 |
 
@@ -434,7 +441,9 @@ public interface ObjectFactory<T> {
 
 ```java
 singletonFactories.put(beanName,
-    () -> getEarlyBeanReference(beanName, mbd, bean));
+    () ->
+
+getEarlyBeanReference(beanName, mbd, bean));
 ```
 
 这里不是直接缓存一个固定对象，而是缓存：
@@ -452,6 +461,7 @@ singletonFactories.put(beanName,
 Bean 本身也可以通过静态工厂方法创建：
 
 ```java
+
 @Bean
 public DataSource dataSource() {
     return DataSourceBuilder.create().build();
@@ -493,7 +503,9 @@ interface Strategy {
 Bean 实例化并不永远等同于：
 
 ```java
-clazz.getDeclaredConstructor().newInstance();
+clazz.getDeclaredConstructor().
+
+newInstance();
 ```
 
 Spring 把实例化细节抽象成：
@@ -524,6 +536,7 @@ strategy.instantiate(...)
 当存在：
 
 ```java
+
 @Autowired
 private PaymentService paymentService;
 ```
@@ -614,6 +627,7 @@ ApplicationListener
 例如：
 
 ```java
+
 @Component
 class OrderListener {
 
@@ -651,8 +665,12 @@ Spring Boot 启动本身就是一个不断发生状态变化的过程：
 
 ```java
 loggingSystem.onStarting();
-configSystem.onStarting();
-monitor.onStarting();
+configSystem.
+
+onStarting();
+monitor.
+
+onStarting();
 ...
 ```
 
@@ -809,7 +827,8 @@ Spring 则更常见：
 
 所以最严谨表述是：
 
-> BeanPostProcessor 体现了责任链/过滤器链式处理思想，本质上又是一个典型插件扩展点；它并不完全等价于最传统的 next-handler 形式责任链实现。
+> BeanPostProcessor 体现了责任链/过滤器链式处理思想，本质上又是一个典型插件扩展点；它并不完全等价于最传统的 next-handler
+> 形式责任链实现。
 
 ---
 
@@ -929,6 +948,7 @@ Spring 很少“只使用一种设计模式”。
 假设：
 
 ```java
+
 @Service
 public class OrderService {
 
@@ -982,7 +1002,8 @@ Target.create()
 class Singleton {
     private static final Singleton INSTANCE = new Singleton();
 
-    private Singleton() {}
+    private Singleton() {
+    }
 
     public static Singleton getInstance() {
         return INSTANCE;
@@ -1037,7 +1058,8 @@ Map<String, Object> singletonObjects;
 
 如果一定要从模式角度解释：
 
-> Spring singleton 的实现更接近“容器维护的 Singleton Registry / Registry Pattern”，而不是 Bean 类自身采用 GoF Singleton Pattern。
+> Spring singleton 的实现更接近“容器维护的 Singleton Registry / Registry Pattern”，而不是 Bean 类自身采用 GoF Singleton
+> Pattern。
 
 面试时这样回答通常比“Spring 用了单例模式”更加严谨。
 
@@ -1050,6 +1072,7 @@ Map<String, Object> singletonObjects;
 框架希望对外提供易用 API：
 
 ```java
+
 @EventListener
 public void handle(UserCreatedEvent event) {
 }
@@ -1095,9 +1118,9 @@ DisposableBean.destroy()
 容器不希望调用方到处写：
 
 ```java
-if (bean instanceof DisposableBean) ...
-if (hasPreDestroy) ...
-if (hasCustomDestroy) ...
+if(bean instanceof DisposableBean)...
+        if(hasPreDestroy)...
+        if(hasCustomDestroy)...
 ```
 
 于是可以通过统一 Adapter 包装并执行多种销毁协议。
@@ -1116,18 +1139,28 @@ if (hasCustomDestroy) ...
 简单启动：
 
 ```java
-SpringApplication.run(App.class, args);
+SpringApplication.run(App .class, args);
 ```
 
 复杂启动可能需要：
 
 ```java
 new SpringApplicationBuilder()
-        .sources(ParentConfig.class)
-        .profiles("prod")
-        .properties("server.port=8080")
-        .child(ChildConfig.class)
-        .run(args);
+        .
+
+sources(ParentConfig .class)
+        .
+
+profiles("prod")
+        .
+
+properties("server.port=8080")
+        .
+
+child(ChildConfig .class)
+        .
+
+run(args);
 ```
 
 当一个对象拥有大量可选参数时：
@@ -1160,7 +1193,7 @@ Facade Pattern 的目标：
 用户只写：
 
 ```java
-SpringApplication.run(App.class, args);
+SpringApplication.run(App .class, args);
 ```
 
 但背后涉及：
@@ -1270,6 +1303,7 @@ org.springframework.boot.autoconfigure.AutoConfiguration.imports
 例如：
 
 ```java
+
 @ConditionalOnClass(DataSource.class)
 @ConditionalOnMissingBean(DataSource.class)
 class DataSourceAutoConfiguration {
@@ -1340,7 +1374,8 @@ BeanFactory
 
 更好的回答是：
 
-> 自动配置不是由某一个 GoF 模式完成，而是插件发现 + 条件策略 + 配置类解析 Processor + BeanDefinition 注册表 + IoC 工厂共同实现的一套机制。
+> 自动配置不是由某一个 GoF 模式完成，而是插件发现 + 条件策略 + 配置类解析 Processor + BeanDefinition 注册表 + IoC
+> 工厂共同实现的一套机制。
 
 ---
 
@@ -1410,7 +1445,7 @@ B 持有 raw A
 
 ```java
 ObjectFactory<?> factory =
-    () -> getEarlyBeanReference(beanName, mbd, bean);
+        () -> getEarlyBeanReference(beanName, mbd, bean);
 ```
 
 真正有人需要 early reference 时才调用。
@@ -1477,11 +1512,13 @@ earlySingletonObjects
 
 ```java
 class A {
-    A(B b) {}
+    A(B b) {
+    }
 }
 
 class B {
-    B(A a) {}
+    B(A a) {
+    }
 }
 ```
 
@@ -1552,19 +1589,19 @@ BeanPostProcessor after
 
 对应设计思想：
 
-| Bean 创建阶段 | 设计思想 |
-|---|---|
-| `getBean` | Facade + Factory |
-| singleton 查询 | Registry |
+| Bean 创建阶段                     | 设计思想                         |
+|-----------------------------------|----------------------------------|
+| `getBean`                         | Facade + Factory                 |
+| singleton 查询                    | Registry                         |
 | `getSingleton(... ObjectFactory)` | Factory Callback + Lazy Creation |
-| `createBeanInstance` | Factory Method + Strategy |
-| 构造器选择 | Strategy / Resolution Algorithm |
-| `populateBean` | IoC/DI + Strategy |
-| BPP before/after | Processor Chain |
-| init method 统一处理 | Adapter / Callback |
-| AOP wrapping | Proxy + Factory + Strategy |
-| scoped bean | Strategy + Proxy |
-| destroy callback | Adapter + Lifecycle |
+| `createBeanInstance`              | Factory Method + Strategy        |
+| 构造器选择                        | Strategy / Resolution Algorithm  |
+| `populateBean`                    | IoC/DI + Strategy                |
+| BPP before/after                  | Processor Chain                  |
+| init method 统一处理              | Adapter / Callback               |
+| AOP wrapping                      | Proxy + Factory + Strategy       |
+| scoped bean                       | Strategy + Proxy                 |
+| destroy callback                  | Adapter + Lifecycle              |
 
 这张表非常适合面试前快速复习。
 
@@ -1698,7 +1735,7 @@ BeanDefinition
 
 ---
 
-## 阶段 6：refresh()
+## 阶段 6：refresh ()
 
 这里是：
 
@@ -1807,7 +1844,8 @@ Callback
 
 更准确：
 
-> Spring 容器持有一组 BeanPostProcessor，并按照顺序迭代处理 Bean，因此体现了责任链/过滤器链思想，同时也是插件扩展点，但不是最传统的 Handler 持有 next 的责任链结构。
+> Spring 容器持有一组 BeanPostProcessor，并按照顺序迭代处理 Bean，因此体现了责任链/过滤器链思想，同时也是插件扩展点，但不是最传统的
+> Handler 持有 next 的责任链结构。
 
 ---
 
@@ -1863,7 +1901,8 @@ GoF Prototype Pattern：
 
 高级答案应该继续说明：
 
-> 三级缓存的关键价值是延迟获得 early reference，让 `SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference()` 有机会提前创建与最终 AOP 语义一致的引用。
+> 三级缓存的关键价值是延迟获得 early reference，让 `SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference()`
+> 有机会提前创建与最终 AOP 语义一致的引用。
 
 ---
 
@@ -1918,7 +1957,8 @@ org.springframework.boot.autoconfigure.AutoConfiguration.imports
 模板方法 + Processor 扩展链
 ```
 
-原因是 `AbstractApplicationContext.refresh()` 通过模板方法固定容器启动骨架，而 BeanFactoryPostProcessor 和 BeanPostProcessor 又让大量框架能力以插件方式嵌入这个骨架。
+原因是 `AbstractApplicationContext.refresh()` 通过模板方法固定容器启动骨架，而 BeanFactoryPostProcessor 和
+BeanPostProcessor 又让大量框架能力以插件方式嵌入这个骨架。
 
 Bean 的创建则进一步组合了 Factory、Strategy、Registry 和 Proxy。
 
@@ -2055,7 +2095,8 @@ Spring 官方文档也强调，普通 `BeanFactory` 并不会像 `ApplicationCon
 
 ## 题 8：三级缓存为什么需要 ObjectFactory 而不是 Supplier<Object>？
 
-从概念上两者都可以表达延迟工厂，但 Spring 的 `ObjectFactory` 是容器自己定义且长期稳定的轻量抽象，并被 Scope、依赖获取、ObjectProvider 等体系复用。
+从概念上两者都可以表达延迟工厂，但 Spring 的 `ObjectFactory` 是容器自己定义且长期稳定的轻量抽象，并被
+Scope、依赖获取、ObjectProvider 等体系复用。
 
 面试关键不在接口名字，而在理解：
 
@@ -2150,7 +2191,8 @@ SpringApplication.run
 
 最终可以用一句话总结：
 
-> **Spring 启动流程的核心设计不是“用了多少模式”，而是通过模板方法稳定骨架，通过工厂和注册表统一对象治理，通过策略隔离变化，通过 Processor 链开放扩展，通过事件解耦生命周期，通过代理完成运行时增强。**
+> **Spring 启动流程的核心设计不是“用了多少模式”，而是通过模板方法稳定骨架，通过工厂和注册表统一对象治理，通过策略隔离变化，通过
+Processor 链开放扩展，通过事件解耦生命周期，通过代理完成运行时增强。**
 
 如果能围绕这句话展开，而不是逐个背“XX 类用了 XX 模式”，通常就达到了高级开发应有的源码理解层次。
 

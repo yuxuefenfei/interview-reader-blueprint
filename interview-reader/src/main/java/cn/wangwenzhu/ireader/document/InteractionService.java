@@ -43,6 +43,50 @@ public class InteractionService {
     private final ContentNodeMapper contentNodeMapper;
     private final ContentBlockMapper contentBlockMapper;
 
+    private static BookmarkDto mapBookmark(BookmarkEntity entity) {
+        return new BookmarkDto(
+                uuid(entity.getId()),
+                uuid(entity.getDocumentId()),
+                uuid(entity.getVersionId()),
+                uuid(entity.getSectionId()),
+                uuid(entity.getBlockId()),
+                entity.getTitle(),
+                entity.getCreatedAt());
+    }
+
+    private static NoteDto mapNote(NoteEntity entity) {
+        return new NoteDto(
+                uuid(entity.getId()),
+                uuid(entity.getDocumentId()),
+                uuid(entity.getVersionId()),
+                uuid(entity.getSectionId()),
+                uuid(entity.getBlockId()),
+                entity.getSelectedText(),
+                entity.getBody(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
+    }
+
+    private static ReviewStateDto mapReviewState(ReviewStateEntity entity) {
+        return new ReviewStateDto(
+                uuid(entity.getId()),
+                uuid(entity.getDocumentId()),
+                uuid(entity.getNodeId()),
+                entity.getMastery(),
+                entity.getDueAt(),
+                entity.getIntervalDays(),
+                entity.getRepetitions(),
+                entity.getUpdatedAt());
+    }
+
+    private static String id(UUID value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static UUID uuid(String value) {
+        return value == null ? null : UUID.fromString(value);
+    }
+
     @Transactional
     public BookmarkDto createBookmark(BookmarkRequest request) {
         verifyDocumentVersion(request.documentId(), request.versionId());
@@ -204,20 +248,6 @@ public class InteractionService {
                 .toList();
     }
 
-    public static class ReviewQueueRow {
-        public String documentId;
-        public String versionId;
-        public String nodeId;
-        public String title;
-        public NodeType nodeType;
-        public SemanticRole semanticRole;
-        public Integer sourcePageStart;
-        public MasteryState mastery;
-        public OffsetDateTime dueAt;
-        public Integer intervalDays;
-        public Integer repetitions;
-    }
-
     private BookmarkDto getBookmark(UUID bookmarkId) {
         var bookmark = bookmarkMapper.selectOneByQuery(QueryWrapper.create()
                 .select(BOOKMARK_ENTITY.ALL_COLUMNS)
@@ -300,47 +330,17 @@ public class InteractionService {
         }
     }
 
-    private static BookmarkDto mapBookmark(BookmarkEntity entity) {
-        return new BookmarkDto(
-                uuid(entity.getId()),
-                uuid(entity.getDocumentId()),
-                uuid(entity.getVersionId()),
-                uuid(entity.getSectionId()),
-                uuid(entity.getBlockId()),
-                entity.getTitle(),
-                entity.getCreatedAt());
-    }
-
-    private static NoteDto mapNote(NoteEntity entity) {
-        return new NoteDto(
-                uuid(entity.getId()),
-                uuid(entity.getDocumentId()),
-                uuid(entity.getVersionId()),
-                uuid(entity.getSectionId()),
-                uuid(entity.getBlockId()),
-                entity.getSelectedText(),
-                entity.getBody(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt());
-    }
-
-    private static ReviewStateDto mapReviewState(ReviewStateEntity entity) {
-        return new ReviewStateDto(
-                uuid(entity.getId()),
-                uuid(entity.getDocumentId()),
-                uuid(entity.getNodeId()),
-                entity.getMastery(),
-                entity.getDueAt(),
-                entity.getIntervalDays(),
-                entity.getRepetitions(),
-                entity.getUpdatedAt());
-    }
-
-    private static String id(UUID value) {
-        return value == null ? null : value.toString();
-    }
-
-    private static UUID uuid(String value) {
-        return value == null ? null : UUID.fromString(value);
+    public static class ReviewQueueRow {
+        public String documentId;
+        public String versionId;
+        public String nodeId;
+        public String title;
+        public NodeType nodeType;
+        public SemanticRole semanticRole;
+        public Integer sourcePageStart;
+        public MasteryState mastery;
+        public OffsetDateTime dueAt;
+        public Integer intervalDays;
+        public Integer repetitions;
     }
 }

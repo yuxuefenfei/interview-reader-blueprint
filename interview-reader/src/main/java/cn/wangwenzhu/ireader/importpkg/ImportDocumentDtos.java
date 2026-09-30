@@ -8,7 +8,9 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 
-/** 导入任务中的文档级资料预览、编辑与冲突决议 DTO。 */
+/**
+ * 导入任务中的文档级资料预览、编辑与冲突决议 DTO。
+ */
 public final class ImportDocumentDtos {
     private ImportDocumentDtos() {
     }

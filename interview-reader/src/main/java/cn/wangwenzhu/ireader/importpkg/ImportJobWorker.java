@@ -54,10 +54,14 @@ public class ImportJobWorker {
             }
             return null;
         }) {
-            @Override protected void done() { futures.remove(jobId, this); }
+            @Override
+            protected void done() {
+                futures.remove(jobId, this);
+            }
         };
         if (futures.putIfAbsent(jobId, future) == null) executor.execute(future);
     }
+
     public int pendingCount() {
         return Math.max(futures.size(), running.get());
     }

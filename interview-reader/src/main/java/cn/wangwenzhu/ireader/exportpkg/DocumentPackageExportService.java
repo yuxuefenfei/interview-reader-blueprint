@@ -40,6 +40,10 @@ public class DocumentPackageExportService {
     private final TagMapper tagMapper;
     private final ObjectMapper objectMapper;
 
+    private static String id(UUID value) {
+        return value == null ? null : value.toString();
+    }
+
     public DocumentPackage exportJsonPackage(UUID documentId, UUID versionId) {
         var header = loadHeader(documentId, versionId);
         var nodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
@@ -60,13 +64,13 @@ public class DocumentPackageExportService {
         var tags = tagIds.isEmpty()
                 ? List.<String>of()
                 : tagMapper.selectListByQuery(QueryWrapper.create()
-                                .select(TAG_ENTITY.ALL_COLUMNS)
-                                .from(TAG_ENTITY)
-                                .where(TAG_ENTITY.ID.in(tagIds)))
-                        .stream()
-                        .map(TagEntity::getName)
-                        .sorted()
-                        .toList();
+                        .select(TAG_ENTITY.ALL_COLUMNS)
+                        .from(TAG_ENTITY)
+                        .where(TAG_ENTITY.ID.in(tagIds)))
+                .stream()
+                .map(TagEntity::getName)
+                .sorted()
+                .toList();
         var sections = nodes.stream()
                 .map(node -> mapSection(node, nodesById.get(node.getParentId())))
                 .toList();
@@ -199,10 +203,6 @@ public class DocumentPackageExportService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Invalid stored metadata JSON", exception);
         }
-    }
-
-    private static String id(UUID value) {
-        return value == null ? null : value.toString();
     }
 
     private record Header(

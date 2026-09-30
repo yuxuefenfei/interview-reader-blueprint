@@ -14,7 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class StateStoreTest {
-    @TempDir Path directory;
+    @TempDir
+    Path directory;
 
     @Test
     void interruptedOperationSurvivesConsoleRestartAndBlocksAnotherDeployment() throws Exception {
@@ -60,6 +61,7 @@ class StateStoreTest {
             assertThat(restarted.value.begin(releaseId).status()).isEqualTo("RUNNING");
         }
     }
+
     @Test
     void migratesLegacyJsonOnceAndKeepsLaterEventsInH2() throws Exception {
         var settings = new UpgradeSettings(directory, directory, directory.resolve("state"), directory.resolve("mysql.cnf"),
@@ -124,7 +126,11 @@ class StateStoreTest {
             assertThat(managed.value.operations(first.id(), 1, 1).items().getFirst().events()).isEmpty();
         }
     }
+
     private record AutoCloseableStore(StateStore value) implements AutoCloseable {
-        @Override public void close() throws Exception { value.close(); }
+        @Override
+        public void close() throws Exception {
+            value.close();
+        }
     }
 }

@@ -11,7 +11,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 文档彻底删除任务持久化实体。 */
+/**
+ * 文档彻底删除任务持久化实体。
+ */
 @Getter
 @Setter
 @Table("document_deletion_job")

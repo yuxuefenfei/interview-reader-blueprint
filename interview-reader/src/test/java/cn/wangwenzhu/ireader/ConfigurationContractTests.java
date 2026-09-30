@@ -47,6 +47,7 @@ class ConfigurationContractTests {
                     .contains("at least one allowed origin must be configured when security is enabled");
         }
     }
+
     @Test
     void uploadLimitMustBePositiveAndProvidesConfigurationDrivenMessage() {
         try (var factory = Validation.buildDefaultValidatorFactory()) {
@@ -71,6 +72,7 @@ class ConfigurationContractTests {
             assertThat(factory.getValidator().validate(invalid)).hasSize(4);
         }
     }
+
     @Test
     void legacyRecordWithOnlyRetiredVersionsMigratesToOffline() {
         var url = "jdbc:h2:mem:legacy-lifecycle-" + UUID.randomUUID() + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
@@ -91,6 +93,7 @@ class ConfigurationContractTests {
         assertThat(jdbc.queryForObject("SELECT current_version_id FROM document WHERE id = ?", String.class, documentId))
                 .isNull();
     }
+
     @Test
     void persistenceEntitiesKeepFieldsPrivateAndExposeBeanAccessors() throws NoSuchMethodException {
         // 实体统一采用 JavaBean 访问器，既保护封装边界，也兼容 MyBatis-Flex 的属性映射。
@@ -127,6 +130,7 @@ class ConfigurationContractTests {
             }
         }
     }
+
     @Test
     void synchronousImportIsAllowedOnlyInTheTestProfile() {
         var development = new MockEnvironment();
@@ -141,6 +145,7 @@ class ConfigurationContractTests {
         test.setProperty("interview-reader.import-worker.enabled", "false");
         new RuntimeProfileGuard(test);
     }
+
     @Test
     void runtimeRequiresAnExplicitSupportedProfile() {
         assertThatThrownBy(() -> new RuntimeProfileGuard(new MockEnvironment()))

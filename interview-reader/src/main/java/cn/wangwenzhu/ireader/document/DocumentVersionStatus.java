@@ -8,7 +8,9 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 文档版本状态，枚举名与数据库及 API 中的稳定编码一致。 */
+/**
+ * 文档版本状态，枚举名与数据库及 API 中的稳定编码一致。
+ */
 public enum DocumentVersionStatus {
     DRAFT("DRAFT"),
     PUBLISHED("PUBLISHED"),
@@ -18,12 +20,6 @@ public enum DocumentVersionStatus {
 
     DocumentVersionStatus(String code) {
         this.code = code;
-    }
-
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
     }
 
     public static Set<String> codes() {
@@ -36,5 +32,11 @@ public enum DocumentVersionStatus {
                 .filter(status -> status.code.equals(value))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown document version status: " + value));
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
     }
 }

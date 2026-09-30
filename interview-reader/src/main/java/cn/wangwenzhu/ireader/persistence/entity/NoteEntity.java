@@ -9,7 +9,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 阅读笔记持久化实体。 */
+/**
+ * 阅读笔记持久化实体。
+ */
 @Getter
 @Setter
 @Table("note")

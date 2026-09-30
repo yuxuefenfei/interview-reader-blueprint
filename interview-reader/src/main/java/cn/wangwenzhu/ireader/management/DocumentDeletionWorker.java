@@ -71,10 +71,14 @@ public class DocumentDeletionWorker {
             }
             return null;
         }) {
-            @Override protected void done() { futures.remove(jobId, this); }
+            @Override
+            protected void done() {
+                futures.remove(jobId, this);
+            }
         };
         if (futures.putIfAbsent(jobId, future) == null) executor.execute(future);
     }
+
     @PreDestroy
     void close() {
         executor.close();

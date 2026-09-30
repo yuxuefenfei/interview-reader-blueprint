@@ -8,7 +8,9 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 导入流程阶段，枚举名与数据库及 API 中的稳定编码一致。 */
+/**
+ * 导入流程阶段，枚举名与数据库及 API 中的稳定编码一致。
+ */
 public enum ImportStage {
     UPLOADED("UPLOADED"),
     PREFLIGHT("PREFLIGHT"),
@@ -29,23 +31,6 @@ public enum ImportStage {
         this.code = code;
     }
 
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
-    public ImportJobStatus activeJobStatus() {
-        return switch (this) {
-            case UPLOADED -> ImportJobStatus.UPLOADED;
-            case PREFLIGHT -> ImportJobStatus.PREFLIGHT;
-            case EXTRACTING -> ImportJobStatus.EXTRACTING;
-            case NORMALIZING -> ImportJobStatus.NORMALIZING;
-            case VALIDATING -> ImportJobStatus.VALIDATING;
-            default -> throw new IllegalStateException("Stage does not represent an active import status: " + code);
-        };
-    }
-
     public static ImportStage resultStage(ImportJobStatus status) {
         return switch (status) {
             case READY -> READY;
@@ -64,5 +49,22 @@ public enum ImportStage {
                 .filter(stage -> stage.code.equals(value))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown import stage: " + value));
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
+    }
+
+    public ImportJobStatus activeJobStatus() {
+        return switch (this) {
+            case UPLOADED -> ImportJobStatus.UPLOADED;
+            case PREFLIGHT -> ImportJobStatus.PREFLIGHT;
+            case EXTRACTING -> ImportJobStatus.EXTRACTING;
+            case NORMALIZING -> ImportJobStatus.NORMALIZING;
+            case VALIDATING -> ImportJobStatus.VALIDATING;
+            default -> throw new IllegalStateException("Stage does not represent an active import status: " + code);
+        };
     }
 }

@@ -14,7 +14,8 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MaintenanceWriteFilterTest {
-    @TempDir Path directory;
+    @TempDir
+    Path directory;
 
     @Test
     void blocksUnsafeRequestsWhileMarkerExistsAndCountsOnlyInFlightWrites() throws ServletException, IOException {

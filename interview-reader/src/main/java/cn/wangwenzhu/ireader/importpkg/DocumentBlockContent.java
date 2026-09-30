@@ -9,7 +9,8 @@ public final class DocumentBlockContent {
 
     public static boolean isMeaningful(BlockType blockType, String plainText, JsonNode payload) {
         if (blockType == BlockType.DIVIDER) return true;
-        if (blockType == BlockType.IMAGE) return hasText(payload, "assetKey") || hasText(payload, "src") || hasText(payload, "url");
+        if (blockType == BlockType.IMAGE)
+            return hasText(payload, "assetKey") || hasText(payload, "src") || hasText(payload, "url");
         if (blockType == BlockType.UNORDERED_LIST || blockType == BlockType.ORDERED_LIST) {
             return hasNonBlankArrayItem(payload, "items") || hasText(plainText);
         }

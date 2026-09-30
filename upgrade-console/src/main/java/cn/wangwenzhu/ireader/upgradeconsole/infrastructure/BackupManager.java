@@ -30,7 +30,8 @@ public class BackupManager {
     public void precheck() throws IOException {
         var data = settings.dataDir().toAbsolutePath().normalize();
         var state = settings.stateDir().toAbsolutePath().normalize();
-        if (state.startsWith(data) || data.startsWith(state)) throw new IOException("备份目录与应用数据目录不能相互包含");
+        if (state.startsWith(data) || data.startsWith(state))
+            throw new IOException("备份目录与应用数据目录不能相互包含");
         if (!Files.isRegularFile(settings.jar()) || !Files.isExecutable(settings.daemon())
                 || !Files.isDirectory(settings.dataDir()) || !Files.isWritable(settings.appDir())
                 || !Files.isExecutable(settings.mysqlBin()) || !Files.isExecutable(settings.mysqldumpBin())) {
@@ -111,7 +112,8 @@ public class BackupManager {
         var root = store.backupPath(backupId);
         var manifest = root.resolve("manifest.json");
         if (!Files.isRegularFile(manifest)) throw new IOException("备份清单不存在");
-        Map<String, String> hashes = json.readValue(manifest.toFile(), new TypeReference<>() {});
+        Map<String, String> hashes = json.readValue(manifest.toFile(), new TypeReference<>() {
+        });
         if (!hashes.containsKey("database.sql") || !hashes.containsKey("interview-reader.jar")) {
             throw new IOException("备份缺少数据库或旧 JAR");
         }
@@ -163,7 +165,8 @@ public class BackupManager {
             @NonNull
             @Override
             public FileVisitResult visitFile(@NonNull Path file, @NonNull BasicFileAttributes attrs) throws IOException {
-                if (!attrs.isRegularFile() || Files.isSymbolicLink(file)) throw new IOException("数据目录包含非普通文件");
+                if (!attrs.isRegularFile() || Files.isSymbolicLink(file))
+                    throw new IOException("数据目录包含非普通文件");
                 Files.copy(file, to.resolve(from.relativize(file)));
                 return FileVisitResult.CONTINUE;
             }
@@ -173,7 +176,11 @@ public class BackupManager {
     private long size(Path root) throws IOException {
         try (var walk = Files.walk(root)) {
             return walk.filter(Files::isRegularFile).mapToLong(file -> {
-                try { return Files.size(file); } catch (IOException exception) { throw new IllegalStateException(exception); }
+                try {
+                    return Files.size(file);
+                } catch (IOException exception) {
+                    throw new IllegalStateException(exception);
+                }
             }).sum();
         }
     }

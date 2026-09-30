@@ -36,7 +36,7 @@ interview-reader:
   security:
     session-ttl: PT12H
     session-cleanup-interval: PT10M
-    allowed-origins: []
+    allowed-origins: [ ]
     trust-forwarded-client-ip: false
     login-rate-limit:
       max-attempts: 5

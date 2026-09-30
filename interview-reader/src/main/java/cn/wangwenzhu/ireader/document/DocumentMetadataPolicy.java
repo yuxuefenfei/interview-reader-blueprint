@@ -8,7 +8,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 
-/** 统一校验并规范化文档级标题、描述与标签。 */
+/**
+ * 统一校验并规范化文档级标题、描述与标签。
+ */
 public final class DocumentMetadataPolicy {
     public static final int TITLE_MAX_LENGTH = 500;
     public static final int DESCRIPTION_MAX_LENGTH = 5_000;

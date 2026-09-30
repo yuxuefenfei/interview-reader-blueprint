@@ -11,7 +11,9 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 复习掌握度，枚举名与数据库及 API 中的稳定编码一致。 */
+/**
+ * 复习掌握度，枚举名与数据库及 API 中的稳定编码一致。
+ */
 public enum MasteryState {
     UNKNOWN("UNKNOWN", null),
     HARD("HARD", 1),
@@ -24,16 +26,6 @@ public enum MasteryState {
     MasteryState(String code, Integer intervalDays) {
         this.code = code;
         this.intervalDays = intervalDays;
-    }
-
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
-    public Integer intervalDays() {
-        return intervalDays;
     }
 
     public static Set<String> codes() {
@@ -51,5 +43,15 @@ public enum MasteryState {
         } catch (RuntimeException exception) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "mastery must be UNKNOWN, HARD, FUZZY or KNOWN");
         }
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
+    }
+
+    public Integer intervalDays() {
+        return intervalDays;
     }
 }

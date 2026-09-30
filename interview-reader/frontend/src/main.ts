@@ -12,6 +12,6 @@ import "./styles.css";
 
 const app = createApp(App).use(router);
 app.use(ElLoading);
-provideGlobalConfig({ locale: zhCn }, app, true);
+provideGlobalConfig({locale: zhCn}, app, true);
 app.mount("#app");
 registerServiceWorker();

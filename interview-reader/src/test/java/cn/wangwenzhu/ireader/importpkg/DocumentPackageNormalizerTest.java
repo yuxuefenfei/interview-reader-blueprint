@@ -14,6 +14,10 @@ class DocumentPackageNormalizerTest {
     private final DocumentPackageNormalizer normalizer = new DocumentPackageNormalizer();
     private final DocumentPackageValidator validator = new DocumentPackageValidator();
 
+    private static DocumentPackage.BlockInfo block(String key, int seq, String type, com.fasterxml.jackson.databind.JsonNode payload, String plainText) {
+        return new DocumentPackage.BlockInfo(key, "section", seq, BlockType.fromCode(type), payload, plainText, null, null, null, null, null);
+    }
+
     @Test
     void removesBlankBlocksAndResequencesTheRemainingBlocks() {
         var json = JsonNodeFactory.instance;
@@ -109,9 +113,5 @@ class DocumentPackageNormalizerTest {
         assertThat(validator.validate(documentPackage))
                 .extracting(ImportIssueDto::issueCode)
                 .contains("ASSET_SHA256_DUPLICATE");
-    }
-
-    private static DocumentPackage.BlockInfo block(String key, int seq, String type, com.fasterxml.jackson.databind.JsonNode payload, String plainText) {
-        return new DocumentPackage.BlockInfo(key, "section", seq, BlockType.fromCode(type), payload, plainText, null, null, null, null, null);
     }
 }

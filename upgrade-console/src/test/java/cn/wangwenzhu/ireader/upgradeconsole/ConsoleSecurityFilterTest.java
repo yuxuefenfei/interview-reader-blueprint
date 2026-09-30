@@ -15,7 +15,8 @@ import java.util.Base64;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ConsoleSecurityFilterTest {
-    @TempDir Path directory;
+    @TempDir
+    Path directory;
 
     @Test
     void requiresIndependentCredentialsAndTrustedOriginForWrites() throws Exception {

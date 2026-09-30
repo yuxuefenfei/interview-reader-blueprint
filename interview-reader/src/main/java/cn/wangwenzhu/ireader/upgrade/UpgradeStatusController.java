@@ -56,7 +56,6 @@ public class UpgradeStatusController {
             return "unknown";
         }
     }
-    private record DatabaseIdentity(String name, String serverId) {}
 
     private DatabaseIdentity databaseIdentity() {
         try (var connection = dataSource.getConnection();
@@ -68,6 +67,7 @@ public class UpgradeStatusController {
         }
         return new DatabaseIdentity("unknown", "unknown");
     }
+
     @GetMapping("/internal/upgrade/status")
     public Map<String, Object> status(HttpServletRequest request,
                                       @RequestHeader(value = "X-Upgrade-Token", required = false) String suppliedToken) {
@@ -97,5 +97,8 @@ public class UpgradeStatusController {
         result.put("httpRequests", requestCount);
         result.put("httpMeanMs", meanMs);
         return result;
+    }
+
+    private record DatabaseIdentity(String name, String serverId) {
     }
 }

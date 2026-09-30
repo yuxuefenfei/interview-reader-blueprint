@@ -72,9 +72,21 @@ public class StateStore implements UpgradeStateRepository {
                 }
             }
         } catch (Exception failure) {
-            try { if (connection != null) connection.close(); } catch (SQLException close) { failure.addSuppressed(close); }
-            try { if (lock != null) lock.release(); } catch (IOException close) { failure.addSuppressed(close); }
-            try { if (channel != null) channel.close(); } catch (IOException close) { failure.addSuppressed(close); }
+            try {
+                if (connection != null) connection.close();
+            } catch (SQLException close) {
+                failure.addSuppressed(close);
+            }
+            try {
+                if (lock != null) lock.release();
+            } catch (IOException close) {
+                failure.addSuppressed(close);
+            }
+            try {
+                if (channel != null) channel.close();
+            } catch (IOException close) {
+                failure.addSuppressed(close);
+            }
             if (failure instanceof IOException io) throw io;
             if (failure instanceof SQLException sql) throw new IOException("升级状态数据库不可用", sql);
             if (failure instanceof RuntimeException runtime) throw runtime;
@@ -82,8 +94,21 @@ public class StateStore implements UpgradeStateRepository {
         }
     }
 
-    public Path releasePath(String id) { return root.resolve("releases").resolve(id + ".jar"); }
-    public Path backupPath(String id) { return root.resolve("backups").resolve(id); }
+    private static String sha256(byte[] bytes) throws IOException {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IOException("SHA-256 不可用", exception);
+        }
+    }
+
+    public Path releasePath(String id) {
+        return root.resolve("releases").resolve(id + ".jar");
+    }
+
+    public Path backupPath(String id) {
+        return root.resolve("backups").resolve(id);
+    }
 
     public synchronized UpgradeSnapshot snapshot() {
         return new UpgradeSnapshot(List.copyOf(snapshot.releases()), List.copyOf(snapshot.operations()));
@@ -98,7 +123,11 @@ public class StateStore implements UpgradeStateRepository {
         try {
             write(() -> insertRelease(release));
         } catch (IOException | RuntimeException failure) {
-            try { Files.deleteIfExists(stored); } catch (IOException cleanup) { failure.addSuppressed(cleanup); }
+            try {
+                Files.deleteIfExists(stored);
+            } catch (IOException cleanup) {
+                failure.addSuppressed(cleanup);
+            }
             throw failure;
         }
         var releases = new ArrayList<>(snapshot.releases());
@@ -550,24 +579,19 @@ public class StateStore implements UpgradeStateRepository {
             insert.executeUpdate();
         }
     }
-    @FunctionalInterface
-    private interface SqlAction { void run() throws SQLException; }
 
     private void write(SqlAction action) throws IOException {
         try {
             action.run();
             db.commit();
         } catch (SQLException | RuntimeException failure) {
-            try { db.rollback(); } catch (SQLException rollback) { failure.addSuppressed(rollback); }
+            try {
+                db.rollback();
+            } catch (SQLException rollback) {
+                failure.addSuppressed(rollback);
+            }
             if (failure instanceof SQLException sql) throw new IOException("升级状态写入失败", sql);
             throw (RuntimeException) failure;
-        }
-    }
-    private static String sha256(byte[] bytes) throws IOException {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IOException("SHA-256 不可用", exception);
         }
     }
 
@@ -578,7 +602,16 @@ public class StateStore implements UpgradeStateRepository {
         } catch (SQLException failure) {
             throw new IOException("关闭升级状态数据库失败", failure);
         } finally {
-            try { processLock.release(); } finally { lockChannel.close(); }
+            try {
+                processLock.release();
+            } finally {
+                lockChannel.close();
+            }
         }
+    }
+
+    @FunctionalInterface
+    private interface SqlAction {
+        void run() throws SQLException;
     }
 }

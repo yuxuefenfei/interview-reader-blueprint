@@ -8,7 +8,9 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 导入问题级别，枚举名与持久化编码一致。 */
+/**
+ * 导入问题级别，枚举名与持久化编码一致。
+ */
 public enum ImportIssueSeverity {
     BLOCKING("BLOCKING"),
     WARNING("WARNING");
@@ -17,16 +19,6 @@ public enum ImportIssueSeverity {
 
     ImportIssueSeverity(String code) {
         this.code = code;
-    }
-
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
-    public boolean matches(String value) {
-        return code.equals(value);
     }
 
     @JsonCreator
@@ -41,5 +33,15 @@ public enum ImportIssueSeverity {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(ImportIssueSeverity::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
+    }
+
+    public boolean matches(String value) {
+        return code.equals(value);
     }
 }

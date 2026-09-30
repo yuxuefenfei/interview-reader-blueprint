@@ -29,6 +29,7 @@ public class ConsoleErrors {
         return ResponseEntity.status(exception.getStatusCode())
                 .body(Map.of("error", exception.getReason() == null ? "请求未通过" : exception.getReason()));
     }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> serverError(Exception exception) {
         LOG.error("Upgrade console request failed", exception);

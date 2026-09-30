@@ -24,6 +24,14 @@ public class DocumentDeletionProcessor {
     private final ImportJobWorker importWorker;
     private final DocumentDeletionProperties properties;
 
+    private static String safeMessage(RuntimeException exception) {
+        if (exception instanceof ApiException) {
+            var message = exception.getMessage();
+            return message == null || message.isBlank() ? "Deletion failed" : message;
+        }
+        return "Deletion failed; inspect server logs with the deletion job id.";
+    }
+
     @SuppressWarnings("BusyWait")
     public void process(UUID jobId) {
         while (true) {
@@ -133,13 +141,5 @@ public class DocumentDeletionProcessor {
             return job.getAttemptCount();
         });
         return attempts == null ? properties.maxAttempts() : attempts;
-    }
-
-    private static String safeMessage(RuntimeException exception) {
-        if (exception instanceof ApiException) {
-            var message = exception.getMessage();
-            return message == null || message.isBlank() ? "Deletion failed" : message;
-        }
-        return "Deletion failed; inspect server logs with the deletion job id.";
     }
 }

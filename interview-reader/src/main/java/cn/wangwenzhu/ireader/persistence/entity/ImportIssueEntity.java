@@ -10,7 +10,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 文档导入问题持久化实体。 */
+/**
+ * 文档导入问题持久化实体。
+ */
 @Getter
 @Setter
 @Table("import_issue")

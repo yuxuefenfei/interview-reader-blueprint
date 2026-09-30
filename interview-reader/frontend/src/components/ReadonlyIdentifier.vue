@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {Check, CopyDocument} from "@element-plus/icons-vue";
 import {onBeforeUnmount, ref} from "vue";
 
@@ -47,21 +47,21 @@ async function copyIdentifier(): Promise<void> {
 </script>
 
 <template>
-  <div class="readonly-identifier" role="group" :aria-label="label">
+  <div :aria-label="label" class="readonly-identifier" role="group">
     <code dir="auto">{{ value || "—" }}</code>
     <el-tooltip :content="copyLabel" placement="top">
       <el-button
-        class="readonly-identifier-copy"
-        :class="{ 'is-copied': copyLabel === '已复制' }"
-        text
-        circle
-        :icon="copyLabel === '已复制' ? Check : CopyDocument"
-        :disabled="!value"
-        :aria-label="copyLabel"
-        @click="copyIdentifier"
+          :aria-label="copyLabel"
+          :class="{ 'is-copied': copyLabel === '已复制' }"
+          :disabled="!value"
+          :icon="copyLabel === '已复制' ? Check : CopyDocument"
+          circle
+          class="readonly-identifier-copy"
+          text
+          @click="copyIdentifier"
       />
     </el-tooltip>
-    <span class="sr-only" aria-live="polite">{{ copyLabel === "复制标识" ? "" : copyLabel }}</span>
+    <span aria-live="polite" class="sr-only">{{ copyLabel === "复制标识" ? "" : copyLabel }}</span>
   </div>
 </template>
 
@@ -75,6 +75,7 @@ async function copyIdentifier(): Promise<void> {
   gap: 4px;
   color: var(--ink-700);
 }
+
 .readonly-identifier code {
   min-width: 0;
   flex: 0 1 auto;
@@ -88,6 +89,7 @@ async function copyIdentifier(): Promise<void> {
   overflow-wrap: anywhere;
   user-select: text;
 }
+
 .readonly-identifier-copy {
   width: 28px;
   min-height: 28px;
@@ -95,11 +97,13 @@ async function copyIdentifier(): Promise<void> {
   flex: 0 0 auto;
   color: var(--ink-300);
 }
+
 .readonly-identifier-copy:hover,
 .readonly-identifier-copy:focus-visible {
   color: var(--brand-500);
   background: var(--brand-050);
 }
+
 .readonly-identifier-copy.is-copied {
   color: var(--brand-500);
 }

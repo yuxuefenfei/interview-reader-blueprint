@@ -20,6 +20,18 @@ public class AuthController {
     private final AuthSessionService sessionService;
     private final LoginAttemptService loginAttemptService;
 
+    static java.util.Optional<String> sessionToken(HttpServletRequest request) {
+        var cookies = request.getCookies();
+        if (cookies == null) {
+            return java.util.Optional.empty();
+        }
+        for (Cookie cookie : cookies) {
+            if (SESSION_COOKIE.equals(cookie.getName())) {
+                return java.util.Optional.ofNullable(cookie.getValue());
+            }
+        }
+        return java.util.Optional.empty();
+    }
 
     @PostMapping("/login")
     ResponseEntity<AuthSessionResponse> login(
@@ -69,19 +81,6 @@ public class AuthController {
                 .path("/")
                 .maxAge(maxAge)
                 .build();
-    }
-
-    static java.util.Optional<String> sessionToken(HttpServletRequest request) {
-        var cookies = request.getCookies();
-        if (cookies == null) {
-            return java.util.Optional.empty();
-        }
-        for (Cookie cookie : cookies) {
-            if (SESSION_COOKIE.equals(cookie.getName())) {
-                return java.util.Optional.ofNullable(cookie.getValue());
-            }
-        }
-        return java.util.Optional.empty();
     }
 
     record LoginRequest(

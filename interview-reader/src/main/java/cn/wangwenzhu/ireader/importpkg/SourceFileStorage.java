@@ -42,7 +42,9 @@ public class SourceFileStorage {
         }
     }
 
-    /** Idempotently deletes one object only when its resolved path remains under the configured storage root. */
+    /**
+     * Idempotently deletes one object only when its resolved path remains under the configured storage root.
+     */
     public void deleteIfManaged(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
             return;
@@ -67,6 +69,7 @@ public class SourceFileStorage {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Cannot delete managed source file");
         }
     }
+
     public record SourceFile(String fileName, byte[] bytes) {
     }
 }

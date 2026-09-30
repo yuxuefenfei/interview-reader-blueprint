@@ -8,7 +8,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 应用用户持久化实体。 */
+/**
+ * 应用用户持久化实体。
+ */
 @Getter
 @Setter
 @Table("app_user")

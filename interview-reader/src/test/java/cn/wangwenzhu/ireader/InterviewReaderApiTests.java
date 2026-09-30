@@ -340,6 +340,7 @@ class InterviewReaderApiTests {
         mockMvc.perform(get("/api/admin/documents/{documentId}", imported.documentId()))
                 .andExpect(status().isNotFound());
     }
+
     @Test
     void searchFiltersUnpublishedMatchesBeforeApplyingLimit() throws Exception {
         var marker = "published-search-" + UUID.randomUUID();
@@ -446,6 +447,7 @@ class InterviewReaderApiTests {
         assertThat(replayed.progressRatio()).isEqualByComparingTo("0.75");
         assertThat(replayed.revision()).isEqualTo(stored.revision());
     }
+
     @Test
     void readingProgressRejectsMissingRatioAndCrossDocumentPositions() throws Exception {
         var firstSource = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("../docs/import/examples/document-package.example.json")));
@@ -711,6 +713,7 @@ class InterviewReaderApiTests {
             assertThat(first.get()).isEqualTo(second.get());
         }
     }
+
     @Test
     void excelTemplateCanBeImportedAndPreservesCodeWhitespace() throws Exception {
         var imported = importAndCommitExcel(Files.readAllBytes(Path.of("../docs/import/templates/interview-reader-import-template.xlsx")));
@@ -902,6 +905,7 @@ class InterviewReaderApiTests {
         assertThat(secondText).contains("Prefix content").doesNotContain("Term content");
         assertThat(firstHashes).doesNotContainAnyElementsOf(secondHashes);
     }
+
     @Test
     void generatedPdfRecognizesListAndCodeBlocks() throws Exception {
         var job = uploadPackage(generatedSemanticPdf(), "PDF", "semantic-blocks.pdf");
@@ -1402,6 +1406,7 @@ class InterviewReaderApiTests {
         mockMvc.perform(post("/api/admin/documents/{documentId}/versions/{versionId}/publish", imported.documentId(), imported.versionId()))
                 .andExpect(status().isNoContent());
     }
+
     @Test
     void revisionSummaryKeepsSourceVersionNumberWhenParentIsDeleted() throws Exception {
         var source = (ObjectNode) objectMapper.readTree(Files.readString(Path.of("../docs/import/examples/document-package.example.json")));
@@ -1899,6 +1904,7 @@ class InterviewReaderApiTests {
         item.setDestination(page);
         outline.addLast(item);
     }
+
     private byte[] generatedTableSnapshotPdf() throws Exception {
         try (var document = new PDDocument();
              var out = new ByteArrayOutputStream()) {

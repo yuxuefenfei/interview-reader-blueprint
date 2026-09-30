@@ -6,7 +6,7 @@ info:
 servers:
   - url: /api
 security:
-  - cookieAuth: []
+  - cookieAuth: [ ]
 paths:
   /health:
     get:
@@ -21,7 +21,7 @@ paths:
   /auth/login:
     post:
       summary: Create a cookie-backed session
-      security: []
+      security: [ ]
       requestBody:
         required: true
         content:
@@ -43,7 +43,7 @@ paths:
   /auth/session:
     get:
       summary: Get the current session
-      security: []
+      security: [ ]
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200": { $ref: "#/components/responses/AuthSession" }
@@ -543,7 +543,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file, draftRevision]
+              required: [ file, draftRevision ]
               properties:
                 file: { type: string, format: binary }
                 draftRevision: { type: integer, minimum: 0 }
@@ -605,7 +605,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              required: [ file ]
               properties:
                 file:
                   type: string
@@ -809,7 +809,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
   schemas:
-    JsonValue: {}
+    JsonValue: { }
     JsonObject:
       type: object
       additionalProperties: true
@@ -817,44 +817,44 @@ components:
       type: string
       format: uuid
     NullableUuid:
-      type: [string, "null"]
+      type: [ string, "null" ]
       format: uuid
     SourceType:
       type: string
-      enum: [PDF, EXCEL, JSON_PACKAGE, MARKDOWN, MANUAL]
+      enum: [ PDF, EXCEL, JSON_PACKAGE, MARKDOWN, MANUAL ]
     NodeType:
       type: string
-      enum: [PART, CHAPTER, SECTION, SUBSECTION, QUESTION, APPENDIX, OTHER]
+      enum: [ PART, CHAPTER, SECTION, SUBSECTION, QUESTION, APPENDIX, OTHER ]
     BlockType:
       type: string
-      enum: [paragraph, heading_note, unordered_list, ordered_list, code, table, quote, callout, formula, image, divider, table_snapshot]
+      enum: [ paragraph, heading_note, unordered_list, ordered_list, code, table, quote, callout, formula, image, divider, table_snapshot ]
     SemanticRole:
       type: string
-      enum: [QUESTION, ANSWER, EXPLANATION, CONCLUSION, INTRODUCTION, DIRECTORY, PRINCIPLE, PRACTICE, PITFALL, FOLLOW_UP]
+      enum: [ QUESTION, ANSWER, EXPLANATION, CONCLUSION, INTRODUCTION, DIRECTORY, PRINCIPLE, PRACTICE, PITFALL, FOLLOW_UP ]
     VersionStatus:
       type: string
-      enum: [DRAFT, PUBLISHED, RETIRED]
+      enum: [ DRAFT, PUBLISHED, RETIRED ]
     DocumentStatus:
       type: string
-      enum: [DRAFT, PUBLISHED, OFFLINE, DELETING, DELETE_FAILED]
+      enum: [ DRAFT, PUBLISHED, OFFLINE, DELETING, DELETE_FAILED ]
     DeletionJobStatus:
       type: string
-      enum: [QUEUED, RUNNING, FAILED, COMPLETED]
+      enum: [ QUEUED, RUNNING, FAILED, COMPLETED ]
     DeletionStage:
       type: string
-      enum: [QUEUED, CLIENT_SYNC_MARKED, DELETING_FILES, DELETING_DATA, COMPLETED, FAILED]
+      enum: [ QUEUED, CLIENT_SYNC_MARKED, DELETING_FILES, DELETING_DATA, COMPLETED, FAILED ]
     ImportStatus:
       type: string
-      enum: [UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, READY, REVIEW_REQUIRED, IMPORTED, FAILED, CANCELED]
+      enum: [ UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, READY, REVIEW_REQUIRED, IMPORTED, FAILED, CANCELED ]
     ImportStage:
       type: string
-      enum: [UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, READY, REVIEW_REQUIRED, REVIEWING, FAILED, CANCELED, COMMITTED, DRAFT_DISCARDED]
+      enum: [ UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING, READY, REVIEW_REQUIRED, REVIEWING, FAILED, CANCELED, COMMITTED, DRAFT_DISCARDED ]
     MasteryState:
       type: string
-      enum: [UNKNOWN, HARD, FUZZY, KNOWN]
+      enum: [ UNKNOWN, HARD, FUZZY, KNOWN ]
     Problem:
       type: object
-      required: [type, title, status, detail, code, error, traceId]
+      required: [ type, title, status, detail, code, error, traceId ]
       properties:
         type: { type: string, format: uri }
         title: { type: string }
@@ -869,29 +869,29 @@ components:
           additionalProperties: { type: string }
     Health:
       type: object
-      required: [status]
+      required: [ status ]
       properties:
-        status: { type: string, enum: [UP] }
+        status: { type: string, enum: [ UP ] }
     LoginRequest:
       type: object
-      required: [username, password]
+      required: [ username, password ]
       properties:
         username: { type: string, minLength: 1 }
         password: { type: string, minLength: 1 }
     AuthSession:
       type: object
-      required: [authenticated, username]
+      required: [ authenticated, username ]
       properties:
         authenticated: { type: boolean }
-        username: { type: [string, "null"] }
+        username: { type: [ string, "null" ] }
     DocumentSummary:
       type: object
-      required: [id, code, title, description, currentVersionId, progressRatio]
+      required: [ id, code, title, description, currentVersionId, progressRatio ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         code: { type: string }
         title: { type: string }
-        description: { type: [string, "null"] }
+        description: { type: [ string, "null" ] }
         currentVersionId: { $ref: "#/components/schemas/NullableUuid" }
         progressRatio:
           type: number
@@ -900,13 +900,13 @@ components:
           description: 当前阅读位置占文档可翻页章节序列的比例。
     DocumentPage:
       type: object
-      required: [items, nextCursor]
+      required: [ items, nextCursor ]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/DocumentSummary" } }
-        nextCursor: { type: [string, "null"] }
+        nextCursor: { type: [ string, "null" ] }
     TocNode:
       type: object
-      required: [id, parentId, title, level, nodeType, semanticRole, anchor, sourcePageStart, children]
+      required: [ id, parentId, title, level, nodeType, semanticRole, anchor, sourcePageStart, children ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         parentId: { $ref: "#/components/schemas/NullableUuid" }
@@ -914,22 +914,22 @@ components:
         level: { type: integer, minimum: 1 }
         nodeType: { $ref: "#/components/schemas/NodeType" }
         semanticRole:
-          anyOf: [{ $ref: "#/components/schemas/SemanticRole" }, { type: "null" }]
+          anyOf: [ { $ref: "#/components/schemas/SemanticRole" }, { type: "null" } ]
         anchor: { type: string }
-        sourcePageStart: { type: [integer, "null"], minimum: 1 }
+        sourcePageStart: { type: [ integer, "null" ], minimum: 1 }
         children: { type: array, items: { $ref: "#/components/schemas/TocNode" } }
     SourceBbox:
       type: object
       additionalProperties: true
       properties:
-        page: { type: [integer, "null"] }
-        x: { type: [number, "null"] }
-        y: { type: [number, "null"] }
-        width: { type: [number, "null"] }
-        height: { type: [number, "null"] }
+        page: { type: [ integer, "null" ] }
+        x: { type: [ number, "null" ] }
+        y: { type: [ number, "null" ] }
+        width: { type: [ number, "null" ] }
+        height: { type: [ number, "null" ] }
     ContentBlock:
       type: object
-      required: [id, blockKey, seq, blockType, payload, plainText, sourcePage, sourceBbox, confidence]
+      required: [ id, blockKey, seq, blockType, payload, plainText, sourcePage, sourceBbox, confidence ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         blockKey: { type: string }
@@ -937,20 +937,20 @@ components:
         blockType: { $ref: "#/components/schemas/BlockType" }
         payload: { $ref: "#/components/schemas/JsonObject" }
         plainText: { type: string }
-        sourcePage: { type: [integer, "null"] }
+        sourcePage: { type: [ integer, "null" ] }
         sourceBbox:
-          anyOf: [{ $ref: "#/components/schemas/SourceBbox" }, { type: "null" }]
-        confidence: { type: [number, "null"], minimum: 0, maximum: 1 }
+          anyOf: [ { $ref: "#/components/schemas/SourceBbox" }, { type: "null" } ]
+        confidence: { type: [ number, "null" ], minimum: 0, maximum: 1 }
     NodeContent:
       type: object
-      required: [node, blocks, nextAfterSeq]
+      required: [ node, blocks, nextAfterSeq ]
       properties:
         node: { $ref: "#/components/schemas/TocNode" }
         blocks: { type: array, items: { $ref: "#/components/schemas/ContentBlock" } }
-        nextAfterSeq: { type: [integer, "null"] }
+        nextAfterSeq: { type: [ integer, "null" ] }
     SearchHit:
       type: object
-      required: [documentId, documentTitle, versionId, nodeId, blockId, title, sectionPath, snippet, score]
+      required: [ documentId, documentTitle, versionId, nodeId, blockId, title, sectionPath, snippet, score ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         documentTitle: { type: string }
@@ -963,7 +963,7 @@ components:
         score: { type: number }
     ReadingProgress:
       type: object
-      required: [versionId, sectionId, blockId, charOffset, blockViewportOffset, progressRatio, clientUpdatedAt, deviceId, revision]
+      required: [ versionId, sectionId, blockId, charOffset, blockViewportOffset, progressRatio, clientUpdatedAt, deviceId, revision ]
       properties:
         versionId: { $ref: "#/components/schemas/Uuid" }
         sectionId: { $ref: "#/components/schemas/NullableUuid" }
@@ -977,73 +977,73 @@ components:
           minimum: 0
           maximum: 1
           description: 当前章节内的滚动进度比例，用于恢复阅读位置。
-        clientUpdatedAt: { type: [string, "null"], format: date-time }
-        deviceId: { type: [string, "null"], maxLength: 200 }
+        clientUpdatedAt: { type: [ string, "null" ], format: date-time }
+        deviceId: { type: [ string, "null" ], maxLength: 200 }
         revision: { type: integer, minimum: 0 }
     BookmarkRequest:
       type: object
-      required: [documentId, versionId, sectionId, blockId, title]
+      required: [ documentId, versionId, sectionId, blockId, title ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         versionId: { $ref: "#/components/schemas/Uuid" }
         sectionId: { $ref: "#/components/schemas/Uuid" }
         blockId: { $ref: "#/components/schemas/Uuid" }
-        title: { type: [string, "null"], maxLength: 500 }
+        title: { type: [ string, "null" ], maxLength: 500 }
     Bookmark:
       type: object
-      required: [id, documentId, versionId, sectionId, blockId, title, createdAt]
+      required: [ id, documentId, versionId, sectionId, blockId, title, createdAt ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         documentId: { $ref: "#/components/schemas/Uuid" }
         versionId: { $ref: "#/components/schemas/Uuid" }
         sectionId: { $ref: "#/components/schemas/Uuid" }
         blockId: { $ref: "#/components/schemas/Uuid" }
-        title: { type: [string, "null"] }
+        title: { type: [ string, "null" ] }
         createdAt: { type: string, format: date-time }
     NoteRequest:
       type: object
-      required: [documentId, versionId, sectionId, blockId, selectedText, body]
+      required: [ documentId, versionId, sectionId, blockId, selectedText, body ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         versionId: { $ref: "#/components/schemas/Uuid" }
         sectionId: { $ref: "#/components/schemas/Uuid" }
         blockId: { $ref: "#/components/schemas/NullableUuid" }
-        selectedText: { type: [string, "null"] }
+        selectedText: { type: [ string, "null" ] }
         body: { type: string, minLength: 1 }
     Note:
       type: object
-      required: [id, documentId, versionId, sectionId, blockId, selectedText, body, createdAt, updatedAt]
+      required: [ id, documentId, versionId, sectionId, blockId, selectedText, body, createdAt, updatedAt ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         documentId: { $ref: "#/components/schemas/Uuid" }
         versionId: { $ref: "#/components/schemas/Uuid" }
         sectionId: { $ref: "#/components/schemas/Uuid" }
         blockId: { $ref: "#/components/schemas/NullableUuid" }
-        selectedText: { type: [string, "null"] }
+        selectedText: { type: [ string, "null" ] }
         body: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     ReviewStateRequest:
       type: object
-      required: [documentId, mastery]
+      required: [ documentId, mastery ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         mastery: { $ref: "#/components/schemas/MasteryState" }
     ReviewState:
       type: object
-      required: [id, documentId, nodeId, mastery, dueAt, intervalDays, repetitions, updatedAt]
+      required: [ id, documentId, nodeId, mastery, dueAt, intervalDays, repetitions, updatedAt ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         documentId: { $ref: "#/components/schemas/Uuid" }
         nodeId: { $ref: "#/components/schemas/Uuid" }
         mastery: { $ref: "#/components/schemas/MasteryState" }
-        dueAt: { type: [string, "null"], format: date-time }
-        intervalDays: { type: [integer, "null"] }
+        dueAt: { type: [ string, "null" ], format: date-time }
+        intervalDays: { type: [ integer, "null" ] }
         repetitions: { type: integer, minimum: 0 }
         updatedAt: { type: string, format: date-time }
     ReviewQueueItem:
       type: object
-      required: [documentId, versionId, nodeId, title, sectionPath, nodeType, semanticRole, sourcePageStart, mastery, dueAt, intervalDays, repetitions]
+      required: [ documentId, versionId, nodeId, title, sectionPath, nodeType, semanticRole, sourcePageStart, mastery, dueAt, intervalDays, repetitions ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         versionId: { $ref: "#/components/schemas/Uuid" }
@@ -1052,46 +1052,46 @@ components:
         sectionPath: { type: array, items: { type: string } }
         nodeType: { $ref: "#/components/schemas/NodeType" }
         semanticRole:
-          anyOf: [{ $ref: "#/components/schemas/SemanticRole" }, { type: "null" }]
-        sourcePageStart: { type: [integer, "null"] }
+          anyOf: [ { $ref: "#/components/schemas/SemanticRole" }, { type: "null" } ]
+        sourcePageStart: { type: [ integer, "null" ] }
         mastery: { $ref: "#/components/schemas/MasteryState" }
-        dueAt: { type: [string, "null"], format: date-time }
-        intervalDays: { type: [integer, "null"] }
+        dueAt: { type: [ string, "null" ], format: date-time }
+        intervalDays: { type: [ integer, "null" ] }
         repetitions: { type: integer, minimum: 0 }
     DeleteDocumentRequest:
       type: object
-      required: [confirmationTitle]
+      required: [ confirmationTitle ]
       properties:
         confirmationTitle: { type: string }
     DeletionJob:
       type: object
-      required: [id, documentId, status, currentStage, attemptCount, errorCode, errorMessage, requestedAt, startedAt, completedAt, updatedAt]
+      required: [ id, documentId, status, currentStage, attemptCount, errorCode, errorMessage, requestedAt, startedAt, completedAt, updatedAt ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         documentId: { $ref: "#/components/schemas/Uuid" }
         status: { $ref: "#/components/schemas/DeletionJobStatus" }
         currentStage: { $ref: "#/components/schemas/DeletionStage" }
         attemptCount: { type: integer, minimum: 0 }
-        errorCode: { type: [string, "null"] }
-        errorMessage: { type: [string, "null"] }
+        errorCode: { type: [ string, "null" ] }
+        errorMessage: { type: [ string, "null" ] }
         requestedAt: { type: string, format: date-time }
-        startedAt: { type: [string, "null"], format: date-time }
-        completedAt: { type: [string, "null"], format: date-time }
+        startedAt: { type: [ string, "null" ], format: date-time }
+        completedAt: { type: [ string, "null" ], format: date-time }
         updatedAt: { type: string, format: date-time }
     DeletedDocumentTombstone:
       type: object
-      required: [documentId, deletedAt]
+      required: [ documentId, deletedAt ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         deletedAt: { type: string, format: date-time }
     DocumentMetadata:
       type: object
-      required: [documentId, code, title, description, tags, metadataRevision, duplicateTitleCount]
+      required: [ documentId, code, title, description, tags, metadataRevision, duplicateTitleCount ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         code: { type: string, readOnly: true }
         title: { type: string, minLength: 1, maxLength: 500 }
-        description: { type: [string, "null"], maxLength: 5000 }
+        description: { type: [ string, "null" ], maxLength: 5000 }
         tags:
           type: array
           maxItems: 20
@@ -1100,18 +1100,18 @@ components:
         duplicateTitleCount: { type: integer, minimum: 0 }
     UpdateDocumentMetadataRequest:
       type: object
-      required: [metadataRevision, title, description, tags]
+      required: [ metadataRevision, title, description, tags ]
       properties:
         metadataRevision: { type: integer, minimum: 0 }
         title: { type: string, minLength: 1, maxLength: 500 }
-        description: { type: [string, "null"], maxLength: 5000 }
+        description: { type: [ string, "null" ], maxLength: 5000 }
         tags:
           type: array
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 50 }
     AdminDocumentSummary:
       type: object
-      required: [id, code, title, status, currentVersionId, versionCount, draftCount, updatedAt, deletionJob]
+      required: [ id, code, title, status, currentVersionId, versionCount, draftCount, updatedAt, deletionJob ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         code: { type: string }
@@ -1122,10 +1122,10 @@ components:
         draftCount: { type: integer, minimum: 0 }
         updatedAt: { type: string, format: date-time }
         deletionJob:
-          anyOf: [{ $ref: "#/components/schemas/DeletionJob" }, { type: "null" }]
+          anyOf: [ { $ref: "#/components/schemas/DeletionJob" }, { type: "null" } ]
     AdminDocumentPage:
       type: object
-      required: [items, page, size, hasNext]
+      required: [ items, page, size, hasNext ]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/AdminDocumentSummary" } }
         page: { type: integer, minimum: 1 }
@@ -1133,54 +1133,54 @@ components:
         hasNext: { type: boolean }
     VersionSummary:
       type: object
-      required: [id, versionNo, parentVersionId, parentVersionNo, originImportJobId, sourceType, sourceFileName, status, draftRevision, publishedAt, createdAt]
+      required: [ id, versionNo, parentVersionId, parentVersionNo, originImportJobId, sourceType, sourceFileName, status, draftRevision, publishedAt, createdAt ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         versionNo: { type: integer, minimum: 1 }
         parentVersionId: { $ref: "#/components/schemas/NullableUuid" }
-        parentVersionNo: { type: [integer, "null"], minimum: 1 }
+        parentVersionNo: { type: [ integer, "null" ], minimum: 1 }
         originImportJobId: { $ref: "#/components/schemas/NullableUuid" }
         sourceType: { $ref: "#/components/schemas/SourceType" }
-        sourceFileName: { type: [string, "null"] }
+        sourceFileName: { type: [ string, "null" ] }
         status: { $ref: "#/components/schemas/VersionStatus" }
         draftRevision: { type: integer, minimum: 0 }
-        publishedAt: { type: [string, "null"], format: date-time }
+        publishedAt: { type: [ string, "null" ], format: date-time }
         createdAt: { type: string, format: date-time }
     EditorDocument:
       type: object
-      required: [id, code, title, description, language]
+      required: [ id, code, title, description, language ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         code: { type: string }
         title: { type: string }
-        description: { type: [string, "null"] }
+        description: { type: [ string, "null" ] }
         language: { type: string }
     EditorNode:
       type: object
-      required: [id, parentId, nodeKey, nodeType, semanticRole, title, level, sortOrder, anchor, sourcePageStart, sourcePageEnd]
+      required: [ id, parentId, nodeKey, nodeType, semanticRole, title, level, sortOrder, anchor, sourcePageStart, sourcePageEnd ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         parentId: { $ref: "#/components/schemas/NullableUuid" }
         nodeKey: { type: string }
         nodeType: { $ref: "#/components/schemas/NodeType" }
         semanticRole:
-          anyOf: [{ $ref: "#/components/schemas/SemanticRole" }, { type: "null" }]
+          anyOf: [ { $ref: "#/components/schemas/SemanticRole" }, { type: "null" } ]
         title: { type: string }
         level: { type: integer, minimum: 1 }
         sortOrder: { type: integer }
         anchor: { type: string }
-        sourcePageStart: { type: [integer, "null"] }
-        sourcePageEnd: { type: [integer, "null"] }
+        sourcePageStart: { type: [ integer, "null" ] }
+        sourcePageEnd: { type: [ integer, "null" ] }
     EditorSnapshot:
       type: object
-      required: [version, document, nodes]
+      required: [ version, document, nodes ]
       properties:
         version: { $ref: "#/components/schemas/VersionSummary" }
         document: { $ref: "#/components/schemas/EditorDocument" }
         nodes: { type: array, items: { $ref: "#/components/schemas/EditorNode" } }
     EditorBlock:
       type: object
-      required: [id, blockKey, seq, blockType, payload, plainText, language, sourcePage, sourceBbox, confidence]
+      required: [ id, blockKey, seq, blockType, payload, plainText, language, sourcePage, sourceBbox, confidence ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         blockKey: { type: string }
@@ -1188,71 +1188,71 @@ components:
         blockType: { $ref: "#/components/schemas/BlockType" }
         payload: { $ref: "#/components/schemas/JsonObject" }
         plainText: { type: string }
-        language: { type: [string, "null"] }
-        sourcePage: { type: [integer, "null"] }
+        language: { type: [ string, "null" ] }
+        sourcePage: { type: [ integer, "null" ] }
         sourceBbox:
-          anyOf: [{ $ref: "#/components/schemas/SourceBbox" }, { type: "null" }]
-        confidence: { type: [number, "null"], minimum: 0, maximum: 1 }
+          anyOf: [ { $ref: "#/components/schemas/SourceBbox" }, { type: "null" } ]
+        confidence: { type: [ number, "null" ], minimum: 0, maximum: 1 }
     NodeBlocksPage:
       type: object
-      required: [items, nextCursor]
+      required: [ items, nextCursor ]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/EditorBlock" } }
-        nextCursor: { type: [string, "null"] }
+        nextCursor: { type: [ string, "null" ] }
     BlockMutationResult:
       type: object
-      required: [draftRevision, removedCount]
+      required: [ draftRevision, removedCount ]
       properties:
         draftRevision: { type: integer, minimum: 0 }
         removedCount: { type: integer, minimum: 0 }
     ImageBlockUploadResult:
       type: object
-      required: [block, draftRevision]
+      required: [ block, draftRevision ]
       properties:
         block: { $ref: "#/components/schemas/EditorBlock" }
         draftRevision: { type: integer, minimum: 0 }
     DocumentInfo:
       type: object
-      required: [documentKey, title, description, language, tags]
+      required: [ documentKey, title, description, language, tags ]
       properties:
         documentKey: { type: string }
         title: { type: string }
-        description: { type: [string, "null"] }
+        description: { type: [ string, "null" ] }
         language: { type: string }
         tags: { type: array, items: { type: string } }
     VersionInfo:
       type: object
-      required: [versionKey, sourceType, sourceFileName, sourceSha256, converterVersion, metadata]
+      required: [ versionKey, sourceType, sourceFileName, sourceSha256, converterVersion, metadata ]
       properties:
         versionKey: { type: string }
         sourceType: { $ref: "#/components/schemas/SourceType" }
-        sourceFileName: { type: [string, "null"] }
-        sourceSha256: { type: [string, "null"], pattern: "^[0-9a-fA-F]{64}$" }
-        converterVersion: { type: [string, "null"] }
+        sourceFileName: { type: [ string, "null" ] }
+        sourceSha256: { type: [ string, "null" ], pattern: "^[0-9a-fA-F]{64}$" }
+        converterVersion: { type: [ string, "null" ] }
         metadata: { $ref: "#/components/schemas/JsonObject" }
     DocumentPackageSection:
       type: object
-      required: [sectionKey, parentSectionKey, level, nodeType, semanticRole, title, sortOrder, anchor, sourcePageStart, sourcePageEnd, sourceBbox, contentHash]
+      required: [ sectionKey, parentSectionKey, level, nodeType, semanticRole, title, sortOrder, anchor, sourcePageStart, sourcePageEnd, sourceBbox, contentHash ]
       properties:
         sectionKey: { type: string }
-        parentSectionKey: { type: [string, "null"] }
+        parentSectionKey: { type: [ string, "null" ] }
         level: { type: integer, minimum: 1 }
         nodeType: { $ref: "#/components/schemas/NodeType" }
         semanticRole:
-          anyOf: [{ $ref: "#/components/schemas/SemanticRole" }, { type: "null" }]
+          anyOf: [ { $ref: "#/components/schemas/SemanticRole" }, { type: "null" } ]
         title: { type: string }
         sortOrder: { type: integer }
         anchor:
           type: string
           description: Server-generated stable internal identifier. Supplied values are ignored during import.
-        sourcePageStart: { type: [integer, "null"] }
-        sourcePageEnd: { type: [integer, "null"] }
+        sourcePageStart: { type: [ integer, "null" ] }
+        sourcePageEnd: { type: [ integer, "null" ] }
         sourceBbox:
-          anyOf: [{ $ref: "#/components/schemas/SourceBbox" }, { type: "null" }]
-        contentHash: { type: [string, "null"] }
+          anyOf: [ { $ref: "#/components/schemas/SourceBbox" }, { type: "null" } ]
+        contentHash: { type: [ string, "null" ] }
     DocumentPackageBlock:
       type: object
-      required: [blockKey, sectionKey, seq, blockType, payload, plainText, language, sourcePage, sourceBbox, confidence, contentHash]
+      required: [ blockKey, sectionKey, seq, blockType, payload, plainText, language, sourcePage, sourceBbox, confidence, contentHash ]
       properties:
         blockKey: { type: string }
         sectionKey: { type: string }
@@ -1260,26 +1260,26 @@ components:
         blockType: { $ref: "#/components/schemas/BlockType" }
         payload: { $ref: "#/components/schemas/JsonObject" }
         plainText: { type: string }
-        language: { type: [string, "null"] }
-        sourcePage: { type: [integer, "null"] }
+        language: { type: [ string, "null" ] }
+        sourcePage: { type: [ integer, "null" ] }
         sourceBbox:
-          anyOf: [{ $ref: "#/components/schemas/SourceBbox" }, { type: "null" }]
-        confidence: { type: [number, "null"], minimum: 0, maximum: 1 }
-        contentHash: { type: [string, "null"] }
+          anyOf: [ { $ref: "#/components/schemas/SourceBbox" }, { type: "null" } ]
+        confidence: { type: [ number, "null" ], minimum: 0, maximum: 1 }
+        contentHash: { type: [ string, "null" ] }
     AssetInfo:
       type: object
-      required: [assetKey, path, mimeType, sha256, alt]
+      required: [ assetKey, path, mimeType, sha256, alt ]
       properties:
         assetKey: { type: string }
         path: { type: string }
         mimeType: { type: string }
         sha256: { type: string }
-        alt: { type: [string, "null"] }
+        alt: { type: [ string, "null" ] }
     DocumentPackage:
       type: object
-      required: [schemaVersion, document, version, sections, blocks, assets]
+      required: [ schemaVersion, document, version, sections, blocks, assets ]
       properties:
-        schemaVersion: { type: string, enum: ["1.0"] }
+        schemaVersion: { type: string, enum: [ "1.0" ] }
         document: { $ref: "#/components/schemas/DocumentInfo" }
         version: { $ref: "#/components/schemas/VersionInfo" }
         sections: { type: array, items: { $ref: "#/components/schemas/DocumentPackageSection" } }
@@ -1287,27 +1287,27 @@ components:
         assets: { type: array, items: { $ref: "#/components/schemas/AssetInfo" } }
     ImportJob:
       type: object
-      required: [id, targetDocumentId, sourceType, status, currentStage, progress, statistics, errorCode, errorMessage]
+      required: [ id, targetDocumentId, sourceType, status, currentStage, progress, statistics, errorCode, errorMessage ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         targetDocumentId: { $ref: "#/components/schemas/NullableUuid" }
         sourceType: { $ref: "#/components/schemas/SourceType" }
         status: { $ref: "#/components/schemas/ImportStatus" }
         currentStage:
-          anyOf: [{ $ref: "#/components/schemas/ImportStage" }, { type: "null" }]
+          anyOf: [ { $ref: "#/components/schemas/ImportStage" }, { type: "null" } ]
         progress: { type: integer, minimum: 0, maximum: 100 }
         statistics: { $ref: "#/components/schemas/JsonObject" }
-        errorCode: { type: [string, "null"] }
-        errorMessage: { type: [string, "null"] }
+        errorCode: { type: [ string, "null" ] }
+        errorMessage: { type: [ string, "null" ] }
     ImportResolution:
       type: string
-      enum: [CREATE_NEW, IMPORT_AS_NEW_VERSION]
+      enum: [ CREATE_NEW, IMPORT_AS_NEW_VERSION ]
     ImportIssueSeverity:
       type: string
-      enum: [BLOCKING, WARNING]
+      enum: [ BLOCKING, WARNING ]
     ExistingDocumentMatch:
       type: object
-      required: [id, code, title, status]
+      required: [ id, code, title, status ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         code: { type: string }
@@ -1315,49 +1315,49 @@ components:
         status: { $ref: "#/components/schemas/DocumentStatus" }
     ImportDocumentPreview:
       type: object
-      required: [documentKey, title, description, tags, editable, matchingDocument, suggestedDocumentKey, duplicateTitleCount]
+      required: [ documentKey, title, description, tags, editable, matchingDocument, suggestedDocumentKey, duplicateTitleCount ]
       properties:
         documentKey: { type: string, readOnly: true }
         title: { type: string, minLength: 1, maxLength: 500 }
-        description: { type: [string, "null"], maxLength: 5000 }
+        description: { type: [ string, "null" ], maxLength: 5000 }
         tags:
           type: array
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 50 }
         editable: { type: boolean }
         matchingDocument:
-          anyOf: [{ $ref: "#/components/schemas/ExistingDocumentMatch" }, { type: "null" }]
-        suggestedDocumentKey: { type: [string, "null"], readOnly: true }
+          anyOf: [ { $ref: "#/components/schemas/ExistingDocumentMatch" }, { type: "null" } ]
+        suggestedDocumentKey: { type: [ string, "null" ], readOnly: true }
         duplicateTitleCount: { type: integer, minimum: 0 }
     UpdateImportDocumentMetadataRequest:
       type: object
-      required: [title, description, tags]
+      required: [ title, description, tags ]
       properties:
         title: { type: string, minLength: 1, maxLength: 500 }
-        description: { type: [string, "null"], maxLength: 5000 }
+        description: { type: [ string, "null" ], maxLength: 5000 }
         tags:
           type: array
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 50 }
     CommitImportRequest:
       type: object
-      required: [resolution]
+      required: [ resolution ]
       properties:
         resolution: { $ref: "#/components/schemas/ImportResolution" }
     ImportIssue:
       type: object
-      required: [severity, issueCode, message, sourcePage, sectionKey, blockKey, cellRef]
+      required: [ severity, issueCode, message, sourcePage, sectionKey, blockKey, cellRef ]
       properties:
         severity: { $ref: "#/components/schemas/ImportIssueSeverity" }
         issueCode: { type: string }
         message: { type: string }
-        sourcePage: { type: [integer, "null"] }
-        sectionKey: { type: [string, "null"] }
-        blockKey: { type: [string, "null"] }
-        cellRef: { type: [string, "null"] }
+        sourcePage: { type: [ integer, "null" ] }
+        sectionKey: { type: [ string, "null" ] }
+        blockKey: { type: [ string, "null" ] }
+        cellRef: { type: [ string, "null" ] }
     DocumentVersion:
       type: object
-      required: [id, documentId, versionNo, status, schemaVersion]
+      required: [ id, documentId, versionNo, status, schemaVersion ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         documentId: { $ref: "#/components/schemas/Uuid" }
@@ -1366,45 +1366,45 @@ components:
         schemaVersion: { type: string }
     UpdateNodeRequest:
       type: object
-      required: [draftRevision, title, nodeType, semanticRole]
+      required: [ draftRevision, title, nodeType, semanticRole ]
       properties:
         draftRevision: { type: integer, minimum: 0 }
         title: { type: string, minLength: 1 }
         nodeType: { $ref: "#/components/schemas/NodeType" }
         semanticRole:
-          anyOf: [{ $ref: "#/components/schemas/SemanticRole" }, { type: "null" }]
+          anyOf: [ { $ref: "#/components/schemas/SemanticRole" }, { type: "null" } ]
     StructureNode:
       type: object
-      required: [id, parentId, sortOrder]
+      required: [ id, parentId, sortOrder ]
       properties:
         id: { $ref: "#/components/schemas/Uuid" }
         parentId: { $ref: "#/components/schemas/NullableUuid" }
         sortOrder: { type: integer }
     StructureUpdateRequest:
       type: object
-      required: [draftRevision, nodes]
+      required: [ draftRevision, nodes ]
       properties:
         draftRevision: { type: integer, minimum: 0 }
         nodes: { type: array, minItems: 1, items: { $ref: "#/components/schemas/StructureNode" } }
     BlockWriteRequest:
       type: object
-      required: [draftRevision, blockType, payload, plainText, language]
+      required: [ draftRevision, blockType, payload, plainText, language ]
       properties:
         draftRevision: { type: integer, minimum: 0 }
         blockType: { $ref: "#/components/schemas/BlockType" }
         payload:
-          anyOf: [{ $ref: "#/components/schemas/JsonObject" }, { type: "null" }]
-        plainText: { type: [string, "null"] }
-        language: { type: [string, "null"] }
+          anyOf: [ { $ref: "#/components/schemas/JsonObject" }, { type: "null" } ]
+        plainText: { type: [ string, "null" ] }
+        language: { type: [ string, "null" ] }
     BlockCleanupRequest:
       type: object
-      required: [draftRevision]
+      required: [ draftRevision ]
       properties:
         draftRevision: { type: integer, minimum: 0 }
     ExportRequest:
       type: object
-      required: [documentId, versionId, format]
+      required: [ documentId, versionId, format ]
       properties:
         documentId: { $ref: "#/components/schemas/Uuid" }
         versionId: { $ref: "#/components/schemas/Uuid" }
-        format: { type: string, enum: [JSON_PACKAGE, EXCEL, MARKDOWN, STATIC_HTML] }
+        format: { type: string, enum: [ JSON_PACKAGE, EXCEL, MARKDOWN, STATIC_HTML ] }

@@ -9,7 +9,9 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 文档来源类型，对应数据库与 API 中的稳定编码。 */
+/**
+ * 文档来源类型，对应数据库与 API 中的稳定编码。
+ */
 public enum SourceType {
     PDF("PDF"),
     EXCEL("EXCEL"),
@@ -23,12 +25,6 @@ public enum SourceType {
         this.code = code;
     }
 
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
     @JsonCreator
     public static SourceType fromCode(String value) {
         var normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
@@ -40,5 +36,11 @@ public enum SourceType {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(SourceType::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
     }
 }

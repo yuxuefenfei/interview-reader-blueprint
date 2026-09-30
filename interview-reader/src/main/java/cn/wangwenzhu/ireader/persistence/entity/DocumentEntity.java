@@ -10,7 +10,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 文档聚合根持久化实体。 */
+/**
+ * 文档聚合根持久化实体。
+ */
 @Getter
 @Setter
 @Table("document")
@@ -22,7 +24,9 @@ public class DocumentEntity {
     private String title;
     @Column(isLarge = true)
     private String description;
-    /** 文档级资料的乐观锁版本，不随内容版本编辑而变化。 */
+    /**
+     * 文档级资料的乐观锁版本，不随内容版本编辑而变化。
+     */
     private long metadataRevision;
     private DocumentStatus status;
     private String currentVersionId;

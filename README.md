@@ -1,6 +1,8 @@
 # Interview Reader
 
-Interview Reader 由 Spring Boot + Vue 主应用和可独立运行的系统升级控制台组成。当前实现聚焦 JSON Package / Excel Package 导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用 MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
+Interview Reader 由 Spring Boot + Vue 主应用和可独立运行的系统升级控制台组成。当前实现聚焦 JSON Package / Excel Package
+导入导出、版本化入库、目录/正文阅读 API、搜索、阅读进度、收藏/笔记/掌握度、PWA 应用壳缓存和响应式阅读器。持久层使用
+MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
 
 ## 环境
 
@@ -59,15 +61,21 @@ java -jar interview-reader/target/interview-reader-1.0.4.jar --spring.profiles.a
 `interview-reader/target/interview-reader-1.0.4.jar` 是可直接运行的 Spring Boot JAR；同目录的 `.jar.original` 是 Maven
 保留的非独立运行薄包。
 
-前端生产构建会包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器支持 Service Worker 时会缓存应用壳；已成功打开的章节正文会写入 IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。右侧复习面板提供“清理离线内容”，只清除正文缓存，不删除未同步进度队列。
+前端生产构建会包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器支持 Service Worker 时会缓存应用壳；已成功打开的章节正文会写入
+IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。右侧复习面板提供“清理离线内容”，只清除正文缓存，不删除未同步进度队列。
 
-导入任务在 jar/dev 模式默认使用 Java 21 虚拟线程后台 worker，最大并发数由 `interview-reader.import-worker.max-concurrency` 控制；测试 profile 关闭异步 worker，使用 H2 MySQL 兼容模式做确定性集成测试。
+导入任务在 jar/dev 模式默认使用 Java 21 虚拟线程后台 worker，最大并发数由
+`interview-reader.import-worker.max-concurrency` 控制；测试 profile 关闭异步 worker，使用 H2 MySQL 兼容模式做确定性集成测试。
 
-文档“下架”只切换为 `OFFLINE` 并保留版本与阅读数据；永久删除仅允许用于草稿或已下架文档，采用持久化后台任务删除版本、阅读数据、导入记录和托管文件。删除任务默认自动重试 3 次，保留 30 天最小墓碑供离线客户端清理缓存；并发数、重试间隔和墓碑期限统一由 `interview-reader.deletion.*` 配置。
+文档“下架”只切换为 `OFFLINE` 并保留版本与阅读数据；永久删除仅允许用于草稿或已下架文档，采用持久化后台任务删除版本、阅读数据、导入记录和托管文件。删除任务默认自动重试
+3 次，保留 30 天最小墓碑供离线客户端清理缓存；并发数、重试间隔和墓碑期限统一由 `interview-reader.deletion.*` 配置。
 
-PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度、文本页估算、页面尺寸和每页 normalized block 覆盖统计，便于复核页定位未覆盖内容并支持后续转换规则回归。疑似 PDF 表格会先保存为低置信度 `table_snapshot` 并产生复核 issue，避免误转成高置信正文。
+PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度、文本页估算、页面尺寸和每页 normalized block
+覆盖统计，便于复核页定位未覆盖内容并支持后续转换规则回归。疑似 PDF 表格会先保存为低置信度 `table_snapshot` 并产生复核
+issue，避免误转成高置信正文。
 
-应用会在未显式设置 `pdfbox.fontcache` 时把 PDFBox 字体缓存放到 `./target/pdfbox-font-cache`，避免 Windows 用户目录权限导致 PDF 样本测试或 jar 运行时产生字体缓存写入告警。
+应用会在未显式设置 `pdfbox.fontcache` 时把 PDFBox 字体缓存放到 `./target/pdfbox-font-cache`，避免 Windows 用户目录权限导致
+PDF 样本测试或 jar 运行时产生字体缓存写入告警。
 
 当前代码没有引入服务端缓存，因此未加入 Redis 依赖；后续只有出现跨请求/跨实例缓存需求时再接入单实例 Redis。
 
@@ -87,10 +95,14 @@ JAR。
 控制台操作记录与启停命令输出持久化到 `UPGRADE_STATE_DIR/console-state.mv.db`，页面使用 SSE 实时接收阶段与本次命令日志；
 `state.json` 仅用于旧数据的一次性迁移。`upgrade-console/frontend/` 可独立运行 `npm ci`、`npm run dev`，开发代理指向 28081。
 
-生产接入需要先安装新的主应用门禁和脚本、配置独立控制台的凭据与目录，并在隔离环境演练；仓库代码完成不表示现网已启用。配置与权限见[生产运行手册](docs/operations/runbook.md)，状态机和接口见[系统升级控制台](docs/architecture/system-upgrade.md)。
+生产接入需要先安装新的主应用门禁和脚本、配置独立控制台的凭据与目录，并在隔离环境演练；仓库代码完成不表示现网已启用。配置与权限见[生产运行手册](docs/operations/runbook.md)
+，状态机和接口见[系统升级控制台](docs/architecture/system-upgrade.md)。
+
 ## 生产 MySQL Profile
 
-应用必须显式选择 `dev`、`test` 或 `prod` profile；未指定时会拒绝启动。生产运行使用 `prod`，数据库和登录凭据均必须通过环境变量显式提供。以下命令仅演示本地启动；当前生产使用 [daemon.sh](deploy/daemon.sh) 管理固定名称的 `interview-reader.jar`，实际目录和权限见[生产运行手册](docs/operations/runbook.md)。
+应用必须显式选择 `dev`、`test` 或 `prod` profile；未指定时会拒绝启动。生产运行使用 `prod`
+，数据库和登录凭据均必须通过环境变量显式提供。以下命令仅演示本地启动；当前生产使用 [daemon.sh](deploy/daemon.sh) 管理固定名称的
+`interview-reader.jar`，实际目录和权限见[生产运行手册](docs/operations/runbook.md)。
 
 ```powershell
 $env:DATABASE_URL='jdbc:mysql://localhost:3306/interview_reader?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC'
@@ -109,10 +121,13 @@ $env:INTERVIEW_READER_PASSWORD='replace-with-a-strong-password'
 $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 ```
 
-会话使用单实例内存存储、HttpOnly 且 SameSite=Lax 的 Cookie；`prod` profile 还会强制设置 `Secure`。应用重启后现有会话会失效；单实例部署无需 Redis。
+会话使用单实例内存存储、HttpOnly 且 SameSite=Lax 的 Cookie；`prod` profile 还会强制设置 `Secure`。应用重启后现有会话会失效；单实例部署无需
+Redis。
 
-浏览器发起的状态变更请求必须携带 `Origin` 或 `Referer`，且来源必须位于 `INTERVIEW_READER_ALLOWED_ORIGINS` 白名单。生产 profile 将应用绑定到 `127.0.0.1`，只在反向代理来自本机时信任其 `X-Forwarded-For`。登录默认在 1 分钟窗口内允许 5 次失败，超过后封禁 5 分钟并返回 `429 + Retry-After`；阈值由 `interview-reader.security.login-rate-limit.*` 统一配置。应用响应统一附带 CSP、禁止嵌入、`nosniff`、Referrer Policy 和 Permissions Policy 安全头。
-
+浏览器发起的状态变更请求必须携带 `Origin` 或 `Referer`，且来源必须位于 `INTERVIEW_READER_ALLOWED_ORIGINS` 白名单。生产
+profile 将应用绑定到 `127.0.0.1`，只在反向代理来自本机时信任其 `X-Forwarded-For`。登录默认在 1 分钟窗口内允许 5 次失败，超过后封禁
+5 分钟并返回 `429 + Retry-After`；阈值由 `interview-reader.security.login-rate-limit.*` 统一配置。应用响应统一附带
+CSP、禁止嵌入、`nosniff`、Referrer Policy 和 Permissions Policy 安全头。
 
 ## 配置与契约校验
 
@@ -121,9 +136,11 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - Spring 与 Nginx 示例的上传上限统一为 10 MiB；端口、上传值和前端代理默认值由契约脚本交叉校验。
 - `interview-reader/frontend/src/shared/runtimeConfig.ts` 统一维护前端开发端口与代理默认值，`runtimePolicy.ts`
   统一维护轮询和离线缓存策略；`interview-reader/frontend/src/offline/database.ts` 统一维护 IndexedDB 名称、版本和 store。
-- `npm run contract:check` 会比较 OpenAPI、Java Controller、前后端枚举、TypeScript 响应字段、响应式断点和上传限制；前端生产构建与 CI 都会自动运行该检查。
+- `npm run contract:check` 会比较 OpenAPI、Java Controller、前后端枚举、TypeScript 响应字段、响应式断点和上传限制；前端生产构建与
+  CI 都会自动运行该检查。
 - 父项目 `pom.xml` 会拒绝非 JDK 21 或低于 Maven 3.9 的构建环境，并通过 `npm ci` 使用锁文件安装前端依赖。
 - 生产部署、健康检查、指标、备份恢复与 Flyway 回滚流程见 [生产运行手册](docs/operations/runbook.md)。
+
 ## 已实现 API
 
 完整契约位于 `docs/api/openapi.yaml`。除登录和会话查询外，业务 API 均要求 `IR_SESSION` Cookie。
@@ -184,9 +201,11 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 - `POST /api/admin/import-jobs/{jobId}/commit`
 - `POST /api/admin/exports`
 
-示例包位于 `docs/import/examples/document-package.example.json`。Excel 导入模板位于 `docs/import/templates/interview-reader-import-template.xlsx`。
+示例包位于 `docs/import/examples/document-package.example.json`。Excel 导入模板位于
+`docs/import/templates/interview-reader-import-template.xlsx`。
 
-`POST /api/admin/import-jobs` 使用 `multipart/form-data`，必填字段为 `file`，可选字段为 `targetDocumentId`。服务端根据文件内容与扩展名识别类型，支持：
+`POST /api/admin/import-jobs` 使用 `multipart/form-data`，必填字段为 `file`，可选字段为 `targetDocumentId`
+。服务端根据文件内容与扩展名识别类型，支持：
 
 - JSON 文档包（`.json`）
 - Excel OOXML 工作簿（`.xlsx`，不支持旧版二进制 `.xls`）
@@ -195,7 +214,8 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 
 PDF 导入会保存原始源文件、raw extraction 和 normalized package，复核页可按 issue/block 定位源页。
 
-PDF/Markdown 新文档的只读标识由源文件名去扩展名后规范化生成；Markdown 标题优先使用首个一级标题，否则回退源文件名。导入标识与现有文档冲突时必须明确选择“创建带 `-2`、`-3` 后缀的新文档”或“作为匹配文档的新版本”，不会静默合并或覆盖已有文档资料。指定目标文档及选择新版本导入时，标题、描述和标签保持只读。
+PDF/Markdown 新文档的只读标识由源文件名去扩展名后规范化生成；Markdown 标题优先使用首个一级标题，否则回退源文件名。导入标识与现有文档冲突时必须明确选择“创建带
+`-2`、`-3` 后缀的新文档”或“作为匹配文档的新版本”，不会静默合并或覆盖已有文档资料。指定目标文档及选择新版本导入时，标题、描述和标签保持只读。
 
 `POST /api/admin/exports` 同步导出 JSON Package、Excel Package、Markdown 或静态 HTML：
 
@@ -207,4 +227,5 @@ PDF/Markdown 新文档的只读标识由源文件名去扩展名后规范化生�
 }
 ```
 
-将 `format` 改为 `EXCEL` 会返回 `.xlsx` 文件；改为 `MARKDOWN` 会返回 `.md` 文本；改为 `STATIC_HTML` 会返回由受信任 renderer 生成的 `.html` 文件。API 中的时间字段使用带时区偏移的 ISO 8601 字符串。
+将 `format` 改为 `EXCEL` 会返回 `.xlsx` 文件；改为 `MARKDOWN` 会返回 `.md` 文本；改为 `STATIC_HTML` 会返回由受信任
+renderer 生成的 `.html` 文件。API 中的时间字段使用带时区偏移的 ISO 8601 字符串。

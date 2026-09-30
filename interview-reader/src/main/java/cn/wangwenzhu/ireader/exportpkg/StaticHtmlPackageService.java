@@ -83,14 +83,16 @@ public class StaticHtmlPackageService {
     private void appendBlock(StringBuilder html, DocumentPackage.BlockInfo block, Function<String, String> assetUrl) {
         switch (block.blockType()) {
             case PARAGRAPH -> html.append("<p>").append(escape(text(block))).append("</p>\n");
-            case HEADING_NOTE -> html.append("<p class=\"heading-note\"><strong>").append(escape(text(block))).append("</strong></p>\n");
+            case HEADING_NOTE ->
+                    html.append("<p class=\"heading-note\"><strong>").append(escape(text(block))).append("</strong></p>\n");
             case UNORDERED_LIST -> appendList(html, block, "ul");
             case ORDERED_LIST -> appendList(html, block, "ol");
             case CODE -> appendCode(html, block);
             case TABLE -> appendTable(html, block);
             case QUOTE -> html.append("<blockquote>").append(escape(text(block))).append("</blockquote>\n");
             case CALLOUT -> appendCallout(html, block);
-            case FORMULA -> html.append("<p class=\"formula\"><code>").append(escape(payloadText(block.payload(), "latex", text(block)))).append("</code></p>\n");
+            case FORMULA ->
+                    html.append("<p class=\"formula\"><code>").append(escape(payloadText(block.payload(), "latex", text(block)))).append("</code></p>\n");
             case IMAGE -> appendImage(html, block, assetUrl);
             case DIVIDER -> html.append("<hr />\n");
             default -> html.append("<pre>").append(escape(text(block))).append("</pre>\n");

@@ -6,7 +6,9 @@ import com.mybatisflex.annotation.Table;
 import lombok.Getter;
 import lombok.Setter;
 
-/** 文档标签持久化实体。 */
+/**
+ * 文档标签持久化实体。
+ */
 @Getter
 @Setter
 @Table("tag")

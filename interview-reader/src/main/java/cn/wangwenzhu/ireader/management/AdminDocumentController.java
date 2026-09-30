@@ -59,7 +59,9 @@ public class AdminDocumentController {
         return service.createRevision(documentId, sourceVersionId);
     }
 
-    /** Small initial editor payload: document header and tree only, no block bodies. */
+    /**
+     * Small initial editor payload: document header and tree only, no block bodies.
+     */
     @GetMapping("/versions/{versionId}/editor")
     public ManagementDtos.EditorSnapshot editor(@PathVariable UUID versionId) {
         return service.editorSnapshot(versionId);
@@ -159,6 +161,7 @@ public class AdminDocumentController {
     ) {
         return service.cleanupEmptyBlocks(versionId, request);
     }
+
     @DeleteMapping("/versions/{versionId}/editor")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteDraft(@PathVariable UUID versionId) {
@@ -196,6 +199,7 @@ public class AdminDocumentController {
     public ManagementDtos.DeletionJobSummary retryDeletion(@PathVariable UUID jobId) {
         return lifecycleService.retry(jobId);
     }
+
     @PostMapping("/documents/{documentId}/versions/{versionId}/publish")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void publish(@PathVariable UUID documentId, @PathVariable UUID versionId) {

@@ -101,6 +101,99 @@ public class ImportPackageService {
         this.converterVersion = properties.converterVersion();
     }
 
+    private static void rejectDeletionLocked(DocumentEntity document) {
+        if (document != null && DocumentStatus.isDeletionLocked(document.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
+        }
+    }
+
+    private static String truncateDocumentKey(String base, String suffix) {
+        var maxBaseLength = 120 - suffix.length();
+        return base.length() <= maxBaseLength ? base : base.substring(0, maxBaseLength);
+    }
+
+    private static boolean startsWith(byte[] bytes) {
+        var prefixBytes = "%PDF-".getBytes(StandardCharsets.US_ASCII);
+        if (bytes.length < prefixBytes.length) return false;
+        for (var index = 0; index < prefixBytes.length; index++) {
+            if (bytes[index] != prefixBytes[index]) return false;
+        }
+        return true;
+    }
+
+    private static char firstNonWhitespace(byte[] bytes) {
+        for (var value : bytes) {
+            var character = (char) value;
+            if (!Character.isWhitespace(character)) return character;
+        }
+        return '\0';
+    }
+
+    private static String id(UUID value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static UUID uuid(String value) {
+        return value == null || value.isBlank() ? null : UUID.fromString(value);
+    }
+
+    private static String emptyToNull(String value) {
+        return isBlank(value) ? null : value;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String opaqueAnchor() {
+        return "sec_" + UUID.randomUUID();
+    }
+
+    private static String normalizedFileName(String fileName, String fallback) {
+        if (isBlank(fileName)) {
+            return fallback;
+        }
+        var slashIndex = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
+        var name = slashIndex >= 0 ? fileName.substring(slashIndex + 1) : fileName;
+        var normalized = repairUtf8Mojibake(name.strip());
+        return ".".equals(normalized) || "..".equals(normalized) || normalized.isBlank() ? fallback : normalized;
+    }
+
+    private static String repairUtf8Mojibake(String value) {
+        var likelyLatin1Mojibake = value.chars().anyMatch(character -> character >= 0x0080 && character <= 0x00FF);
+        if (!likelyLatin1Mojibake) {
+            return value;
+        }
+        var bytes = new byte[value.length()];
+        for (var index = 0; index < value.length(); index++) {
+            var character = value.charAt(index);
+            if (character > 0x00FF) {
+                return value;
+            }
+            bytes[index] = (byte) character;
+        }
+        var repaired = new String(bytes, StandardCharsets.UTF_8);
+        return repaired.indexOf('\uFFFD') >= 0 ? value : repaired;
+    }
+
+    private static String defaultFileName(SourceType sourceType) {
+        return switch (sourceType) {
+            case EXCEL -> "document-package.xlsx";
+            case MARKDOWN -> "document.md";
+            case PDF -> "document.pdf";
+            default -> "document-package.json";
+        };
+    }
+
+    private static boolean looksLikeZip(byte[] bytes) {
+        return bytes.length >= 4
+                && bytes[0] == 'P'
+                && bytes[1] == 'K'
+                && ((bytes[2] == 3 && bytes[3] == 4)
+                || (bytes[2] == 5 && bytes[3] == 6)
+                || (bytes[2] == 7 && bytes[3] == 8));
+    }
+
     @Transactional
     public ImportJobDto createImportJob(MultipartFile file, UUID targetDocumentId) {
         var fileBytes = readBytes(file);
@@ -301,6 +394,7 @@ public class ImportPackageService {
         importJobMapper.update(job);
         return documentMetadata(jobId);
     }
+
     @Transactional
     public JsonNode reviseSection(UUID jobId, String sectionKey, JsonNode patch) {
         return reviseNormalizedItem(jobId, "sections", "sectionKey", sectionKey, patch);
@@ -442,17 +536,13 @@ public class ImportPackageService {
         }
     }
 
-    private static void rejectDeletionLocked(DocumentEntity document) {
-        if (document != null && DocumentStatus.isDeletionLocked(document.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
-        }
-    }
     private long duplicateTitleCount(String title) {
         return documentMapper.selectCountByQuery(QueryWrapper.create()
                 .from(DOCUMENT_ENTITY)
                 .where(DOCUMENT_ENTITY.OWNER_ID.eq(LOCAL_USER_ID))
                 .and(DOCUMENT_ENTITY.TITLE.eq(title)));
     }
+
     private DocumentEntity findDocumentByCode(String documentKey) {
         return documentMapper.selectOneByQuery(QueryWrapper.create()
                 .select(DOCUMENT_ENTITY.ALL_COLUMNS)
@@ -492,11 +582,6 @@ public class ImportPackageService {
             }
         }
         throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_KEY_EXHAUSTED", "无法生成可用的文档标识。");
-    }
-
-    private static String truncateDocumentKey(String base, String suffix) {
-        var maxBaseLength = 120 - suffix.length();
-        return base.length() <= maxBaseLength ? base : base.substring(0, maxBaseLength);
     }
 
     private void lockLocalUser() {
@@ -742,26 +827,11 @@ public class ImportPackageService {
         if (startsWith(bytes)) return SourceType.PDF;
         if (normalizedName.endsWith(".xlsx") || looksLikeZip(bytes)) return SourceType.EXCEL;
         if (normalizedName.endsWith(".md") || normalizedName.endsWith(".markdown")) return SourceType.MARKDOWN;
-        if (normalizedName.endsWith(".json") || firstNonWhitespace(bytes) == '{' || firstNonWhitespace(bytes) == '[') return SourceType.JSON_PACKAGE;
+        if (normalizedName.endsWith(".json") || firstNonWhitespace(bytes) == '{' || firstNonWhitespace(bytes) == '[')
+            return SourceType.JSON_PACKAGE;
         throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_SOURCE_FILE", "无法识别文件格式，请上传 PDF、Excel、Markdown 或 JSON 文档包。");
     }
 
-    private static boolean startsWith(byte[] bytes) {
-        var prefixBytes = "%PDF-".getBytes(StandardCharsets.US_ASCII);
-        if (bytes.length < prefixBytes.length) return false;
-        for (var index = 0; index < prefixBytes.length; index++) {
-            if (bytes[index] != prefixBytes[index]) return false;
-        }
-        return true;
-    }
-
-    private static char firstNonWhitespace(byte[] bytes) {
-        for (var value : bytes) {
-            var character = (char) value;
-            if (!Character.isWhitespace(character)) return character;
-        }
-        return '\0';
-    }
     private ParsedSource parseSource(SourceType sourceType, byte[] fileBytes, String sourceFileName, String sourceSha256) {
         if (sourceType == SourceType.EXCEL) {
             if (!looksLikeZip(fileBytes)) {
@@ -827,71 +897,6 @@ public class ImportPackageService {
 
     private String toJsonOrNull(Object value) {
         return value == null ? null : toJson(value);
-    }
-
-    private static String id(UUID value) {
-        return value == null ? null : value.toString();
-    }
-
-    private static UUID uuid(String value) {
-        return value == null || value.isBlank() ? null : UUID.fromString(value);
-    }
-
-    private static String emptyToNull(String value) {
-        return isBlank(value) ? null : value;
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    private static String opaqueAnchor() {
-        return "sec_" + UUID.randomUUID();
-    }
-
-    private static String normalizedFileName(String fileName, String fallback) {
-        if (isBlank(fileName)) {
-            return fallback;
-        }
-        var slashIndex = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
-        var name = slashIndex >= 0 ? fileName.substring(slashIndex + 1) : fileName;
-        var normalized = repairUtf8Mojibake(name.strip());
-        return ".".equals(normalized) || "..".equals(normalized) || normalized.isBlank() ? fallback : normalized;
-    }
-
-    private static String repairUtf8Mojibake(String value) {
-        var likelyLatin1Mojibake = value.chars().anyMatch(character -> character >= 0x0080 && character <= 0x00FF);
-        if (!likelyLatin1Mojibake) {
-            return value;
-        }
-        var bytes = new byte[value.length()];
-        for (var index = 0; index < value.length(); index++) {
-            var character = value.charAt(index);
-            if (character > 0x00FF) {
-                return value;
-            }
-            bytes[index] = (byte) character;
-        }
-        var repaired = new String(bytes, StandardCharsets.UTF_8);
-        return repaired.indexOf('\uFFFD') >= 0 ? value : repaired;
-    }
-
-    private static String defaultFileName(SourceType sourceType) {
-        return switch (sourceType) {
-            case EXCEL -> "document-package.xlsx";
-            case MARKDOWN -> "document.md";
-            case PDF -> "document.pdf";
-            default -> "document-package.json";
-        };
-    }
-
-    private static boolean looksLikeZip(byte[] bytes) {
-        return bytes.length >= 4
-                && bytes[0] == 'P'
-                && bytes[1] == 'K'
-                && ((bytes[2] == 3 && bytes[3] == 4)
-                || (bytes[2] == 5 && bytes[3] == 6)
-                || (bytes[2] == 7 && bytes[3] == 8));
     }
 
     private record ParsedSource(DocumentPackage documentPackage, List<ImportIssueDto> issues, Object rawExtraction) {

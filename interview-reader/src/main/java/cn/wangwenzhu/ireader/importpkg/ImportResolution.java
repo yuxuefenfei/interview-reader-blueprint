@@ -8,7 +8,9 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 导入提交时的目标文档处理方式。 */
+/**
+ * 导入提交时的目标文档处理方式。
+ */
 public enum ImportResolution {
     CREATE_NEW("CREATE_NEW"),
     IMPORT_AS_NEW_VERSION("IMPORT_AS_NEW_VERSION");
@@ -17,11 +19,6 @@ public enum ImportResolution {
 
     ImportResolution(String code) {
         this.code = code;
-    }
-
-    @JsonValue
-    public String getCode() {
-        return code;
     }
 
     @JsonCreator
@@ -35,5 +32,10 @@ public enum ImportResolution {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(ImportResolution::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonValue
+    public String getCode() {
+        return code;
     }
 }

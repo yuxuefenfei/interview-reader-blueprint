@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from "vue";
 import type {ReaderTheme} from "../utils/readingComfort";
 import {
@@ -99,7 +99,7 @@ onMounted(() => {
     observer = null;
     nearViewport.value = true;
     scheduleRender();
-  }, { rootMargin: "400px 0px" });
+  }, {rootMargin: "400px 0px"});
   if (host.value) observer.observe(host.value);
 });
 
@@ -111,8 +111,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="host" class="mermaid-diagram" :aria-busy="rendering">
-    <div ref="canvas" class="mermaid-canvas" :class="canvasClass" v-html="svg"></div>
+  <div ref="host" :aria-busy="rendering" class="mermaid-diagram">
+    <div ref="canvas" :class="canvasClass" class="mermaid-canvas" v-html="svg"></div>
     <p v-if="rendering && !svg" class="mermaid-status" role="status">正在渲染流程图…</p>
     <p v-else-if="!nearViewport" class="mermaid-status">滚动到附近时渲染流程图</p>
   </div>

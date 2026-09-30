@@ -11,7 +11,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 文档目录节点持久化实体。 */
+/**
+ * 文档目录节点持久化实体。
+ */
 @Getter
 @Setter
 @Table("content_node")

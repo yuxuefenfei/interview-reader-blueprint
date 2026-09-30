@@ -50,6 +50,12 @@ public class DocumentDeletionPersistence {
     private final NoteMapper noteMapper;
     private final ReadingProgressMapper readingProgressMapper;
 
+    private static void addKey(Set<String> keys, String value) {
+        if (value != null && !value.isBlank()) {
+            keys.add(value);
+        }
+    }
+
     public DocumentDeletionJobEntity findJob(String jobId) {
         return deletionJobMapper.selectOneById(jobId);
     }
@@ -255,12 +261,6 @@ public class DocumentDeletionPersistence {
                     .where(TAG_ENTITY.OWNER_ID.eq(references.ownerId()))
                     .and(TAG_ENTITY.ID.in(references.tagIds()))
                     .and(TAG_ENTITY.ID.notIn(tagsStillInUse)));
-        }
-    }
-
-    private static void addKey(Set<String> keys, String value) {
-        if (value != null && !value.isBlank()) {
-            keys.add(value);
         }
     }
 

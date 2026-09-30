@@ -135,6 +135,7 @@ class InterviewReaderAuthTests {
                 .andExpect(result -> assertThat(result.getResponse().getHeader(HttpHeaders.RETRY_AFTER)).isNotBlank())
                 .andExpect(jsonPath("$.code").value("LOGIN_RATE_LIMITED"));
     }
+
     @Test
     void loginCreatesSessionCookieForProtectedApi() throws Exception {
         mockMvc.perform(post("/api/auth/login")

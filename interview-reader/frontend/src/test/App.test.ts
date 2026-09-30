@@ -6,113 +6,113 @@ import {BRAND_ICON_URL} from "../shared/branding";
 import {rememberOfflineReaderAccess} from "../offline/offlineAccess";
 
 const mocks = vi.hoisted(() => ({
-  session: vi.fn(),
-  activateUpdate: vi.fn(),
-  syncDeletedDocuments: vi.fn()
+    session: vi.fn(),
+    activateUpdate: vi.fn(),
+    syncDeletedDocuments: vi.fn()
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ replace: vi.fn() })
+    useRouter: () => ({replace: vi.fn()})
 }));
 
 vi.mock("../api/reader", () => ({
-  readerApi: {
-    session: mocks.session,
-    login: vi.fn(),
-    logout: vi.fn()
-  }
+    readerApi: {
+        session: mocks.session,
+        login: vi.fn(),
+        logout: vi.fn()
+    }
 }));
 
 vi.mock("../offline/deletionSync", () => ({
-  syncDeletedDocuments: mocks.syncDeletedDocuments
+    syncDeletedDocuments: mocks.syncDeletedDocuments
 }));
 
 vi.mock("../offline/serviceWorkerRegistration", () => ({
-  SERVICE_WORKER_UPDATE_EVENT: "interview-reader-update-available",
-  activateServiceWorkerUpdate: mocks.activateUpdate
+    SERVICE_WORKER_UPDATE_EVENT: "interview-reader-update-available",
+    activateServiceWorkerUpdate: mocks.activateUpdate
 }));
 
 const ButtonStub = defineComponent({
-  emits: ["click"],
-  template: '<button @click="$emit(\'click\')"><slot /></button>'
+    emits: ["click"],
+    template: '<button @click="$emit(\'click\')"><slot /></button>'
 });
 
 function mountApp() {
-  return mount(App, {
-    global: {
-      stubs: {
-        ElAlert: true,
-        ElButton: ButtonStub,
-        ElInput: true,
-        RouterView: true
-      }
-    }
-  });
+    return mount(App, {
+        global: {
+            stubs: {
+                ElAlert: true,
+                ElButton: ButtonStub,
+                ElInput: true,
+                RouterView: true
+            }
+        }
+    });
 }
 
 describe("App update notification", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    const values = new Map<string, string>();
-    vi.stubGlobal("localStorage", {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => values.set(key, value),
-      removeItem: (key: string) => values.delete(key),
-      clear: () => values.clear(),
+    beforeEach(() => {
+        vi.clearAllMocks();
+        const values = new Map<string, string>();
+        vi.stubGlobal("localStorage", {
+            getItem: (key: string) => values.get(key) ?? null,
+            setItem: (key: string, value: string) => values.set(key, value),
+            removeItem: (key: string) => values.delete(key),
+            clear: () => values.clear(),
+        });
+        mocks.syncDeletedDocuments.mockResolvedValue(undefined);
     });
-    mocks.syncDeletedDocuments.mockResolvedValue(undefined);
-  });
 
-  it("does not show an application update on the login page", async () => {
-    mocks.session.mockResolvedValue({ authenticated: false, username: null });
-    const wrapper = mountApp();
-    await flushPromises();
+    it("does not show an application update on the login page", async () => {
+        mocks.session.mockResolvedValue({authenticated: false, username: null});
+        const wrapper = mountApp();
+        await flushPromises();
 
-    window.dispatchEvent(new Event("interview-reader-update-available"));
-    await flushPromises();
+        window.dispatchEvent(new Event("interview-reader-update-available"));
+        await flushPromises();
 
-    expect(wrapper.find(".app-update-banner").exists()).toBe(false);
-    wrapper.unmount();
-  });
+        expect(wrapper.find(".app-update-banner").exists()).toBe(false);
+        wrapper.unmount();
+    });
 
-  it("uses the shared SVG brand icon on the login page", async () => {
-    mocks.session.mockResolvedValue({ authenticated: false, username: null });
-    const wrapper = mountApp();
-    await flushPromises();
+    it("uses the shared SVG brand icon on the login page", async () => {
+        mocks.session.mockResolvedValue({authenticated: false, username: null});
+        const wrapper = mountApp();
+        await flushPromises();
 
-    const brand = wrapper.get("img.brand-mark");
-    expect(brand.attributes("src")).toBe(BRAND_ICON_URL);
-    expect(brand.attributes("alt")).toBe("");
-    wrapper.unmount();
-  });
+        const brand = wrapper.get("img.brand-mark");
+        expect(brand.attributes("src")).toBe(BRAND_ICON_URL);
+        expect(brand.attributes("alt")).toBe("");
+        wrapper.unmount();
+    });
 
-  it("lets an authenticated user activate a waiting update", async () => {
-    mocks.session.mockResolvedValue({ authenticated: true, username: "admin" });
-    const wrapper = mountApp();
-    await flushPromises();
+    it("lets an authenticated user activate a waiting update", async () => {
+        mocks.session.mockResolvedValue({authenticated: true, username: "admin"});
+        const wrapper = mountApp();
+        await flushPromises();
 
-    window.dispatchEvent(new Event("interview-reader-update-available"));
-    await flushPromises();
+        window.dispatchEvent(new Event("interview-reader-update-available"));
+        await flushPromises();
 
-    const banner = wrapper.get(".app-update-banner");
-    expect(banner.text()).toContain("新版本已准备好");
-    await banner.get("button").trigger("click");
-    expect(mocks.activateUpdate).toHaveBeenCalledOnce();
-    wrapper.unmount();
-  });
+        const banner = wrapper.get(".app-update-banner");
+        expect(banner.text()).toContain("新版本已准备好");
+        await banner.get("button").trigger("click");
+        expect(mocks.activateUpdate).toHaveBeenCalledOnce();
+        wrapper.unmount();
+    });
 
-  it("opens the cached reader shell when session lookup fails offline", async () => {
-    rememberOfflineReaderAccess("admin");
-    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
-    mocks.session.mockRejectedValue(new Error("offline"));
+    it("opens the cached reader shell when session lookup fails offline", async () => {
+        rememberOfflineReaderAccess("admin");
+        Object.defineProperty(navigator, "onLine", {configurable: true, value: false});
+        mocks.session.mockRejectedValue(new Error("offline"));
 
-    const wrapper = mountApp();
-    await flushPromises();
+        const wrapper = mountApp();
+        await flushPromises();
 
-    expect(wrapper.find(".route-content").exists()).toBe(true);
-    expect(wrapper.find(".login-page").exists()).toBe(false);
-    expect(wrapper.get(".app-status-banner").text()).toContain("离线状态");
-    wrapper.unmount();
-    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
-  });
+        expect(wrapper.find(".route-content").exists()).toBe(true);
+        expect(wrapper.find(".login-page").exists()).toBe(false);
+        expect(wrapper.get(".app-status-banner").text()).toContain("离线状态");
+        wrapper.unmount();
+        Object.defineProperty(navigator, "onLine", {configurable: true, value: true});
+    });
 });

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {toUserMessage} from "../utils/errorMessage";
 import {
   ArrowDown,
@@ -140,26 +140,26 @@ const currentDocumentProgressRatio = computed(() => {
   return documentReadingPositionRatio(activeIndex.value, readable.value.length, chapterProgress.value);
 });
 const navigationDocument = computed<DocumentSummary | null>(() =>
-  selected.value ? { ...selected.value, progressRatio: currentDocumentProgressRatio.value } : null);
+    selected.value ? {...selected.value, progressRatio: currentDocumentProgressRatio.value} : null);
 const navigationDocuments = computed(() => {
   const listed = documents.value.map((document) =>
-    document.id === selected.value?.id
-    ? { ...document, progressRatio: currentDocumentProgressRatio.value }
-    : document);
+      document.id === selected.value?.id
+          ? {...document, progressRatio: currentDocumentProgressRatio.value}
+          : document);
   if (!documentQuery.value.trim() && selected.value && !listed.some((document) => document.id === selected.value?.id)) {
-    listed.unshift({ ...selected.value, progressRatio: currentDocumentProgressRatio.value });
+    listed.unshift({...selected.value, progressRatio: currentDocumentProgressRatio.value});
   }
   return listed;
 });
-const mobileProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
-const desktopProgressStyle = computed(() => ({ width: `${Math.round(chapterProgress.value * 100)}%` }));
-const desktopRailProgressStyle = computed(() => ({ height: `${currentDocumentProgressRatio.value * 100}%` }));
+const mobileProgressStyle = computed(() => ({width: `${Math.round(chapterProgress.value * 100)}%`}));
+const desktopProgressStyle = computed(() => ({width: `${Math.round(chapterProgress.value * 100)}%`}));
+const desktopRailProgressStyle = computed(() => ({height: `${currentDocumentProgressRatio.value * 100}%`}));
 const chapterTransitioning = computed(() => chapterLoading.value && content.value !== null);
 const readerPageStyle = computed(() => ({
   ...comfortStyle(comfort),
   "--reader-viewport-height": `${viewportHeight.value}px`,
 }));
-const readerSurfaceStyle = computed(() => ({ backgroundColor: readerThemeColor(theme.value) }));
+const readerSurfaceStyle = computed(() => ({backgroundColor: readerThemeColor(theme.value)}));
 const chapterPosition = computed(() => activeIndex.value >= 0 ? `${activeIndex.value + 1} / ${readable.value.length}` : `0 / ${readable.value.length}`);
 const progressPercent = computed(() => Math.round(chapterProgress.value * 100));
 const searchShortcut = navigator.platform.toLowerCase().includes("mac") ? "⌘ K" : "Ctrl K";
@@ -181,7 +181,7 @@ watch(theme, (value) => {
   localStorage.setItem("reader.theme", value);
   updateThemeColor(value);
 });
-watch(comfort, (value) => persistReaderComfort(value), { deep: true });
+watch(comfort, (value) => persistReaderComfort(value), {deep: true});
 watch(() => route.params.documentId, (documentId) => {
   if (typeof documentId === "string" && ignoredRouteDocumentId === documentId) {
     ignoredRouteDocumentId = null;
@@ -291,8 +291,8 @@ async function loadDocuments(reset = true): Promise<void> {
     const page = await readerApi.documents(requestedQuery, requestedCursor, 16, abortController.signal);
     if (requestId !== documentListRequestId || requestedQuery !== documentQuery.value.trim()) return;
     documents.value = reset
-      ? page.items
-      : [...documents.value, ...page.items.filter((item) => !documents.value.some((existing) => existing.id === item.id))];
+        ? page.items
+        : [...documents.value, ...page.items.filter((item) => !documents.value.some((existing) => existing.id === item.id))];
     documentNextCursor.value = page.nextCursor;
     documentListLoadError.value = "";
     if (!requestedQuery) void cacheReaderDocuments(documents.value).catch(() => undefined);
@@ -303,9 +303,9 @@ async function loadDocuments(reset = true): Promise<void> {
         if (cachedDocuments.length > 0) {
           const normalizedQuery = requestedQuery.toLocaleLowerCase();
           documents.value = normalizedQuery
-            ? cachedDocuments.filter((document) =>
-                `${document.title} ${document.code}`.toLocaleLowerCase().includes(normalizedQuery))
-            : cachedDocuments;
+              ? cachedDocuments.filter((document) =>
+                  `${document.title} ${document.code}`.toLocaleLowerCase().includes(normalizedQuery))
+              : cachedDocuments;
           documentNextCursor.value = null;
           documentListLoadError.value = "";
         } else {
@@ -348,8 +348,8 @@ async function openFromRoute(forceRefresh = false, requestedDocumentId?: string)
   }
   try {
     let document = forceRefresh
-      ? null
-      : documents.value.find((item) => item.id === documentId) || latestReadDocument;
+        ? null
+        : documents.value.find((item) => item.id === documentId) || latestReadDocument;
     document ||= await readerApi.document(documentId);
     if (requestId !== documentRequestId) return;
     if (forceRefresh) {
@@ -416,11 +416,11 @@ async function selectDocumentFromNavigation(document: DocumentSummary, surface: 
 }
 
 async function selectNode(
-  node: TocNode,
-  shouldScroll = true,
-  closeDrawer = true,
-  restoredProgress: ReadingProgress | null = null,
-  targetBlockId: string | null = null,
+    node: TocNode,
+    shouldScroll = true,
+    closeDrawer = true,
+    restoredProgress: ReadingProgress | null = null,
+    targetBlockId: string | null = null,
 ): Promise<void> {
   const targetNode = isReadableNode(node) ? node : firstReadableDescendant(node);
   if (!targetNode) return;
@@ -445,8 +445,8 @@ async function selectNode(
       const prefetchKey = contentPrefetchKey(versionId, targetNode.id);
       const prefetched = contentPrefetches.get(prefetchKey);
       nextContent = prefetched
-        ? await prefetched.promise
-        : await readerApi.content(versionId, targetNode.id, undefined, abortController.signal);
+          ? await prefetched.promise
+          : await readerApi.content(versionId, targetNode.id, undefined, abortController.signal);
       contentPrefetches.delete(prefetchKey);
       void cacheNodeContent(documentId, versionId, targetNode.id, 100, nextContent).catch(() => undefined);
     } catch (caught) {
@@ -460,11 +460,11 @@ async function selectNode(
         && nextContent.nextAfterSeq
         && navigator.onLine !== false) {
       nextContent = await loadThroughRestoredBlock(
-        versionId,
-        targetNode.id,
-        nextContent,
-        restoredProgress.blockId,
-        abortController.signal,
+          versionId,
+          targetNode.id,
+          nextContent,
+          restoredProgress.blockId,
+          abortController.signal,
       ).catch(() => nextContent);
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
@@ -476,34 +476,34 @@ async function selectNode(
     if (shouldScroll) {
       await nextTick();
       const targetBlock = targetBlockId
-        ? [...(readingArea.value?.querySelectorAll<HTMLElement>("[data-block-id]") ?? [])]
-            .find((element) => element.dataset.blockId === targetBlockId)
-        : null;
+          ? [...(readingArea.value?.querySelectorAll<HTMLElement>("[data-block-id]") ?? [])]
+              .find((element) => element.dataset.blockId === targetBlockId)
+          : null;
       if (targetBlock) {
-        targetBlock.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+        targetBlock.scrollIntoView({block: "center", inline: "nearest", behavior: "auto"});
       } else {
-        readingArea.value?.scrollTo({ top: 0, behavior: "auto" });
+        readingArea.value?.scrollTo({top: 0, behavior: "auto"});
       }
     } else if (restoredProgress?.blockId || chapterProgress.value > 0) {
       await nextTick();
       const area = readingArea.value;
       if (area) {
         const restoredBlock = restoredProgress?.blockId
-          ? area.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(restoredProgress.blockId)}"]`)
-          : null;
+            ? area.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(restoredProgress.blockId)}"]`)
+            : null;
         if (restoredBlock && restoredProgress) {
           const areaTop = area.getBoundingClientRect().top;
           area.scrollTo({
             top: scrollTopForBlockOffset(
-              area.scrollTop,
-              restoredBlock.getBoundingClientRect().top - areaTop,
-              restoredProgress.blockViewportOffset,
+                area.scrollTop,
+                restoredBlock.getBoundingClientRect().top - areaTop,
+                restoredProgress.blockViewportOffset,
             ),
             behavior: "auto",
           });
         } else {
           const distance = Math.max(0, area.scrollHeight - area.clientHeight);
-          area.scrollTo({ top: distance * chapterProgress.value, behavior: "auto" });
+          area.scrollTo({top: distance * chapterProgress.value, behavior: "auto"});
         }
       }
     }
@@ -516,7 +516,7 @@ async function selectNode(
     if (isCurrentContentRequest(requestId, documentId, versionId)) {
       failedNodeId.value = targetNode.id;
       if (content.value) {
-        ElMessage.error({ message: "章节加载失败，请重试", duration: 2_000, showClose: false });
+        ElMessage.error({message: "章节加载失败，请重试", duration: 2_000, showClose: false});
       } else {
         error.value = message(caught);
       }
@@ -531,11 +531,11 @@ async function selectNode(
 }
 
 async function loadThroughRestoredBlock(
-  versionId: string,
-  nodeId: string,
-  initialContent: NodeContent,
-  blockId: string,
-  signal: AbortSignal,
+    versionId: string,
+    nodeId: string,
+    initialContent: NodeContent,
+    blockId: string,
+    signal: AbortSignal,
 ): Promise<NodeContent> {
   let merged = initialContent;
   for (let pageNumber = 0; pageNumber < 20 && merged.nextAfterSeq; pageNumber += 1) {
@@ -606,7 +606,7 @@ function connectContentLoadObserver(): void {
   if (typeof IntersectionObserver === "undefined" || !contentLoadSentinel.value) return;
   contentLoadObserver = new IntersectionObserver((entries) => {
     if (entries.some((entry) => entry.isIntersecting)) void loadMoreContent();
-  }, { root: readingArea.value, rootMargin: "0px 0px 240px", threshold: 0 });
+  }, {root: readingArea.value, rootMargin: "0px 0px 240px", threshold: 0});
   contentLoadObserver.observe(contentLoadSentinel.value);
 }
 
@@ -643,16 +643,16 @@ function syncReadingProgressFromViewport(): void {
   if (!area) return;
   if (area.clientHeight > 0) {
     chapterProgress.value = viewportReadingProgress(
-      area.scrollTop,
-      area.scrollHeight,
-      area.clientHeight,
-      content.value?.nextAfterSeq != null,
+        area.scrollTop,
+        area.scrollHeight,
+        area.clientHeight,
+        content.value?.nextAfterSeq != null,
     );
   }
   const nodeId = activeNode.value?.id;
   if (nodeId && chapterProgress.value >= .995 && !completedNodes.has(nodeId)) {
     completedNodes.add(nodeId);
-    ElMessage.success({ message: "本节已读完", duration: 1600, showClose: false });
+    ElMessage.success({message: "本节已读完", duration: 1600, showClose: false});
   }
   scheduleProgress();
 }
@@ -696,7 +696,7 @@ function currentReadingBlockPosition(): { id: string; top: number } | null {
   }).filter((block) => block.id);
   const anchor = Math.min(72, Math.max(24, area.clientHeight * 0.12));
   const block = blockAtViewportAnchor(blocks, anchor);
-  return block ? { id: block.id, top: block.top } : null;
+  return block ? {id: block.id, top: block.top} : null;
 }
 
 async function saveProgressOfflineAware(documentId: string, progress: ReadingProgress): Promise<void> {
@@ -784,22 +784,22 @@ function prefetchNode(node: TocNode | null): void {
   }
   const controller = new AbortController();
   const promise = readerApi.content(versionId, targetNode.id, undefined, controller.signal)
-    .then((prefetchedContent) => {
-      if (isCurrentDocumentVersion(documentId, versionId)) {
-        void cacheNodeContent(documentId, versionId, targetNode.id, 100, prefetchedContent).catch(() => undefined);
-      }
-      return prefetchedContent;
-    })
-    .catch((caught) => {
-      contentPrefetches.delete(key);
-      throw caught;
-    });
-  contentPrefetches.set(key, { controller, promise });
+      .then((prefetchedContent) => {
+        if (isCurrentDocumentVersion(documentId, versionId)) {
+          void cacheNodeContent(documentId, versionId, targetNode.id, 100, prefetchedContent).catch(() => undefined);
+        }
+        return prefetchedContent;
+      })
+      .catch((caught) => {
+        contentPrefetches.delete(key);
+        throw caught;
+      });
+  contentPrefetches.set(key, {controller, promise});
   void promise.catch(() => undefined);
 }
 
 function clearContentPrefetches(): void {
-  contentPrefetches.forEach(({ controller }) => controller.abort());
+  contentPrefetches.forEach(({controller}) => controller.abort());
   contentPrefetches.clear();
 }
 
@@ -816,8 +816,8 @@ function loadExpandedTocNodeIds(documentId: string, nodes: TocNode[]): string[] 
   try {
     const stored = JSON.parse(localStorage.getItem(tocExpansionStorageKey(documentId)) ?? "[]");
     return Array.isArray(stored)
-      ? stored.filter((nodeId): nodeId is string => typeof nodeId === "string" && expandableIds.has(nodeId))
-      : [];
+        ? stored.filter((nodeId): nodeId is string => typeof nodeId === "string" && expandableIds.has(nodeId))
+        : [];
   } catch {
     return [];
   }
@@ -870,12 +870,12 @@ function toggleTocNode(nodeId: string): void {
 
 function scrollActiveTocIntoView(container: HTMLElement | null): void {
   container?.querySelector<HTMLElement>(".toc-node[aria-current='location']")
-    ?.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+      ?.scrollIntoView({block: "center", inline: "nearest", behavior: "auto"});
 }
 
 function scrollCurrentDocumentIntoView(container: HTMLElement | null): void {
   container?.querySelector<HTMLElement>(".reader-document-option.active")
-    ?.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+      ?.scrollIntoView({block: "center", inline: "nearest", behavior: "auto"});
 }
 
 async function showMobileDocumentsView(): Promise<void> {
@@ -990,9 +990,9 @@ async function runSearch(): Promise<void> {
   searchError.value = "";
   try {
     const hits = await readerApi.search(
-      term,
-      searchScope.value === "document" ? selected.value?.id : undefined,
-      abortController.signal,
+        term,
+        searchScope.value === "document" ? selected.value?.id : undefined,
+        abortController.signal,
     );
     if (requestId !== searchRequestId || abortController.signal.aborted) return;
     searchHits.value = hits;
@@ -1060,81 +1060,104 @@ function resetComfort(): void {
   comfort.codeWrap = false;
   comfort.fontFamily = "sans";
 }
-function message(value: unknown): string { return toUserMessage(value, "加载失败"); }
+
+function message(value: unknown): string {
+  return toUserMessage(value, "加载失败");
+}
 </script>
 
 <template>
   <div
-    class="reader-page"
-    :class="[
+      :class="[
       `theme-${theme}`,
       {
         'reader-overlay-open': drawer || searchOpen || mobileComfortOpen,
         'desktop-nav-collapsed': desktopNavCollapsed,
       },
     ]"
-    :style="readerPageStyle"
+      :style="readerPageStyle"
+      class="reader-page"
   >
     <header class="reader-header">
-      <button class="reader-menu-button" type="button" aria-label="打开目录" :aria-expanded="drawer" @click="drawer = true">
-        <el-icon><Tickets /></el-icon>
+      <button :aria-expanded="drawer" aria-label="打开目录" class="reader-menu-button" type="button"
+              @click="drawer = true">
+        <el-icon>
+          <Tickets/>
+        </el-icon>
       </button>
       <div class="reader-heading">
-        <strong :title="activeNode?.title || selected?.title || '阅读器'">{{ activeNode?.title || selected?.title || "阅读器" }}</strong>
+        <strong :title="activeNode?.title || selected?.title || '阅读器'">{{
+            activeNode?.title || selected?.title || "阅读器"
+          }}</strong>
         <span :title="selected?.title">{{ selected?.title }}</span>
       </div>
       <div class="reader-header-actions ui-action-row ui-action-row--nowrap">
         <button
-          class="reader-header-search-trigger"
-          type="button"
-          aria-label="搜索文档内容"
-          title="搜索文档内容"
-          @click="openSearch"
+            aria-label="搜索文档内容"
+            class="reader-header-search-trigger"
+            title="搜索文档内容"
+            type="button"
+            @click="openSearch"
         >
           <span class="reader-search-placeholder">搜索文档内容</span>
           <kbd>{{ searchShortcut }}</kbd>
-          <el-icon><Search /></el-icon>
+          <el-icon>
+            <Search/>
+          </el-icon>
         </button>
-        <el-popover v-model:visible="comfortOpen" placement="bottom-end" :width="340" trigger="click" popper-class="reader-comfort-popper">
+        <el-popover v-model:visible="comfortOpen" :width="340" placement="bottom-end" popper-class="reader-comfort-popper"
+                    trigger="click">
           <template #reference>
             <button
-              class="reader-comfort-button reader-comfort-desktop"
-              type="button"
-              aria-label="阅读设置"
-              title="阅读设置"
-              :aria-expanded="comfortOpen"
+                :aria-expanded="comfortOpen"
+                aria-label="阅读设置"
+                class="reader-comfort-button reader-comfort-desktop"
+                title="阅读设置"
+                type="button"
             >
-              <el-icon><Reading /></el-icon>
+              <el-icon>
+                <Reading/>
+              </el-icon>
               <span>阅读设置</span>
             </button>
           </template>
           <ReaderComfortSettings
-            v-model:theme="theme"
-            v-model:font-size="comfort.fontSize"
-            v-model:line-height="comfort.lineHeight"
-            v-model:column-width="comfort.columnWidth"
-            v-model:code-wrap="comfort.codeWrap"
-            v-model:font-family="comfort.fontFamily"
-            @reset="resetComfort"
+              v-model:code-wrap="comfort.codeWrap"
+              v-model:column-width="comfort.columnWidth"
+              v-model:font-family="comfort.fontFamily"
+              v-model:font-size="comfort.fontSize"
+              v-model:line-height="comfort.lineHeight"
+              v-model:theme="theme"
+              @reset="resetComfort"
           />
         </el-popover>
         <button
-          class="reader-comfort-button reader-comfort-mobile"
-          type="button"
-          aria-label="阅读设置"
-          title="阅读设置"
-          :aria-expanded="mobileComfortOpen"
-          @click="mobileComfortOpen = true"
+            :aria-expanded="mobileComfortOpen"
+            aria-label="阅读设置"
+            class="reader-comfort-button reader-comfort-mobile"
+            title="阅读设置"
+            type="button"
+            @click="mobileComfortOpen = true"
         >
-          <el-icon><Reading /></el-icon>
+          <el-icon>
+            <Reading/>
+          </el-icon>
         </button>
-        <el-button v-if="props.online !== false" class="reader-admin-link" text @click="router.push('/admin')">管理后台</el-button>
-        <el-button v-if="props.online !== false" class="reader-logout-button" text @click="emit('logout')">退出</el-button>
-        <el-dropdown v-if="props.online !== false" class="reader-account-menu" trigger="click" placement="bottom-end" @command="handleAccountCommand">
-          <button class="reader-theme-trigger" type="button" aria-label="账户菜单" title="账户菜单">
-            <el-icon><User /></el-icon>
+        <el-button v-if="props.online !== false" class="reader-admin-link" text @click="router.push('/admin')">
+          管理后台
+        </el-button>
+        <el-button v-if="props.online !== false" class="reader-logout-button" text @click="emit('logout')">退出
+        </el-button>
+        <el-dropdown v-if="props.online !== false" class="reader-account-menu" placement="bottom-end" trigger="click"
+                     @command="handleAccountCommand">
+          <button aria-label="账户菜单" class="reader-theme-trigger" title="账户菜单" type="button">
+            <el-icon>
+              <User/>
+            </el-icon>
             <span>账户</span>
-            <el-icon class="reader-theme-chevron"><ArrowDown /></el-icon>
+            <el-icon class="reader-theme-chevron">
+              <ArrowDown/>
+            </el-icon>
           </button>
           <template #dropdown>
             <el-dropdown-menu>
@@ -1145,104 +1168,124 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
         </el-dropdown>
       </div>
       <!-- 桌面阅读进度条 -->
-      <div class="reader-header-progress" :class="{ 'is-loading': chapterTransitioning }" aria-hidden="true">
-        <span class="reader-progress-fill" :style="desktopProgressStyle"></span>
-        <span v-if="chapterTransitioning" class="chapter-loading-dots"><i /><i /><i /></span>
+      <div :class="{ 'is-loading': chapterTransitioning }" aria-hidden="true" class="reader-header-progress">
+        <span :style="desktopProgressStyle" class="reader-progress-fill"></span>
+        <span v-if="chapterTransitioning" class="chapter-loading-dots"><i/><i/><i/></span>
       </div>
       <!-- 移动端章节进度条 -->
-      <div class="mobile-chapter-progress" :class="{ 'is-loading': chapterTransitioning }" aria-label="当前章节阅读进度">
-        <span class="reader-progress-fill" :style="mobileProgressStyle"></span>
-        <span v-if="chapterTransitioning" class="chapter-loading-dots" aria-hidden="true"><i /><i /><i /></span>
+      <div :class="{ 'is-loading': chapterTransitioning }" aria-label="当前章节阅读进度"
+           class="mobile-chapter-progress">
+        <span :style="mobileProgressStyle" class="reader-progress-fill"></span>
+        <span v-if="chapterTransitioning" aria-hidden="true" class="chapter-loading-dots"><i/><i/><i/></span>
       </div>
-      <output v-if="!chapterTransitioning" class="mobile-progress-label" aria-live="polite">{{ progressPercent }}%</output>
-      <span v-if="chapterTransitioning" class="sr-only" role="status" aria-live="polite">正在加载下一节</span>
+      <output v-if="!chapterTransitioning" aria-live="polite" class="mobile-progress-label">{{
+          progressPercent
+        }}%
+      </output>
+      <span v-if="chapterTransitioning" aria-live="polite" class="sr-only" role="status">正在加载下一节</span>
     </header>
 
-    <aside class="reader-desktop-nav" :class="{ collapsed: desktopNavCollapsed }">
+    <aside :class="{ collapsed: desktopNavCollapsed }" class="reader-desktop-nav">
       <template v-if="desktopNavCollapsed">
-        <button class="reader-desktop-nav-expand" type="button" aria-label="展开文档目录" @click="toggleDesktopNav">
-          <Expand aria-hidden="true" />
+        <button aria-label="展开文档目录" class="reader-desktop-nav-expand" type="button" @click="toggleDesktopNav">
+          <Expand aria-hidden="true"/>
         </button>
-        <div class="reader-desktop-rail-progress" role="progressbar" aria-label="文档阅读位置" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="Math.round(currentDocumentProgressRatio * 100)">
+        <div :aria-valuenow="Math.round(currentDocumentProgressRatio * 100)" aria-label="文档阅读位置" aria-valuemax="100" aria-valuemin="0"
+             class="reader-desktop-rail-progress" role="progressbar">
           <span :style="desktopRailProgressStyle"></span>
         </div>
       </template>
       <template v-else-if="desktopNavView === 'toc'">
         <div class="reader-desktop-nav-header">
-          <ReaderDocumentSelector :document="navigationDocument" @open="showDesktopDocumentsView" />
-          <button class="reader-desktop-nav-collapse" type="button" aria-label="收起文档侧栏" title="收起文档侧栏" @click="toggleDesktopNav">
-            <Fold aria-hidden="true" />
+          <ReaderDocumentSelector :document="navigationDocument" @open="showDesktopDocumentsView"/>
+          <button aria-label="收起文档侧栏" class="reader-desktop-nav-collapse" title="收起文档侧栏" type="button"
+                  @click="toggleDesktopNav">
+            <Fold aria-hidden="true"/>
           </button>
         </div>
-        <div ref="desktopTocArea" class="reader-desktop-toc-scroll" aria-label="当前文档章节目录">
+        <div ref="desktopTocArea" aria-label="当前文档章节目录" class="reader-desktop-toc-scroll">
           <div v-if="loading && toc.length === 0" class="reader-toc-state" role="status">正在加载目录…</div>
           <div v-else-if="toc.length === 0" class="reader-toc-state">当前文档暂无目录</div>
           <TocTree
-            v-else
-            tree-id="desktop"
-            :nodes="toc"
-            :active-node-id="activeNode?.id || null"
-            :expanded-node-ids="expandedTocNodeIds"
-            :pending-node-id="pendingNodeId"
-            :failed-node-id="failedNodeId"
-            @select="selectNode"
-            @toggle="toggleTocNode"
-            @prefetch="prefetchNode"
+              v-else
+              :active-node-id="activeNode?.id || null"
+              :expanded-node-ids="expandedTocNodeIds"
+              :failed-node-id="failedNodeId"
+              :nodes="toc"
+              :pending-node-id="pendingNodeId"
+              tree-id="desktop"
+              @prefetch="prefetchNode"
+              @select="selectNode"
+              @toggle="toggleTocNode"
           />
         </div>
       </template>
       <template v-else>
         <div class="reader-desktop-nav-header document-browser-header">
-          <button class="reader-drawer-back" type="button" aria-label="返回当前文档目录" @click="showDesktopTocView">
-            <ArrowLeftBold class="reader-drawer-back-icon" aria-hidden="true" />
+          <button aria-label="返回当前文档目录" class="reader-drawer-back" type="button" @click="showDesktopTocView">
+            <ArrowLeftBold aria-hidden="true" class="reader-drawer-back-icon"/>
             返回目录
           </button>
           <strong>切换文档</strong>
-          <button class="reader-desktop-nav-collapse" type="button" aria-label="收起文档侧栏" title="收起文档侧栏" @click="toggleDesktopNav">
-            <Fold aria-hidden="true" />
+          <button aria-label="收起文档侧栏" class="reader-desktop-nav-collapse" title="收起文档侧栏" type="button"
+                  @click="toggleDesktopNav">
+            <Fold aria-hidden="true"/>
           </button>
         </div>
         <div ref="desktopDocumentListArea" class="reader-desktop-document-browser">
           <ReaderDocumentList
-            v-model:query="documentQuery"
-            :documents="navigationDocuments"
-            :selected-document-id="selected?.id || null"
-            :pending-document-id="pendingDocumentId"
-            :error="documentSwitchError"
-            :loading="documentListLoading"
-            :has-more="!!documentNextCursor"
-            :load-error="documentListLoadError"
-            @select="selectDocumentFromNavigation($event, 'desktop')"
-            @load-more="loadDocuments(false)"
+              v-model:query="documentQuery"
+              :documents="navigationDocuments"
+              :error="documentSwitchError"
+              :has-more="!!documentNextCursor"
+              :load-error="documentListLoadError"
+              :loading="documentListLoading"
+              :pending-document-id="pendingDocumentId"
+              :selected-document-id="selected?.id || null"
+              @select="selectDocumentFromNavigation($event, 'desktop')"
+              @load-more="loadDocuments(false)"
           />
         </div>
       </template>
     </aside>
 
     <main
-      ref="readingArea"
-      class="reader-content"
-      :class="{ 'chapter-transitioning': chapterLoading && !!content }"
-      :style="readerSurfaceStyle"
-      :aria-busy="chapterLoading"
-      @scroll.passive="onReadingScroll"
+        ref="readingArea"
+        :aria-busy="chapterLoading"
+        :class="{ 'chapter-transitioning': chapterLoading && !!content }"
+        :style="readerSurfaceStyle"
+        class="reader-content"
+        @scroll.passive="onReadingScroll"
     >
       <div v-if="loading" class="reader-state">正在加载章节…</div>
-      <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false" />
+      <el-alert v-else-if="error" :closable="false" :title="error" show-icon type="error"/>
       <template v-else-if="content">
-        <article :key="content.node.id" class="reader-article" :data-node-id="content.node.id">
+        <article :key="content.node.id" :data-node-id="content.node.id" class="reader-article">
           <h1>{{ content.node.title }}</h1>
-          <ContentBlockView v-for="block in content.blocks" :key="block.id" :block="block" :highlight="searchHighlight" :wrap-code="comfort.codeWrap" show-code-wrap-toggle :diagram-theme="theme" :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" @update:wrap-code="comfort.codeWrap = $event" />
+          <ContentBlockView v-for="block in content.blocks" :key="block.id" :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" :block="block"
+                            :diagram-theme="theme" :highlight="searchHighlight" :wrap-code="comfort.codeWrap"
+                            show-code-wrap-toggle
+                            @update:wrap-code="comfort.codeWrap = $event"/>
           <div v-if="content.nextAfterSeq" :ref="captureContentLoadSentinel" class="reader-load-more">
             <span v-if="loadingMore" role="status">正在载入后续内容…</span>
             <button v-else-if="contentLoadError" type="button" @click="loadMoreContent">载入失败，点击重试</button>
             <span v-else class="sr-only">继续阅读时将自动载入后续内容</span>
           </div>
         </article>
-        <nav class="chapter-pagination" aria-label="章节翻页">
-          <el-button class="chapter-nav-button chapter-nav-previous" :disabled="!previousNode || chapterLoading" :loading="pendingNodeId === previousNode?.id" :icon="ArrowLeft" @pointerenter="prefetchNode(previousNode)" @focus="prefetchNode(previousNode)" @click="previousNode && selectNode(previousNode)">上一节</el-button>
-          <span class="chapter-position" aria-live="polite">{{ chapterPosition }}</span>
-          <el-button class="chapter-nav-button chapter-nav-next" type="primary" :disabled="!nextNode || chapterLoading" :loading="pendingNodeId === nextNode?.id" @pointerenter="prefetchNode(nextNode)" @focus="prefetchNode(nextNode)" @click="nextNode && selectNode(nextNode)">下一节<el-icon><ArrowRight /></el-icon></el-button>
+        <nav aria-label="章节翻页" class="chapter-pagination">
+          <el-button :disabled="!previousNode || chapterLoading" :icon="ArrowLeft"
+                     :loading="pendingNodeId === previousNode?.id" class="chapter-nav-button chapter-nav-previous"
+                     @click="previousNode && selectNode(previousNode)" @focus="prefetchNode(previousNode)"
+                     @pointerenter="prefetchNode(previousNode)">上一节
+          </el-button>
+          <span aria-live="polite" class="chapter-position">{{ chapterPosition }}</span>
+          <el-button :disabled="!nextNode || chapterLoading" :loading="pendingNodeId === nextNode?.id" class="chapter-nav-button chapter-nav-next"
+                     type="primary" @click="nextNode && selectNode(nextNode)"
+                     @focus="prefetchNode(nextNode)" @pointerenter="prefetchNode(nextNode)">下一节
+            <el-icon>
+              <ArrowRight/>
+            </el-icon>
+          </el-button>
         </nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
@@ -1250,44 +1293,44 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
 
     <!-- 移动端目录抽屉 -->
     <el-drawer
-      v-model="drawer"
-      class="reader-overlay-drawer reader-toc-drawer"
-      direction="ltr"
-      size="min(92vw, 400px)"
-      :with-header="false"
+        v-model="drawer"
+        :with-header="false"
+        class="reader-overlay-drawer reader-toc-drawer"
+        direction="ltr"
+        size="min(92vw, 400px)"
     >
-      <section class="reader-drawer" :data-view="drawerView">
+      <section :data-view="drawerView" class="reader-drawer">
         <template v-if="drawerView === 'toc'">
           <div class="reader-drawer-sticky">
             <header>
               <strong>文档目录</strong>
-              <el-button circle :icon="Close" aria-label="关闭目录" @click="drawer = false" />
+              <el-button :icon="Close" aria-label="关闭目录" circle @click="drawer = false"/>
             </header>
-            <ReaderDocumentSelector :document="navigationDocument" @open="showMobileDocumentsView" />
+            <ReaderDocumentSelector :document="navigationDocument" @open="showMobileDocumentsView"/>
           </div>
-          <div ref="mobileTocArea" class="reader-toc-scroll" aria-label="当前文档章节目录">
+          <div ref="mobileTocArea" aria-label="当前文档章节目录" class="reader-toc-scroll">
             <div v-if="loading && toc.length === 0" class="reader-toc-state" role="status">正在加载目录…</div>
             <div v-else-if="toc.length === 0" class="reader-toc-state">当前文档暂无目录</div>
             <TocTree
-              v-else
-              tree-id="mobile"
-              :nodes="toc"
-              :active-node-id="activeNode?.id || null"
-              :expanded-node-ids="expandedTocNodeIds"
-              :pending-node-id="pendingNodeId"
-              :failed-node-id="failedNodeId"
-              compact-groups
-              @select="selectNode"
-              @toggle="toggleTocNode"
-              @prefetch="prefetchNode"
+                v-else
+                :active-node-id="activeNode?.id || null"
+                :expanded-node-ids="expandedTocNodeIds"
+                :failed-node-id="failedNodeId"
+                :nodes="toc"
+                :pending-node-id="pendingNodeId"
+                compact-groups
+                tree-id="mobile"
+                @prefetch="prefetchNode"
+                @select="selectNode"
+                @toggle="toggleTocNode"
             />
           </div>
         </template>
         <template v-else>
           <div class="reader-drawer-sticky">
             <header>
-              <button class="reader-drawer-back" type="button" aria-label="返回当前文档目录" @click="showMobileTocView">
-                <ArrowLeftBold class="reader-drawer-back-icon" aria-hidden="true" />
+              <button aria-label="返回当前文档目录" class="reader-drawer-back" type="button" @click="showMobileTocView">
+                <ArrowLeftBold aria-hidden="true" class="reader-drawer-back-icon"/>
                 返回目录
               </button>
               <strong>切换文档</strong>
@@ -1295,16 +1338,16 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
           </div>
           <div ref="mobileDocumentListArea" class="reader-mobile-document-browser">
             <ReaderDocumentList
-              v-model:query="documentQuery"
-              :documents="navigationDocuments"
-              :selected-document-id="selected?.id || null"
-              :pending-document-id="pendingDocumentId"
-              :error="documentSwitchError"
-              :loading="documentListLoading"
-              :has-more="!!documentNextCursor"
-              :load-error="documentListLoadError"
-              @select="selectDocumentFromNavigation($event, 'mobile')"
-              @load-more="loadDocuments(false)"
+                v-model:query="documentQuery"
+                :documents="navigationDocuments"
+                :error="documentSwitchError"
+                :has-more="!!documentNextCursor"
+                :load-error="documentListLoadError"
+                :loading="documentListLoading"
+                :pending-document-id="pendingDocumentId"
+                :selected-document-id="selected?.id || null"
+                @select="selectDocumentFromNavigation($event, 'mobile')"
+                @load-more="loadDocuments(false)"
             />
           </div>
         </template>
@@ -1313,42 +1356,52 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
 
     <!-- 搜索面板 -->
     <el-drawer
-      v-model="searchOpen"
-      class="reader-overlay-drawer reader-search-drawer"
-      direction="btt"
-      size="min(68vh, 520px)"
-      :with-header="false"
+        v-model="searchOpen"
+        :with-header="false"
+        class="reader-overlay-drawer reader-search-drawer"
+        direction="btt"
+        size="min(68vh, 520px)"
     >
       <section class="reader-search-sheet">
         <header>
           <strong>搜索文档内容</strong>
-          <el-button circle :icon="Close" aria-label="关闭搜索" @click="searchOpen = false" />
+          <el-button :icon="Close" aria-label="关闭搜索" circle @click="searchOpen = false"/>
         </header>
-        <div class="comfort-option-grid" style="width:max-content;grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="搜索范围">
-          <button type="button" :class="{ active: searchScope === 'document' }" :aria-pressed="searchScope === 'document'" @click="setSearchScope('document')">当前文档</button>
-          <button type="button" :class="{ active: searchScope === 'all' }" :aria-pressed="searchScope === 'all'" @click="setSearchScope('all')">全部文档</button>
+        <div aria-label="搜索范围" class="comfort-option-grid"
+             role="group" style="width:max-content;grid-template-columns:repeat(2,minmax(0,1fr))">
+          <button :aria-pressed="searchScope === 'document'" :class="{ active: searchScope === 'document' }"
+                  type="button" @click="setSearchScope('document')">当前文档
+          </button>
+          <button :aria-pressed="searchScope === 'all'" :class="{ active: searchScope === 'all' }" type="button"
+                  @click="setSearchScope('all')">全部文档
+          </button>
         </div>
         <el-input
-          ref="searchInput"
-          v-model="query"
-          name="reader-search"
-          aria-label="搜索标题或正文"
-          aria-describedby="reader-search-feedback"
-          autocomplete="off"
-          placeholder="输入至少 2 个字符…"
-          clearable
-          @keyup.enter="searchNow"
+            ref="searchInput"
+            v-model="query"
+            aria-describedby="reader-search-feedback"
+            aria-label="搜索标题或正文"
+            autocomplete="off"
+            clearable
+            name="reader-search"
+            placeholder="输入至少 2 个字符…"
+            @keyup.enter="searchNow"
         >
-          <template #append><el-button :icon="Search" :loading="searchLoading" aria-label="立即搜索" @click="searchNow" /></template>
+          <template #append>
+            <el-button :icon="Search" :loading="searchLoading" aria-label="立即搜索" @click="searchNow"/>
+          </template>
         </el-input>
-        <div id="reader-search-feedback" class="reader-search-feedback" role="status" aria-live="polite">
+        <div id="reader-search-feedback" aria-live="polite" class="reader-search-feedback" role="status">
           <template v-if="query.trim().length === 1">再输入 1 个字符开始搜索</template>
           <template v-else-if="searchLoading">正在搜索“{{ query.trim() }}”…</template>
           <template v-else-if="searchError">
             <span>{{ searchError }}</span>
             <button type="button" @click="searchNow">重新搜索</button>
           </template>
-          <template v-else-if="searchCompletedTerm && searchHits.length === 0">没有找到“{{ searchCompletedTerm }}”</template>
+          <template v-else-if="searchCompletedTerm && searchHits.length === 0">没有找到“{{
+              searchCompletedTerm
+            }}”
+          </template>
           <template v-else-if="searchCompletedTerm">找到 {{ searchHits.length }} 条结果</template>
           <template v-else>可搜索章节标题和正文</template>
         </div>
@@ -1358,10 +1411,13 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
               <strong>{{ group.documentTitle }}</strong>
               <span>{{ group.hits.length }} 条</span>
             </header>
-            <button v-for="hit in group.hits" :key="hit.blockId" class="reader-search-hit" type="button" @click="jump(hit)">
-              <strong><InlineMarkdown :text="hit.title" :highlight="searchHighlight" /></strong>
+            <button v-for="hit in group.hits" :key="hit.blockId" class="reader-search-hit" type="button"
+                    @click="jump(hit)">
+              <strong>
+                <InlineMarkdown :highlight="searchHighlight" :text="hit.title"/>
+              </strong>
               <small>{{ searchHitSource(hit) }}</small>
-              <span><InlineMarkdown :text="hit.snippet" :highlight="searchHighlight" /></span>
+              <span><InlineMarkdown :highlight="searchHighlight" :text="hit.snippet"/></span>
             </button>
           </section>
         </div>
@@ -1369,25 +1425,25 @@ function message(value: unknown): string { return toUserMessage(value, "加载�
     </el-drawer>
 
     <el-drawer
-      v-model="mobileComfortOpen"
-      class="reader-overlay-drawer reader-comfort-drawer"
-      direction="btt"
-      size="min(82vh, 620px)"
-      :with-header="false"
+        v-model="mobileComfortOpen"
+        :with-header="false"
+        class="reader-overlay-drawer reader-comfort-drawer"
+        direction="btt"
+        size="min(82vh, 620px)"
     >
       <section class="reader-mobile-comfort-sheet">
         <header>
           <strong>阅读设置</strong>
-          <el-button circle :icon="Close" aria-label="关闭阅读设置" @click="mobileComfortOpen = false" />
+          <el-button :icon="Close" aria-label="关闭阅读设置" circle @click="mobileComfortOpen = false"/>
         </header>
         <ReaderComfortSettings
-          v-model:theme="theme"
-          v-model:font-size="comfort.fontSize"
-          v-model:line-height="comfort.lineHeight"
-          v-model:column-width="comfort.columnWidth"
-          v-model:code-wrap="comfort.codeWrap"
-          v-model:font-family="comfort.fontFamily"
-          @reset="resetComfort"
+            v-model:code-wrap="comfort.codeWrap"
+            v-model:column-width="comfort.columnWidth"
+            v-model:font-family="comfort.fontFamily"
+            v-model:font-size="comfort.fontSize"
+            v-model:line-height="comfort.lineHeight"
+            v-model:theme="theme"
+            @reset="resetComfort"
         />
       </section>
     </el-drawer>

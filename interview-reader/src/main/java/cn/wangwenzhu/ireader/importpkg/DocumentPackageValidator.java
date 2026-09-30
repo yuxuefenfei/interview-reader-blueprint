@@ -9,6 +9,10 @@ import java.util.regex.Pattern;
 public class DocumentPackageValidator {
     private static final Pattern SHA256 = Pattern.compile("^[0-9a-fA-F]{64}$");
 
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
     public List<ImportIssueDto> validate(DocumentPackage documentPackage) {
         var issues = new ArrayList<ImportIssueDto>();
         if (documentPackage == null) {
@@ -174,10 +178,6 @@ public class DocumentPackageValidator {
 
     private ImportIssueDto blocking(String code, String message, String sectionKey, String blockKey) {
         return new ImportIssueDto(ImportIssueSeverity.BLOCKING, code, message, null, sectionKey, blockKey);
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 
 }

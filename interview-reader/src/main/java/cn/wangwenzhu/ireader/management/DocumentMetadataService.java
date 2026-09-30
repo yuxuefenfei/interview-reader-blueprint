@@ -29,7 +29,9 @@ import static cn.wangwenzhu.ireader.persistence.entity.table.DocumentEntityTable
 import static cn.wangwenzhu.ireader.persistence.entity.table.DocumentTagEntityTableDef.DOCUMENT_TAG_ENTITY;
 import static cn.wangwenzhu.ireader.persistence.entity.table.TagEntityTableDef.TAG_ENTITY;
 
-/** 管理文档级资料；内容版本与资料修订保持相互独立。 */
+/**
+ * 管理文档级资料；内容版本与资料修订保持相互独立。
+ */
 @Service
 @RequiredArgsConstructor
 public class DocumentMetadataService {
@@ -39,6 +41,12 @@ public class DocumentMetadataService {
     private final TagMapper tagMapper;
     private final DocumentTagMapper documentTagMapper;
     private final AppUserMapper appUserMapper;
+
+    private static void rejectDeletionLocked(DocumentEntity document) {
+        if (DocumentStatus.isDeletionLocked(document.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "永久删除流程已锁定当前文档。");
+        }
+    }
 
     public DocumentMetadataDtos.DocumentMetadata get(UUID documentId) {
         return metadata(requireOwnedDocument(documentId));
@@ -178,11 +186,5 @@ public class DocumentMetadataService {
             throw new ApiException(HttpStatus.NOT_FOUND, "DOCUMENT_NOT_FOUND", "文档不存在。");
         }
         return document;
-    }
-
-    private static void rejectDeletionLocked(DocumentEntity document) {
-        if (DocumentStatus.isDeletionLocked(document.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "永久删除流程已锁定当前文档。");
-        }
     }
 }

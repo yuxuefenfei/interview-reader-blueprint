@@ -8,7 +8,9 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 
-/** 文档级资料接口 DTO。 */
+/**
+ * 文档级资料接口 DTO。
+ */
 public final class DocumentMetadataDtos {
     private DocumentMetadataDtos() {
     }

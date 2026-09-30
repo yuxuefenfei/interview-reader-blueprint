@@ -9,7 +9,9 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 文档内容块类型，对应数据库与 API 中的稳定编码。 */
+/**
+ * 文档内容块类型，对应数据库与 API 中的稳定编码。
+ */
 public enum BlockType {
     PARAGRAPH("paragraph"),
     HEADING_NOTE("heading_note"),
@@ -30,12 +32,6 @@ public enum BlockType {
         this.code = code;
     }
 
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
     @JsonCreator
     public static BlockType fromCode(String value) {
         var normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
@@ -47,5 +43,11 @@ public enum BlockType {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(BlockType::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
     }
 }

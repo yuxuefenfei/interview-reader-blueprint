@@ -9,7 +9,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 复习状态持久化实体。 */
+/**
+ * 复习状态持久化实体。
+ */
 @Getter
 @Setter
 @Table("review_state")

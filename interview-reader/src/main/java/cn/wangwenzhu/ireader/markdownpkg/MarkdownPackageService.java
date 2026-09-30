@@ -145,6 +145,12 @@ public class MarkdownPackageService {
         return Stream.of(trimmed.split("\\|", -1)).map(String::trim).toList();
     }
 
+    private record Heading(int level, String title) {
+    }
+
+    private record ListItem(boolean ordered, String text) {
+    }
+
     private final class ParseState {
         private final String sourceFileName;
         private final String sourceSha256;
@@ -340,11 +346,5 @@ public class MarkdownPackageService {
         private SemanticRole guessSemanticRole(String title) {
             return title.endsWith("?") || title.endsWith("？") ? SemanticRole.QUESTION : null;
         }
-    }
-
-    private record Heading(int level, String title) {
-    }
-
-    private record ListItem(boolean ordered, String text) {
     }
 }

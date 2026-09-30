@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {computed, type CSSProperties, defineAsyncComponent, onBeforeUnmount, ref, watch} from "vue";
 import type {ReaderTheme} from "../utils/readingComfort";
 import {highlightCode} from "../utils/codeHighlight";
@@ -32,7 +32,10 @@ const codeHighlightPending = ref(false);
 let copyLabelTimer: number | null = null;
 let codeHighlightRequestId = 0;
 
-const codeBlockStyle = computed<CSSProperties | undefined>(() => props.wrap ? { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } : undefined);
+const codeBlockStyle = computed<CSSProperties | undefined>(() => props.wrap ? {
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere"
+} : undefined);
 const showSource = computed(() => !isMermaid.value || displayMode.value === "source");
 
 watch([normalizedCode, normalizedLanguage, showSource], async ([code, language, shouldHighlight]) => {
@@ -51,7 +54,7 @@ watch([normalizedCode, normalizedLanguage, showSource], async ([code, language, 
   } finally {
     if (requestId === codeHighlightRequestId) codeHighlightPending.value = false;
   }
-}, { immediate: true });
+}, {immediate: true});
 
 watch([normalizedCode, normalizedLanguage], () => {
   displayMode.value = "diagram";
@@ -108,27 +111,44 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <figure class="code-block" :class="{ 'mermaid-code-block': isMermaid }">
+  <figure :class="{ 'mermaid-code-block': isMermaid }" class="code-block">
     <figcaption>
       <span>{{ normalizedLanguage }}</span>
       <div class="ui-action-row ui-action-row--compact ui-action-row--nowrap code-block-actions">
         <template v-if="isMermaid">
-          <button class="code-copy code-toolbar-button" type="button" :class="{ active: displayMode === 'diagram' }" :aria-pressed="displayMode === 'diagram'" @click="showDiagram">图形</button>
-          <button class="code-copy code-toolbar-button" type="button" :class="{ active: displayMode === 'source' }" :aria-pressed="displayMode === 'source'" @click="displayMode = 'source'">源码</button>
-          <button v-if="displayMode === 'diagram'" class="code-copy code-toolbar-button" type="button" :aria-pressed="fitWidth" :aria-label="fitWidth ? '切换到阅读尺寸' : '使流程图适应正文宽度'" @click="fitWidth = !fitWidth">{{ fitWidth ? "阅读尺寸" : "适应宽度" }}</button>
+          <button :aria-pressed="displayMode === 'diagram'" :class="{ active: displayMode === 'diagram' }" class="code-copy code-toolbar-button"
+                  type="button" @click="showDiagram">图形
+          </button>
+          <button :aria-pressed="displayMode === 'source'" :class="{ active: displayMode === 'source' }" class="code-copy code-toolbar-button"
+                  type="button" @click="displayMode = 'source'">源码
+          </button>
+          <button v-if="displayMode === 'diagram'" :aria-label="fitWidth ? '切换到阅读尺寸' : '使流程图适应正文宽度'" :aria-pressed="fitWidth"
+                  class="code-copy code-toolbar-button" type="button"
+                  @click="fitWidth = !fitWidth">{{ fitWidth ? "阅读尺寸" : "适应宽度" }}
+          </button>
         </template>
-        <button v-if="showWrapToggle && showSource" class="code-copy code-toolbar-button" type="button" :aria-pressed="wrap" :aria-label="wrap ? '关闭代码自动换行' : '启用代码自动换行'" :title="wrap ? '关闭自动换行' : '自动换行'" @click="emit('update:wrap', !wrap)">换行</button>
-        <button class="code-copy" type="button" :aria-label="copyLabel" :title="copyLabel" @click="copyCode">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1 2-2v-8a2 2 0 0 1 2-2Z" /></svg>
+        <button v-if="showWrapToggle && showSource" :aria-label="wrap ? '关闭代码自动换行' : '启用代码自动换行'" :aria-pressed="wrap"
+                :title="wrap ? '关闭自动换行' : '自动换行'" class="code-copy code-toolbar-button"
+                type="button" @click="emit('update:wrap', !wrap)">换行
+        </button>
+        <button :aria-label="copyLabel" :title="copyLabel" class="code-copy" type="button" @click="copyCode">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path
+                d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1 2-2v-8a2 2 0 0 1 2-2Z"/>
+          </svg>
         </button>
       </div>
     </figcaption>
 
     <p v-if="diagramNotice" class="diagram-notice" role="status">{{ diagramNotice }}</p>
     <Suspense v-if="isMermaid && displayMode === 'diagram'">
-      <MermaidDiagram :source="normalizedCode" :diagram-id="blockId" :theme="theme" :fit-width="fitWidth" @error="handleDiagramError" @rendered="diagramNotice = ''" />
+      <MermaidDiagram :diagram-id="blockId" :fit-width="fitWidth" :source="normalizedCode" :theme="theme"
+                      @error="handleDiagramError" @rendered="diagramNotice = ''"/>
       <template #fallback><p class="mermaid-component-loading" role="status">正在加载流程图组件…</p></template>
     </Suspense>
-    <pre v-else :style="codeBlockStyle" :aria-busy="codeHighlightPending"><code v-if="highlightedCode !== null" class="hljs" v-html="highlightedCode"></code><code v-else>{{ normalizedCode }}</code></pre>
+    <pre v-else :aria-busy="codeHighlightPending" :style="codeBlockStyle"><code v-if="highlightedCode !== null"
+                                                                                class="hljs"
+                                                                                v-html="highlightedCode"></code><code
+        v-else>{{ normalizedCode }}</code></pre>
   </figure>
 </template>

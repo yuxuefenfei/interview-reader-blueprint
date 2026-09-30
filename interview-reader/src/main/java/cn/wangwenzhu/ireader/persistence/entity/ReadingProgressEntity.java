@@ -9,7 +9,9 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-/** 阅读进度持久化实体。 */
+/**
+ * 阅读进度持久化实体。
+ */
 @Getter
 @Setter
 @Table("reading_progress")

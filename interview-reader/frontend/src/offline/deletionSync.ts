@@ -4,14 +4,14 @@ import {purgeReadingProgressForDocument} from "./progressQueue";
 import {purgeReaderBootstrapForDocument} from "./bootstrapCache";
 
 export async function syncDeletedDocuments(): Promise<number> {
-  const tombstones = await readerApi.deletedDocuments();
-  for (const tombstone of tombstones) {
-    await Promise.all([
-      purgeNodeContentForDocument(tombstone.documentId),
-      purgeReadingProgressForDocument(tombstone.documentId),
-      purgeReaderBootstrapForDocument(tombstone.documentId),
-    ]);
-    navigator.serviceWorker?.controller?.postMessage({ type: "PURGE_DOCUMENT", documentId: tombstone.documentId });
-  }
-  return tombstones.length;
+    const tombstones = await readerApi.deletedDocuments();
+    for (const tombstone of tombstones) {
+        await Promise.all([
+            purgeNodeContentForDocument(tombstone.documentId),
+            purgeReadingProgressForDocument(tombstone.documentId),
+            purgeReaderBootstrapForDocument(tombstone.documentId),
+        ]);
+        navigator.serviceWorker?.controller?.postMessage({type: "PURGE_DOCUMENT", documentId: tombstone.documentId});
+    }
+    return tombstones.length;
 }

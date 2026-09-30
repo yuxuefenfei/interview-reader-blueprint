@@ -12,7 +12,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/** Assigns a server-generated trace ID before authentication and MVC error handling run. */
+/**
+ * Assigns a server-generated trace ID before authentication and MVC error handling run.
+ */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestTraceFilter extends OncePerRequestFilter {

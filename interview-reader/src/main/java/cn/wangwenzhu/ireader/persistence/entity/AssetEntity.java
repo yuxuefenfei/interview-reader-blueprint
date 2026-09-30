@@ -9,7 +9,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 文档资源文件持久化实体。 */
+/**
+ * 文档资源文件持久化实体。
+ */
 @Getter
 @Setter
 @Table("asset")

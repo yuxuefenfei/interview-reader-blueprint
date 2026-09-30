@@ -11,13 +11,17 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 import java.util.UUID;
 
-/** Public image bytes are available only while their owning version is the published reader version. */
+/**
+ * Public image bytes are available only while their owning version is the published reader version.
+ */
 @RestController
 @RequiredArgsConstructor
 public class PublicImageAssetController {
     private final PublicImageAssetService service;
 
-    /** Compatibility route for previously published HTML and cached links. */
+    /**
+     * Compatibility route for previously published HTML and cached links.
+     */
     @GetMapping("/assets/versions/{versionId}/{assetKey}")
     public ResponseEntity<byte[]> image(@PathVariable UUID versionId, @PathVariable String assetKey) {
         return response(service.load(null, versionId, assetKey));

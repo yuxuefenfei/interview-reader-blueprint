@@ -12,7 +12,8 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ImportJobWorkerDrainTest {
-    @TempDir Path directory;
+    @TempDir
+    Path directory;
 
     @Test
     void cancelledTaskRemainsInDrainCountUntilItsCodeActuallyExits() throws Exception {
@@ -25,8 +26,9 @@ class ImportJobWorkerDrainTest {
             worker.submit(id, () -> {
                 started.countDown();
                 while (release.getCount() > 0) {
-                    try { release.await(); }
-                    catch (InterruptedException ignored) { /* Simulate a converter that has not stopped yet. */ }
+                    try {
+                        release.await();
+                    } catch (InterruptedException ignored) { /* Simulate a converter that has not stopped yet. */ }
                 }
             });
             assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();

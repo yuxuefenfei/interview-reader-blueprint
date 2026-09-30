@@ -33,6 +33,18 @@ public class DocumentLifecycleService {
     private final DocumentDeletionPersistence deletionPersistence;
     private final DocumentDeletionWorker deletionWorker;
 
+    public static void rejectLocked(DocumentEntity document) {
+        if (DocumentStatus.isDeletionLocked(document.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
+        }
+    }
+
+    public static ManagementDtos.DeletionJobSummary summary(DocumentDeletionJobEntity job) {
+        return new ManagementDtos.DeletionJobSummary(UUID.fromString(job.getId()), UUID.fromString(job.getDocumentId()),
+                job.getStatus(), job.getCurrentStage(), job.getAttemptCount(), job.getErrorCode(), job.getErrorMessage(),
+                job.getRequestedAt(), job.getStartedAt(), job.getCompletedAt(), job.getUpdatedAt());
+    }
+
     @Transactional
     public void takeDown(UUID documentId) {
         var document = requireDocument(documentId);
@@ -138,7 +150,10 @@ public class DocumentLifecycleService {
     private void submitAfterCommit(UUID jobId) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCommit() { deletionWorker.submit(jobId); }
+                @Override
+                public void afterCommit() {
+                    deletionWorker.submit(jobId);
+                }
             });
         } else {
             deletionWorker.submit(jobId);
@@ -177,17 +192,5 @@ public class DocumentLifecycleService {
             throw new ApiException(HttpStatus.NOT_FOUND, "DELETION_JOB_NOT_FOUND", "Deletion job not found");
         }
         return job;
-    }
-
-    public static void rejectLocked(DocumentEntity document) {
-        if (DocumentStatus.isDeletionLocked(document.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_DELETION_LOCKED", "Document is locked by permanent deletion");
-        }
-    }
-
-    public static ManagementDtos.DeletionJobSummary summary(DocumentDeletionJobEntity job) {
-        return new ManagementDtos.DeletionJobSummary(UUID.fromString(job.getId()), UUID.fromString(job.getDocumentId()),
-                job.getStatus(), job.getCurrentStage(), job.getAttemptCount(), job.getErrorCode(), job.getErrorMessage(),
-                job.getRequestedAt(), job.getStartedAt(), job.getCompletedAt(), job.getUpdatedAt());
     }
 }

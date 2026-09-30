@@ -47,7 +47,8 @@ public class MarkdownPackageService {
             case TABLE -> appendTable(markdown, block);
             case QUOTE -> appendQuote(markdown, block);
             case CALLOUT -> appendCallout(markdown, block);
-            case FORMULA -> markdown.append("$$\n").append(payloadText(block.payload(), "latex", text(block))).append("\n$$\n\n");
+            case FORMULA ->
+                    markdown.append("$$\n").append(payloadText(block.payload(), "latex", text(block))).append("\n$$\n\n");
             case IMAGE -> appendImage(markdown, block, assetUrl);
             case DIVIDER -> markdown.append("---\n\n");
             default -> markdown.append(text(block)).append("\n\n");

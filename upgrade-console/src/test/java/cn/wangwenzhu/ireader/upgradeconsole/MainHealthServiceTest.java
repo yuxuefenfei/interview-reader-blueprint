@@ -16,7 +16,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MainHealthServiceTest {
-    @TempDir Path directory;
+    @TempDir
+    Path directory;
 
     @Test
     void healthGateRequiresDatabaseAndMatchingStorageConfiguration() throws Exception {
@@ -55,6 +56,8 @@ class MainHealthServiceTest {
         var bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         exchange.sendResponseHeaders(200, bytes.length);
-        try (var output = exchange.getResponseBody()) { output.write(bytes); }
+        try (var output = exchange.getResponseBody()) {
+            output.write(bytes);
+        }
     }
 }

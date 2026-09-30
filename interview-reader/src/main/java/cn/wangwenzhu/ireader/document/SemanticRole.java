@@ -9,7 +9,9 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 文档节点语义角色，对应数据库与 API 中的稳定编码。 */
+/**
+ * 文档节点语义角色，对应数据库与 API 中的稳定编码。
+ */
 public enum SemanticRole {
     QUESTION("QUESTION"),
     ANSWER("ANSWER"),
@@ -28,12 +30,6 @@ public enum SemanticRole {
         this.code = code;
     }
 
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
     @JsonCreator
     public static SemanticRole fromCode(String value) {
         var normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
@@ -49,5 +45,11 @@ public enum SemanticRole {
 
     public static Set<String> codes() {
         return Arrays.stream(values()).map(SemanticRole::getCode).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
     }
 }

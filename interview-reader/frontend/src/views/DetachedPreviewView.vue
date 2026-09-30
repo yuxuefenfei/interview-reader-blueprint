@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {toUserMessage} from "../utils/errorMessage";
 import {RefreshRight} from "@element-plus/icons-vue";
 import {computed, onBeforeUnmount, onMounted, ref} from "vue";
@@ -45,7 +45,7 @@ onMounted(() => {
     if (event.data.type !== "preview-state") return;
     applyState(event.data.state);
   };
-  channel.postMessage({ type: "preview-state-request" });
+  channel.postMessage({type: "preview-state-request"});
   window.addEventListener("pagehide", notifyPreviewClosed);
   void loadSavedPreview();
 });
@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
 function notifyPreviewClosed(): void {
   if (closeNotified) return;
   closeNotified = true;
-  channel?.postMessage({ type: "preview-dismissed" });
+  channel?.postMessage({type: "preview-dismissed"});
 }
 
 function applyState(state: DetachedPreviewState): void {
@@ -105,16 +105,26 @@ async function loadSavedPreview(force = false): Promise<void> {
   <main class="detached-preview-page">
     <header class="detached-preview-header">
       <div><p class="eyebrow">弹出预览</p><strong>{{ document?.title || "草稿预览" }}</strong></div>
-      <div class="detached-preview-actions ui-action-row ui-action-row--nowrap"><span :class="{ live: connected }">{{ statusLabel }}</span><el-button circle :icon="RefreshRight" aria-label="刷新已保存草稿" title="刷新已保存草稿" @click="loadSavedPreview(true)" /></div>
+      <div class="detached-preview-actions ui-action-row ui-action-row--nowrap"><span
+          :class="{ live: connected }">{{ statusLabel }}</span>
+        <el-button :icon="RefreshRight" aria-label="刷新已保存草稿" circle title="刷新已保存草稿"
+                   @click="loadSavedPreview(true)"/>
+      </div>
     </header>
-    <section class="detached-preview-content" v-loading="loading">
-      <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
+    <section v-loading="loading" class="detached-preview-content">
+      <el-alert v-if="error" :closable="false" :title="error" show-icon type="error"/>
       <template v-else-if="node">
         <article class="detached-preview-article">
-          <div class="preview-node-meta"><el-tag effect="plain">{{ zh(node.nodeType) }}</el-tag><el-tag v-if="node.semanticRole" type="success" effect="plain">{{ zh(node.semanticRole) }}</el-tag></div>
+          <div class="preview-node-meta">
+            <el-tag effect="plain">{{ zh(node.nodeType) }}</el-tag>
+            <el-tag v-if="node.semanticRole" effect="plain" type="success">{{ zh(node.semanticRole) }}</el-tag>
+          </div>
           <h1>{{ node.title }}</h1>
-          <div v-for="block in blocks" :key="block.id" class="detached-preview-block" :class="{ active: activeBlock?.id === block.id }"><ContentBlockView :block="block" :asset-base-url="`/api/admin/versions/${versionId}/editor/assets`" /></div>
-          <el-empty v-if="!blocks.length" description="当前节点暂无内容" :image-size="72" />
+          <div v-for="block in blocks" :key="block.id" :class="{ active: activeBlock?.id === block.id }"
+               class="detached-preview-block">
+            <ContentBlockView :asset-base-url="`/api/admin/versions/${versionId}/editor/assets`" :block="block"/>
+          </div>
+          <el-empty v-if="!blocks.length" :image-size="72" description="当前节点暂无内容"/>
         </article>
       </template>
     </section>

@@ -9,7 +9,9 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 导入任务状态，枚举名与数据库及 API 中的稳定编码一致。 */
+/**
+ * 导入任务状态，枚举名与数据库及 API 中的稳定编码一致。
+ */
 public enum ImportJobStatus {
     UPLOADED("UPLOADED"),
     PREFLIGHT("PREFLIGHT"),
@@ -30,12 +32,6 @@ public enum ImportJobStatus {
         this.code = code;
     }
 
-    @JsonValue
-    @EnumValue
-    public String getCode() {
-        return code;
-    }
-
     public static boolean isCancelable(ImportJobStatus value) {
         return CANCELABLE.contains(value);
     }
@@ -50,5 +46,11 @@ public enum ImportJobStatus {
                 .filter(status -> status.code.equals(value))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown import job status: " + value));
+    }
+
+    @JsonValue
+    @EnumValue
+    public String getCode() {
+        return code;
     }
 }

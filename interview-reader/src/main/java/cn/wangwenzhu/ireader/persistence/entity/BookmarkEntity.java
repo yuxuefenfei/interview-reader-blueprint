@@ -8,7 +8,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 阅读书签持久化实体。 */
+/**
+ * 阅读书签持久化实体。
+ */
 @Getter
 @Setter
 @Table("bookmark")

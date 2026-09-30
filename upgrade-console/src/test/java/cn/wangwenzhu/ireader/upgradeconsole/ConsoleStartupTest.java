@@ -19,13 +19,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class ConsoleStartupTest {
     private static final Path ROOT;
+
     static {
         try {
             ROOT = Files.createTempDirectory("upgrade-console-test-");
             Files.writeString(ROOT.resolve("mysql.cnf"), "[client]\n");
-        } catch (java.io.IOException exception) { throw new ExceptionInInitializerError(exception); }
+        } catch (java.io.IOException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
     }
-    @Autowired MockMvc mvc;
+
+    @Autowired
+    MockMvc mvc;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {

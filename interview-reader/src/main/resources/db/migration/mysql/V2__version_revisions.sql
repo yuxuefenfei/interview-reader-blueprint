@@ -9,5 +9,5 @@ ALTER TABLE import_job
     ADD COLUMN target_document_id CHAR(36) NULL AFTER owner_id,
     ADD CONSTRAINT fk_import_job_target_document FOREIGN KEY (target_document_id) REFERENCES document(id);
 
-CREATE INDEX idx_document_version_state ON document_version(document_id, status, version_no);
-CREATE INDEX idx_import_job_target_state ON import_job(target_document_id, status, created_at);
+CREATE INDEX idx_document_version_state ON document_version (document_id, status, version_no);
+CREATE INDEX idx_import_job_target_state ON import_job (target_document_id, status, created_at);

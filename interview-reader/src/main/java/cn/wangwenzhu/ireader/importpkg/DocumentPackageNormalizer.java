@@ -7,6 +7,26 @@ import java.util.*;
 
 @Component
 public class DocumentPackageNormalizer {
+    private static boolean acceptsExternalAnchor(SourceType sourceType) {
+        return sourceType == SourceType.JSON_PACKAGE || sourceType == SourceType.EXCEL;
+    }
+
+    private static String opaqueAnchor() {
+        return "sec_" + UUID.randomUUID();
+    }
+
+    private static boolean isOpaqueAnchor(String anchor) {
+        if (anchor == null || !anchor.startsWith("sec_")) {
+            return false;
+        }
+        try {
+            UUID.fromString(anchor.substring("sec_".length()));
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
     public NormalizationResult normalize(DocumentPackage source) {
         return normalize(source, null);
     }
@@ -112,26 +132,6 @@ public class DocumentPackageNormalizer {
             }
         });
         return normalized;
-    }
-
-    private static boolean acceptsExternalAnchor(SourceType sourceType) {
-        return sourceType == SourceType.JSON_PACKAGE || sourceType == SourceType.EXCEL;
-    }
-
-    private static String opaqueAnchor() {
-        return "sec_" + UUID.randomUUID();
-    }
-
-    private static boolean isOpaqueAnchor(String anchor) {
-        if (anchor == null || !anchor.startsWith("sec_")) {
-            return false;
-        }
-        try {
-            UUID.fromString(anchor.substring("sec_".length()));
-            return true;
-        } catch (IllegalArgumentException exception) {
-            return false;
-        }
     }
 
     public record NormalizationResult(DocumentPackage documentPackage, List<ImportIssueDto> issues) {

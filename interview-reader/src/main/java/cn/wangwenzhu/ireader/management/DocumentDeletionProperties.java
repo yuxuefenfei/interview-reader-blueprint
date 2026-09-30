@@ -16,12 +16,12 @@ public record DocumentDeletionProperties(
         @Min(1) int maxAttempts,
         @NotNull Duration retryDelay,
         @NotNull Duration tombstoneRetention) {
+    private static boolean positive(Duration value) {
+        return value == null || (!value.isZero() && !value.isNegative());
+    }
+
     @AssertTrue(message = "retry delay and tombstone retention must be positive")
     public boolean hasPositiveDurations() {
         return positive(retryDelay) && positive(tombstoneRetention);
-    }
-
-    private static boolean positive(Duration value) {
-        return value == null || (!value.isZero() && !value.isNegative());
     }
 }

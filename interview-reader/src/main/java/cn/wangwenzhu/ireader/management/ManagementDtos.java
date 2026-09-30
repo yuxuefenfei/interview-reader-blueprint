@@ -32,6 +32,7 @@ public final class ManagementDtos {
 
     public record DeletedDocumentTombstone(UUID documentId, OffsetDateTime deletedAt) {
     }
+
     public record VersionSummary(
             UUID id, int versionNo, UUID parentVersionId, Integer parentVersionNo, UUID originImportJobId,
             SourceType sourceType, String sourceFileName, DocumentVersionStatus status, long draftRevision,
@@ -69,10 +70,12 @@ public final class ManagementDtos {
     public record StructureNode(UUID id, UUID parentId, int sortOrder) {
     }
 
-    public record CreateBlockRequest(long draftRevision, BlockType blockType, JsonNode payload, String plainText, String language) {
+    public record CreateBlockRequest(long draftRevision, BlockType blockType, JsonNode payload, String plainText,
+                                     String language) {
     }
 
-    public record UpdateBlockRequest(long draftRevision, BlockType blockType, JsonNode payload, String plainText, String language) {
+    public record UpdateBlockRequest(long draftRevision, BlockType blockType, JsonNode payload, String plainText,
+                                     String language) {
     }
 
     public record BlockCleanupRequest(long draftRevision) {
@@ -81,7 +84,9 @@ public final class ManagementDtos {
     public record BlockMutationResult(long draftRevision, int removedCount) {
     }
 
-    /** A successful image replacement updates both the block and the draft revision atomically. */
+    /**
+     * A successful image replacement updates both the block and the draft revision atomically.
+     */
     public record ImageBlockUploadResult(EditorBlock block, long draftRevision) {
     }
 }

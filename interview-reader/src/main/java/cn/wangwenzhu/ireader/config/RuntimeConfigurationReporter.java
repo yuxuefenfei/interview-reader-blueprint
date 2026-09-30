@@ -9,7 +9,9 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/** 在启动完成后输出不含凭据的关键运行配置，便于部署核对最终生效值。 */
+/**
+ * 在启动完成后输出不含凭据的关键运行配置，便于部署核对最终生效值。
+ */
 @Component
 public class RuntimeConfigurationReporter {
     private static final Logger LOGGER = LoggerFactory.getLogger(RuntimeConfigurationReporter.class);

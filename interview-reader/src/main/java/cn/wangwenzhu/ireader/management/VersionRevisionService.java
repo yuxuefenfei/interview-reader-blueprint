@@ -56,6 +56,65 @@ public class VersionRevisionService {
     private final SourceFileStorage storage;
     private final UploadProperties uploadProperties;
 
+    private static long littleEndianUInt32(byte[] bytes, int offset) {
+        return ((long) bytes[offset] & 0xff)
+                | (((long) bytes[offset + 1] & 0xff) << 8)
+                | (((long) bytes[offset + 2] & 0xff) << 16)
+                | (((long) bytes[offset + 3] & 0xff) << 24);
+    }
+
+    private static String normalizeImageText(String value, String field, int maxLength) {
+        var normalized = Objects.requireNonNullElse(value, "").trim();
+        if (normalized.length() > maxLength) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_TEXT_TOO_LONG", field + "不能超过 " + maxLength + " 个字符。");
+        }
+        return normalized;
+    }
+
+    private static String safeOriginalName(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        var normalized = value.replace('\\', '/');
+        var lastSlash = normalized.lastIndexOf('/');
+        return (lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized).substring(0,
+                Math.min(lastSlash >= 0 ? normalized.length() - lastSlash - 1 : normalized.length(), 255));
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    private static BlockType requiredBlockType(BlockType value) {
+        if (value == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "内容块类型不能为空。");
+        }
+        return value;
+    }
+
+    private static NodeType requiredNodeType(NodeType value) {
+        if (value == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "节点类型不能为空。");
+        }
+        return value;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private static String id(UUID value) {
+        return value.toString();
+    }
+
+    private static UUID uuid(String value) {
+        return value == null || value.isBlank() ? null : UUID.fromString(value);
+    }
+
     public ManagementDtos.AdminDocumentPage documents(Integer page, Integer size) {
         return documents(null, page, size);
     }
@@ -104,10 +163,10 @@ public class VersionRevisionService {
     public List<ManagementDtos.VersionSummary> versions(UUID documentId) {
         requireDocument(documentId);
         return documentVersionMapper.selectListByQuery(QueryWrapper.create()
-                .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
-                .from(DOCUMENT_VERSION_ENTITY)
-                .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
-                .orderBy(DOCUMENT_VERSION_ENTITY.VERSION_NO.desc()))
+                        .select(DOCUMENT_VERSION_ENTITY.ALL_COLUMNS)
+                        .from(DOCUMENT_VERSION_ENTITY)
+                        .where(DOCUMENT_VERSION_ENTITY.DOCUMENT_ID.eq(id(documentId)))
+                        .orderBy(DOCUMENT_VERSION_ENTITY.VERSION_NO.desc()))
                 .stream().map(this::summary).toList();
     }
 
@@ -150,15 +209,14 @@ public class VersionRevisionService {
         deleteObjectsIfUnreferencedAfterCommit(removedObjectKeys);
     }
 
-
     public ManagementDtos.EditorSnapshot editorSnapshot(UUID versionId) {
         var version = requireDraft(versionId);
         var document = requireDocument(uuid(version.getDocumentId()));
         var nodes = contentNodeMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
-                .from(CONTENT_NODE_ENTITY)
-                .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.getId()))
-                .orderBy(CONTENT_NODE_ENTITY.PATH.asc()))
+                        .select(CONTENT_NODE_ENTITY.ALL_COLUMNS)
+                        .from(CONTENT_NODE_ENTITY)
+                        .where(CONTENT_NODE_ENTITY.VERSION_ID.eq(version.getId()))
+                        .orderBy(CONTENT_NODE_ENTITY.PATH.asc()))
                 .stream().map(this::editorNode).toList();
         return new ManagementDtos.EditorSnapshot(summary(version),
                 new ManagementDtos.EditorDocument(uuid(document.getId()), document.getCode(), document.getTitle(), document.getDescription(), version.getLanguage()), nodes);
@@ -405,6 +463,7 @@ public class VersionRevisionService {
         var source = storage.load(asset.getObjectKey());
         return new StoredImage(asset.getMimeType(), asset.getSha256(), source.bytes());
     }
+
     @Transactional
     public ManagementDtos.EditorBlock createBlock(UUID versionId, UUID nodeId, ManagementDtos.CreateBlockRequest request) {
         var version = requireDraft(versionId);
@@ -503,6 +562,7 @@ public class VersionRevisionService {
         }
         return new ManagementDtos.BlockMutationResult(version.getDraftRevision(), removedCount);
     }
+
     @Transactional
     public void publish(UUID documentId, UUID versionId) {
         documentPublishingService.publish(documentId, versionId);
@@ -601,13 +661,6 @@ public class VersionRevisionService {
         return null;
     }
 
-    private static long littleEndianUInt32(byte[] bytes, int offset) {
-        return ((long) bytes[offset] & 0xff)
-                | (((long) bytes[offset + 1] & 0xff) << 8)
-                | (((long) bytes[offset + 2] & 0xff) << 16)
-                | (((long) bytes[offset + 3] & 0xff) << 24);
-    }
-
     private Integer[] imageDimensions(byte[] bytes, ImageKind kind) {
         try (var input = new java.io.ByteArrayInputStream(bytes)) {
             var image = javax.imageio.ImageIO.read(input);
@@ -632,7 +685,9 @@ public class VersionRevisionService {
                 .toList();
     }
 
-    /** Removes assets created by this editor only after no image block in the draft references them. */
+    /**
+     * Removes assets created by this editor only after no image block in the draft references them.
+     */
     private void cleanupUnusedEditorImages(String versionId) {
         var referencedKeys = contentBlockMapper.selectListByQuery(QueryWrapper.create()
                         .select(CONTENT_BLOCK_ENTITY.PAYLOAD)
@@ -717,47 +772,6 @@ public class VersionRevisionService {
                         .or(IMPORT_JOB_ENTITY.NORMALIZED_OBJECT_KEY.eq(objectKey)))) > 0;
     }
 
-    private static String normalizeImageText(String value, String field, int maxLength) {
-        var normalized = Objects.requireNonNullElse(value, "").trim();
-        if (normalized.length() > maxLength) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "IMAGE_TEXT_TOO_LONG", field + "不能超过 " + maxLength + " 个字符。");
-        }
-        return normalized;
-    }
-
-    private static String safeOriginalName(String value, String fallback) {
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        var normalized = value.replace('\\', '/');
-        var lastSlash = normalized.lastIndexOf('/');
-        return (lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized).substring(0,
-                Math.min(lastSlash >= 0 ? normalized.length() - lastSlash - 1 : normalized.length(), 255));
-    }
-
-    private static String sha256(byte[] bytes) {
-        try {
-            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 unavailable", exception);
-        }
-    }
-
-    public record StoredImage(String mimeType, String sha256, byte[] bytes) {
-    }
-
-    private record VerifiedImage(byte[] bytes, String sha256, String mimeType, String extension, Integer width, Integer height) {
-    }
-
-    private enum ImageKind {
-        PNG("image/png", ".png"), JPEG("image/jpeg", ".jpg"), WEBP("image/webp", ".webp");
-        private final String mimeType;
-        private final String extension;
-        ImageKind(String mimeType, String extension) { this.mimeType = mimeType; this.extension = extension; }
-        String mimeType() { return mimeType; }
-        String extension() { return extension; }
-    }
-
     private void refreshNodeSearchText(String versionId, String nodeId) {
         var node = contentNodeMapper.selectOneByQuery(QueryWrapper.create()
                 .select(CONTENT_NODE_ENTITY.ID, CONTENT_NODE_ENTITY.TITLE)
@@ -768,11 +782,11 @@ public class VersionRevisionService {
             return;
         }
         var text = contentBlockMapper.selectListByQuery(QueryWrapper.create()
-                .select(CONTENT_BLOCK_ENTITY.PLAIN_TEXT)
-                .from(CONTENT_BLOCK_ENTITY)
-                .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
-                .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
-                .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()))
+                        .select(CONTENT_BLOCK_ENTITY.PLAIN_TEXT)
+                        .from(CONTENT_BLOCK_ENTITY)
+                        .where(CONTENT_BLOCK_ENTITY.VERSION_ID.eq(versionId))
+                        .and(CONTENT_BLOCK_ENTITY.NODE_ID.eq(nodeId))
+                        .orderBy(CONTENT_BLOCK_ENTITY.SEQ.asc()))
                 .stream().map(block -> Objects.requireNonNullElse(block.getPlainText(), "")).collect(java.util.stream.Collectors.joining("\n"));
         var update = UpdateWrapper.of(ContentNodeEntity.class)
                 .set(CONTENT_NODE_ENTITY.SEARCH_TEXT, node.getTitle() + (text.isBlank() ? "" : "\n" + text));
@@ -780,6 +794,7 @@ public class VersionRevisionService {
                 .where(CONTENT_NODE_ENTITY.ID.eq(nodeId))
                 .and(CONTENT_NODE_ENTITY.VERSION_ID.eq(versionId)));
     }
+
     private void requireRevision(DocumentVersionEntity version, long requestedRevision) {
         if (requestedRevision != version.getDraftRevision()) {
             throw new ApiException(HttpStatus.CONFLICT, "DRAFT_REVISION_CONFLICT", "草稿已被其他操作更新，请刷新后再试。");
@@ -832,22 +847,13 @@ public class VersionRevisionService {
 
     private int decodeBlockCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) return 0;
-        try { return Math.max(Integer.parseInt(cursor), 0); }
-        catch (NumberFormatException exception) { throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", "内容块游标不合法。"); }
+        try {
+            return Math.max(Integer.parseInt(cursor), 0);
+        } catch (NumberFormatException exception) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", "内容块游标不合法。");
+        }
     }
 
-    private static BlockType requiredBlockType(BlockType value) {
-        if (value == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "内容块类型不能为空。");
-        }
-        return value;
-    }
-    private static NodeType requiredNodeType(NodeType value) {
-        if (value == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "FIELD_REQUIRED", "节点类型不能为空。");
-        }
-        return value;
-    }
     private void resetImportJobs(String versionId) {
         var jobs = importJobMapper.selectListByQuery(QueryWrapper.create()
                 .select(IMPORT_JOB_ENTITY.ALL_COLUMNS)
@@ -976,15 +982,29 @@ public class VersionRevisionService {
         }
     }
 
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
+    private enum ImageKind {
+        PNG("image/png", ".png"), JPEG("image/jpeg", ".jpg"), WEBP("image/webp", ".webp");
+        private final String mimeType;
+        private final String extension;
+
+        ImageKind(String mimeType, String extension) {
+            this.mimeType = mimeType;
+            this.extension = extension;
+        }
+
+        String mimeType() {
+            return mimeType;
+        }
+
+        String extension() {
+            return extension;
+        }
     }
 
-    private static String id(UUID value) {
-        return value.toString();
+    public record StoredImage(String mimeType, String sha256, byte[] bytes) {
     }
 
-    private static UUID uuid(String value) {
-        return value == null || value.isBlank() ? null : UUID.fromString(value);
+    private record VerifiedImage(byte[] bytes, String sha256, String mimeType, String extension, Integer width,
+                                 Integer height) {
     }
 }

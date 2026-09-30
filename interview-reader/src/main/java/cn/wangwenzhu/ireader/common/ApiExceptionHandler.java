@@ -26,6 +26,9 @@ public class ApiExceptionHandler {
     private final ApiProblemFactory problemFactory;
     private final UploadProperties uploadProperties;
 
+    private static Object traceId(ProblemDetail problem) {
+        return problem.getProperties() == null ? "unknown" : problem.getProperties().get("traceId");
+    }
 
     @ExceptionHandler(ApiException.class)
     ProblemDetail handleApiException(ApiException exception) {
@@ -70,6 +73,7 @@ public class ApiExceptionHandler {
                 .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
                 .body(problemFactory.create(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_RATE_LIMITED", exception.getMessage()));
     }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleIntegrityViolation(DataIntegrityViolationException exception) {
         var problem = problemFactory.create(HttpStatus.CONFLICT, "DATA_CONFLICT", "当前操作与已有数据关联冲突，请刷新后重试。");
@@ -92,9 +96,5 @@ public class ApiExceptionHandler {
         var problem = problemFactory.create(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "服务器暂时无法处理该请求。");
         LOGGER.error("Unhandled request failure traceId={}", traceId(problem), exception);
         return problem;
-    }
-
-    private static Object traceId(ProblemDetail problem) {
-        return problem.getProperties() == null ? "unknown" : problem.getProperties().get("traceId");
     }
 }

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {onBeforeUnmount, onMounted, ref} from "vue";
 import {useRouter} from "vue-router";
 import {toUserMessage} from "./utils/errorMessage";
@@ -12,7 +12,7 @@ const router = useRouter();
 const ready = ref(false);
 const authenticated = ref(false);
 const username = ref<string | null>(null);
-const form = ref({ username: "", password: "" });
+const form = ref({username: "", password: ""});
 const error = ref("");
 const submitting = ref(false);
 const online = ref(navigator.onLine);
@@ -48,6 +48,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("offline", handleOffline);
   window.removeEventListener(SERVICE_WORKER_UPDATE_EVENT, handleUpdateAvailable);
 });
+
 async function login(): Promise<void> {
   submitting.value = true;
   error.value = "";
@@ -103,22 +104,27 @@ function applyUpdate(): void {
   <section v-else-if="!authenticated" class="login-page">
     <form class="login-card login-card-enter" @submit.prevent="login">
       <div class="login-brand-row">
-        <img class="brand-mark" :src="BRAND_ICON_URL" alt="" aria-hidden="true" width="34" height="34" fetchpriority="high" />
+        <img :src="BRAND_ICON_URL" alt="" aria-hidden="true" class="brand-mark" fetchpriority="high" height="34"
+             width="34"/>
         <div>
           <h1>Interview Reader</h1>
           <p>结构化面试讲义，随时从上次读到的地方继续。</p>
         </div>
       </div>
-      <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
-      <el-input v-model="form.username" name="username" aria-label="用户名" autocomplete="username" spellcheck="false" placeholder="用户名…" size="large" />
-      <el-input v-model="form.password" name="password" aria-label="密码" type="password" autocomplete="current-password" placeholder="密码…" show-password size="large" />
-      <el-button class="login-submit" native-type="submit" type="primary" size="large" :loading="submitting">进入阅读</el-button>
+      <el-alert v-if="error" :closable="false" :title="error" show-icon type="error"/>
+      <el-input v-model="form.username" aria-label="用户名" autocomplete="username" name="username" placeholder="用户名…"
+                size="large" spellcheck="false"/>
+      <el-input v-model="form.password" aria-label="密码" autocomplete="current-password" name="password"
+                placeholder="密码…" show-password size="large" type="password"/>
+      <el-button :loading="submitting" class="login-submit" native-type="submit" size="large" type="primary">进入阅读
+      </el-button>
     </form>
   </section>
   <div v-else id="main-content" class="route-content" tabindex="-1">
-    <router-view :username="username" :online="online" @logout="logout" />
+    <router-view :online="online" :username="username" @logout="logout"/>
   </div>
-  <div v-if="!online" class="app-status-banner" role="status">当前处于离线状态；已缓存内容仍可阅读，进度会在联网后同步。</div>
+  <div v-if="!online" class="app-status-banner" role="status">当前处于离线状态；已缓存内容仍可阅读，进度会在联网后同步。
+  </div>
   <div v-if="ready && authenticated && updateAvailable" class="app-update-banner" role="status">
     <span>新版本已准备好。</span>
     <button type="button" @click="applyUpdate">刷新并更新</button>

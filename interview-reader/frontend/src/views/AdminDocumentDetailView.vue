@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {toUserMessage} from "../utils/errorMessage";
 import {CircleCheckFilled, Delete, EditPen, MoreFilled, Plus, RefreshRight, Upload} from "@element-plus/icons-vue";
 import {computed, onBeforeUnmount, onMounted, ref} from "vue";
@@ -22,7 +22,7 @@ const document = ref<AdminDocumentSummary | null>(null);
 const metadata = ref<DocumentMetadata | null>(null);
 const metadataDialogVisible = ref(false);
 const metadataSaving = ref(false);
-const metadataForm = ref({ title: "", description: "", tags: [] as string[] });
+const metadataForm = ref({title: "", description: "", tags: [] as string[]});
 const versions = ref<VersionSummary[]>([]);
 const loading = ref(false);
 const loadError = ref("");
@@ -37,8 +37,12 @@ const deletionLocked = computed(() => document.value?.status === "DELETING" || d
 const actionsLocked = computed(() => activeAction.value !== null || deletionLocked.value);
 const canPermanentlyDelete = computed(() => document.value?.status === "DRAFT" || document.value?.status === "OFFLINE");
 
-onMounted(() => { void load(); });
-onBeforeUnmount(() => { if (deletionPollTimer !== null) window.clearTimeout(deletionPollTimer); });
+onMounted(() => {
+  void load();
+});
+onBeforeUnmount(() => {
+  if (deletionPollTimer !== null) window.clearTimeout(deletionPollTimer);
+});
 
 async function load(): Promise<void> {
   loading.value = true;
@@ -51,14 +55,18 @@ async function load(): Promise<void> {
   } catch (caught) {
     loadError.value = message(caught);
     ElMessage.error(loadError.value);
-  } finally { loading.value = false; }
+  } finally {
+    loading.value = false;
+  }
 }
 
 function scheduleDeletionPoll(job: DeletionJob | null): void {
   if (deletionPollTimer !== null) window.clearTimeout(deletionPollTimer);
   deletionPollTimer = null;
   if (!job || (job.status !== "QUEUED" && job.status !== "RUNNING")) return;
-  deletionPollTimer = window.setTimeout(() => { void pollDeletion(job.id); }, 700);
+  deletionPollTimer = window.setTimeout(() => {
+    void pollDeletion(job.id);
+  }, 700);
 }
 
 async function pollDeletion(jobId: string): Promise<void> {
@@ -97,10 +105,12 @@ function lineageNumbers(version: VersionSummary): number[] {
   if (!current.parentVersionId && current.parentVersionNo !== null && numbers[0] !== current.parentVersionNo) numbers.unshift(current.parentVersionNo);
   return numbers;
 }
+
 function lineageLabel(version: VersionSummary): string {
   const numbers = lineageNumbers(version);
   return numbers.length > 1 ? `修订链：${numbers.map((number) => `v${number}`).join(" → ")}` : "初始版本";
 }
+
 function includesCurrentPublishedVersion(version: VersionSummary): boolean | null {
   const current = publishedVersion.value;
   if (!current) return null;
@@ -117,8 +127,15 @@ function includesCurrentPublishedVersion(version: VersionSummary): boolean | nul
   }
   return candidate.parentVersionNo === current.versionNo ? true : false;
 }
-function isLatestDraft(version: VersionSummary): boolean { return version.status === "DRAFT" && version.versionNo === latestDraftVersionNo.value; }
-function isBranchDraft(version: VersionSummary): boolean { return version.status === "DRAFT" && includesCurrentPublishedVersion(version) === false; }
+
+function isLatestDraft(version: VersionSummary): boolean {
+  return version.status === "DRAFT" && version.versionNo === latestDraftVersionNo.value;
+}
+
+function isBranchDraft(version: VersionSummary): boolean {
+  return version.status === "DRAFT" && includesCurrentPublishedVersion(version) === false;
+}
+
 function versionStatusLabel(version: VersionSummary): string {
   if (version.status !== "DRAFT") return zh(version.status);
   if (isLatestDraft(version) && isBranchDraft(version)) return "最新分支草稿";
@@ -126,13 +143,20 @@ function versionStatusLabel(version: VersionSummary): string {
   if (isBranchDraft(version)) return "分支草稿";
   return "草稿";
 }
-function isActive(target: string, kind: ActionKind): boolean { return activeAction.value?.target === target && activeAction.value.kind === kind; }
+
+function isActive(target: string, kind: ActionKind): boolean {
+  return activeAction.value?.target === target && activeAction.value.kind === kind;
+}
+
 function begin(target: string, kind: ActionKind): boolean {
   if (activeAction.value !== null || (deletionLocked.value && kind !== "retry-delete")) return false;
-  activeAction.value = { target, kind };
+  activeAction.value = {target, kind};
   return true;
 }
-function finish(target: string, kind: ActionKind): void { if (isActive(target, kind)) activeAction.value = null; }
+
+function finish(target: string, kind: ActionKind): void {
+  if (isActive(target, kind)) activeAction.value = null;
+}
 
 function openMetadataEditor(): void {
   if (!metadata.value || deletionLocked.value) return;
@@ -143,6 +167,7 @@ function openMetadataEditor(): void {
   };
   metadataDialogVisible.value = true;
 }
+
 function normalizedTags(values: string[]): string[] {
   const unique = new Map<string, string>();
   for (const value of values) {
@@ -151,16 +176,29 @@ function normalizedTags(values: string[]): string[] {
   }
   return [...unique.values()];
 }
+
 async function saveMetadata(): Promise<void> {
   const current = metadata.value;
   if (!current || metadataSaving.value) return;
   const title = metadataForm.value.title.trim();
   const description = metadataForm.value.description.trim();
   const tags = normalizedTags(metadataForm.value.tags);
-  if (!title) { ElMessage.warning("文档标题不能为空"); return; }
-  if (title.length > 500) { ElMessage.warning("文档标题不能超过 500 个字符"); return; }
-  if (description.length > 5000) { ElMessage.warning("文档描述不能超过 5000 个字符"); return; }
-  if (tags.length > 20 || tags.some((tag) => tag.length > 50)) { ElMessage.warning("最多设置 20 个标签，单个标签不能超过 50 个字符"); return; }
+  if (!title) {
+    ElMessage.warning("文档标题不能为空");
+    return;
+  }
+  if (title.length > 500) {
+    ElMessage.warning("文档标题不能超过 500 个字符");
+    return;
+  }
+  if (description.length > 5000) {
+    ElMessage.warning("文档描述不能超过 5000 个字符");
+    return;
+  }
+  if (tags.length > 20 || tags.some((tag) => tag.length > 50)) {
+    ElMessage.warning("最多设置 20 个标签，单个标签不能超过 50 个字符");
+    return;
+  }
   metadataSaving.value = true;
   try {
     const updated = await adminApi.updateDocumentMetadata(documentId, {
@@ -176,17 +214,24 @@ async function saveMetadata(): Promise<void> {
     if (updated.duplicateTitleCount > 0) ElMessage.warning(`另有 ${updated.duplicateTitleCount} 个同名文档，请结合文档标识区分。`);
   } catch (caught) {
     ElMessage.error(message(caught));
-  } finally { metadataSaving.value = false; }
+  } finally {
+    metadataSaving.value = false;
+  }
 }
+
 async function createRevision(version: VersionSummary): Promise<void> {
   if (!begin(version.id, "create")) return;
   try {
     const draft = await adminApi.createRevision(documentId, version.id);
     ElMessage.success(`已基于 v${version.versionNo} 创建草稿 v${draft.versionNo}`);
     await router.push(`/admin/versions/${draft.id}/edit`);
-  } catch (caught) { ElMessage.error(message(caught)); }
-  finally { finish(version.id, "create"); }
+  } catch (caught) {
+    ElMessage.error(message(caught));
+  } finally {
+    finish(version.id, "create");
+  }
 }
+
 function publishConfirmation(version: VersionSummary): string {
   const current = publishedVersion.value;
   const lineage = lineageLabel(version).replace("修订链：", "修订链 ");
@@ -194,158 +239,344 @@ function publishConfirmation(version: VersionSummary): string {
   const warning = includesCurrentPublishedVersion(version) === false ? `该草稿不包含当前线上 v${current.versionNo} 的后续变更，可能覆盖现有内容。` : "";
   return `${lineage}。${warning}发布 v${version.versionNo} 后将替换当前线上 v${current.versionNo}，阅读端会立即切换。`;
 }
+
 async function publish(version: VersionSummary): Promise<void> {
   if (!begin(version.id, "publish")) return;
   try {
-    await ElMessageBox.confirm(publishConfirmation(version), `发布 v${version.versionNo}`, { type: "warning", confirmButtonText: `发布 v${version.versionNo}`, cancelButtonText: "取消" });
+    await ElMessageBox.confirm(publishConfirmation(version), `发布 v${version.versionNo}`, {
+      type: "warning",
+      confirmButtonText: `发布 v${version.versionNo}`,
+      cancelButtonText: "取消"
+    });
     await adminApi.publish(documentId, version.id);
     ElMessage.success(`v${version.versionNo} 已发布`);
     await load();
-  } catch (caught) { if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught)); }
-  finally { finish(version.id, "publish"); }
+  } catch (caught) {
+    if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught));
+  } finally {
+    finish(version.id, "publish");
+  }
 }
+
 async function takeDown(): Promise<void> {
   if (!document.value || !begin(documentId, "take-down")) return;
   try {
-    await ElMessageBox.confirm("下架后阅读端将立即隐藏该文档；所有版本、阅读进度、书签和笔记都会保留，可随时重新上架。", "下架文档", { type: "warning", confirmButtonText: "确认下架", cancelButtonText: "取消" });
+    await ElMessageBox.confirm("下架后阅读端将立即隐藏该文档；所有版本、阅读进度、书签和笔记都会保留，可随时重新上架。", "下架文档", {
+      type: "warning",
+      confirmButtonText: "确认下架",
+      cancelButtonText: "取消"
+    });
     await adminApi.takeDown(documentId);
     ElMessage.success("文档已下架，数据已保留");
     await load();
-  } catch (caught) { if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught)); }
-  finally { finish(documentId, "take-down"); }
+  } catch (caught) {
+    if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught));
+  } finally {
+    finish(documentId, "take-down");
+  }
 }
+
 async function restore(): Promise<void> {
   if (!begin(documentId, "restore")) return;
   try {
     await adminApi.restore(documentId);
     ElMessage.success("文档已重新上架");
     await load();
-  } catch (caught) { ElMessage.error(message(caught)); }
-  finally { finish(documentId, "restore"); }
+  } catch (caught) {
+    ElMessage.error(message(caught));
+  } finally {
+    finish(documentId, "restore");
+  }
 }
+
 async function permanentlyDelete(): Promise<void> {
   const current = document.value;
   if (!current || !begin(documentId, "delete-document")) return;
   try {
     const result = await ElMessageBox.prompt(
-      `此操作开始后不可撤销。文档、全部版本与草稿、阅读数据、导入记录、原始文件及转换中间产物都会被彻底删除。请输入完整文档标题：${current.title}`,
-      "永久删除文档",
-      { type: "error", confirmButtonText: "永久删除", cancelButtonText: "取消", inputPlaceholder: current.title,
-        inputValidator: (value: string) => value === current.title || "输入必须与完整文档标题完全一致" }
+        `此操作开始后不可撤销。文档、全部版本与草稿、阅读数据、导入记录、原始文件及转换中间产物都会被彻底删除。请输入完整文档标题：${current.title}`,
+        "永久删除文档",
+        {
+          type: "error", confirmButtonText: "永久删除", cancelButtonText: "取消", inputPlaceholder: current.title,
+          inputValidator: (value: string) => value === current.title || "输入必须与完整文档标题完全一致"
+        }
     );
     const job = await adminApi.deleteDocument(documentId, result.value);
     current.status = job.status === "FAILED" ? "DELETE_FAILED" : "DELETING";
     current.deletionJob = job;
     ElMessage.warning("永久删除任务已开始，操作不可撤销");
     scheduleDeletionPoll(job);
-  } catch (caught) { if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught)); }
-  finally { finish(documentId, "delete-document"); }
+  } catch (caught) {
+    if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught));
+  } finally {
+    finish(documentId, "delete-document");
+  }
 }
+
 async function retryDeletion(): Promise<void> {
   const job = document.value?.deletionJob;
   if (!job || !begin(documentId, "retry-delete")) return;
   try {
     const restarted = await adminApi.retryDeletion(job.id);
-    if (document.value) { document.value.status = "DELETING"; document.value.deletionJob = restarted; }
+    if (document.value) {
+      document.value.status = "DELETING";
+      document.value.deletionJob = restarted;
+    }
     ElMessage.info("已重新提交永久删除任务");
     scheduleDeletionPoll(restarted);
-  } catch (caught) { ElMessage.error(message(caught)); }
-  finally { finish(documentId, "retry-delete"); }
+  } catch (caught) {
+    ElMessage.error(message(caught));
+  } finally {
+    finish(documentId, "retry-delete");
+  }
 }
+
 async function discard(version: VersionSummary): Promise<void> {
   if (!begin(version.id, "discard")) return;
   try {
-    await ElMessageBox.confirm(`将永久丢弃草稿 v${version.versionNo}。`, `丢弃草稿 v${version.versionNo}`, { type: "warning", confirmButtonText: `丢弃 v${version.versionNo}`, cancelButtonText: "取消" });
+    await ElMessageBox.confirm(`将永久丢弃草稿 v${version.versionNo}。`, `丢弃草稿 v${version.versionNo}`, {
+      type: "warning",
+      confirmButtonText: `丢弃 v${version.versionNo}`,
+      cancelButtonText: "取消"
+    });
     await adminApi.deleteDraft(version.id);
     ElMessage.success(`草稿 v${version.versionNo} 已丢弃`);
     await load();
-  } catch (caught) { if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught)); }
-  finally { finish(version.id, "discard"); }
+  } catch (caught) {
+    if (caught !== "cancel" && caught !== "close") ElMessage.error(message(caught));
+  } finally {
+    finish(version.id, "discard");
+  }
 }
-function editVersion(version: VersionSummary): void { if (!actionsLocked.value) void router.push(`/admin/versions/${version.id}/edit`); }
+
+function editVersion(version: VersionSummary): void {
+  if (!actionsLocked.value) void router.push(`/admin/versions/${version.id}/edit`);
+}
+
 function handleMoreCommand(version: VersionSummary, command: string | number | object): void {
   if (command === ("create" satisfies MoreCommand)) void createRevision(version);
   if (command === ("discard" satisfies MoreCommand)) void discard(version);
 }
+
 function handleDocumentMoreCommand(command: string | number | object): void {
   if (command === ("delete-document" satisfies DocumentMoreCommand)) void permanentlyDelete();
 }
-function message(value: unknown): string { return toUserMessage(value, "操作失败，请稍后重试"); }
+
+function message(value: unknown): string {
+  return toUserMessage(value, "操作失败，请稍后重试");
+}
 </script>
 
 <template>
-  <section class="admin-view document-detail-view" v-loading="loading" :aria-busy="loading || actionsLocked">
+  <section v-loading="loading" :aria-busy="loading || actionsLocked" class="admin-view document-detail-view">
     <AdminPageHeader
-      eyebrow="版本管理"
-      :title="document?.title || '文档详情'"
-      :description="document ? `${document.code} · 共 ${document.versionCount} 个版本，${document.draftCount} 个草稿` : '加载文档版本与生命周期信息'"
-      back-label="返回文档管理"
-      @back="router.push('/admin/documents')"
+        :description="document ? `${document.code} · 共 ${document.versionCount} 个版本，${document.draftCount} 个草稿` : '加载文档版本与生命周期信息'"
+        :title="document?.title || '文档详情'"
+        back-label="返回文档管理"
+        eyebrow="版本管理"
+        @back="router.push('/admin/documents')"
     >
-      <template #status><el-tag v-if="document" :type="document.status === 'PUBLISHED' ? 'success' : document.status === 'DELETE_FAILED' ? 'danger' : 'info'" effect="plain">{{ zh(document.status) }}</el-tag></template>
+      <template #status>
+        <el-tag v-if="document"
+                :type="document.status === 'PUBLISHED' ? 'success' : document.status === 'DELETE_FAILED' ? 'danger' : 'info'"
+                effect="plain">{{ zh(document.status) }}
+        </el-tag>
+      </template>
       <template #actions>
-        <el-button v-if="document?.status === 'OFFLINE' && document.currentVersionId" type="success" :icon="RefreshRight" :loading="isActive(documentId, 'restore')" :disabled="actionsLocked && !isActive(documentId, 'restore')" data-testid="restore-document" @click="restore">重新上架</el-button>
-        <el-button :icon="Upload" :disabled="actionsLocked" @click="router.push({ path: '/admin/imports', query: { targetDocumentId: documentId } })">重新导入</el-button>
-        <el-dropdown v-if="canPermanentlyDelete" trigger="click" :disabled="actionsLocked" @command="handleDocumentMoreCommand">
-          <el-button :icon="MoreFilled" :loading="isActive(documentId, 'delete-document')" :disabled="actionsLocked">更多</el-button>
-          <template #dropdown><el-dropdown-menu><el-dropdown-item command="delete-document" :icon="Delete" class="danger-command" data-testid="delete-document">永久删除文档</el-dropdown-item></el-dropdown-menu></template>
+        <el-button v-if="document?.status === 'OFFLINE' && document.currentVersionId" :disabled="actionsLocked && !isActive(documentId, 'restore')"
+                   :icon="RefreshRight" :loading="isActive(documentId, 'restore')"
+                   data-testid="restore-document" type="success"
+                   @click="restore">重新上架
+        </el-button>
+        <el-button :disabled="actionsLocked" :icon="Upload"
+                   @click="router.push({ path: '/admin/imports', query: { targetDocumentId: documentId } })">重新导入
+        </el-button>
+        <el-dropdown v-if="canPermanentlyDelete" :disabled="actionsLocked" trigger="click"
+                     @command="handleDocumentMoreCommand">
+          <el-button :disabled="actionsLocked" :icon="MoreFilled" :loading="isActive(documentId, 'delete-document')">
+            更多
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item :icon="Delete" class="danger-command" command="delete-document"
+                                data-testid="delete-document">永久删除文档
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
         </el-dropdown>
       </template>
     </AdminPageHeader>
 
-    <el-alert v-if="document?.status === 'DELETING'" :title="`永久删除进行中：${zh(document.deletionJob?.currentStage)}`" type="warning" :closable="false" show-icon description="任务开始后不可撤销；当前文档的全部管理操作已锁定。" />
-    <el-alert v-if="document?.status === 'DELETE_FAILED'" title="永久删除失败" type="error" :closable="false" show-icon :description="document.deletionJob?.errorMessage || '已自动重试 3 次，请手动重试。'">
-      <template #default><el-button type="danger" :loading="isActive(documentId, 'retry-delete')" data-testid="retry-deletion" @click="retryDeletion">重试删除</el-button></template>
+    <el-alert v-if="document?.status === 'DELETING'" :closable="false"
+              :title="`永久删除进行中：${zh(document.deletionJob?.currentStage)}`" description="任务开始后不可撤销；当前文档的全部管理操作已锁定。" show-icon
+              type="warning"/>
+    <el-alert v-if="document?.status === 'DELETE_FAILED'" :closable="false" :description="document.deletionJob?.errorMessage || '已自动重试 3 次，请手动重试。'" show-icon title="永久删除失败"
+              type="error">
+      <template #default>
+        <el-button :loading="isActive(documentId, 'retry-delete')" data-testid="retry-deletion" type="danger"
+                   @click="retryDeletion">重试删除
+        </el-button>
+      </template>
     </el-alert>
-    <div v-if="loadError" class="load-error-panel" role="alert"><span>{{ loadError }}</span><el-button :loading="loading" @click="load">重新加载</el-button></div>
+    <div v-if="loadError" class="load-error-panel" role="alert"><span>{{ loadError }}</span>
+      <el-button :loading="loading" @click="load">重新加载</el-button>
+    </div>
 
-    <el-card v-if="metadata" shadow="never" class="document-metadata-card">
-      <template #header><div class="card-heading"><div><h2>文档资料</h2><span>资料独立于内容版本，保存后立即同步阅读端。</span></div><el-button :icon="EditPen" :disabled="deletionLocked" data-testid="edit-document-metadata" @click="openMetadataEditor">编辑资料</el-button></div></template>
+    <el-card v-if="metadata" class="document-metadata-card" shadow="never">
+      <template #header>
+        <div class="card-heading">
+          <div><h2>文档资料</h2><span>资料独立于内容版本，保存后立即同步阅读端。</span></div>
+          <el-button :disabled="deletionLocked" :icon="EditPen" data-testid="edit-document-metadata"
+                     @click="openMetadataEditor">编辑资料
+          </el-button>
+        </div>
+      </template>
       <dl class="document-metadata-grid">
-        <div><dt>描述</dt><dd>{{ metadata.description || '暂无描述' }}</dd></div>
-        <div><dt>标签</dt><dd class="document-tag-list"><el-tag v-for="tag in metadata.tags" :key="tag" effect="plain">{{ tag }}</el-tag><span v-if="!metadata.tags.length" class="muted-text">暂无标签</span></dd></div>
-        <div><dt>文档标识</dt><dd><ReadonlyIdentifier :value="metadata.code" /></dd></div>
+        <div>
+          <dt>描述</dt>
+          <dd>{{ metadata.description || '暂无描述' }}</dd>
+        </div>
+        <div>
+          <dt>标签</dt>
+          <dd class="document-tag-list">
+            <el-tag v-for="tag in metadata.tags" :key="tag" effect="plain">{{ tag }}</el-tag>
+            <span v-if="!metadata.tags.length" class="muted-text">暂无标签</span></dd>
+        </div>
+        <div>
+          <dt>文档标识</dt>
+          <dd>
+            <ReadonlyIdentifier :value="metadata.code"/>
+          </dd>
+        </div>
       </dl>
-      <el-alert v-if="metadata.duplicateTitleCount > 0" :title="`另有 ${metadata.duplicateTitleCount} 个同名文档，请结合文档标识区分。`" type="warning" :closable="false" show-icon />
+      <el-alert v-if="metadata.duplicateTitleCount > 0"
+                :closable="false" :title="`另有 ${metadata.duplicateTitleCount} 个同名文档，请结合文档标识区分。`"
+                show-icon type="warning"/>
     </el-card>
-    <el-card v-if="!loadError || versions.length" shadow="never" class="version-history-card">
-      <template #header><div class="card-heading"><div><h2>版本历史</h2><span>当前发布版本单独置顶；下架只影响阅读端可见性，不删除任何数据。</span></div></div></template>
-      <el-empty v-if="!loading && !versions.length" description="当前文档还没有版本" />
+    <el-card v-if="!loadError || versions.length" class="version-history-card" shadow="never">
+      <template #header>
+        <div class="card-heading">
+          <div><h2>版本历史</h2><span>当前发布版本单独置顶；下架只影响阅读端可见性，不删除任何数据。</span></div>
+        </div>
+      </template>
+      <el-empty v-if="!loading && !versions.length" description="当前文档还没有版本"/>
       <template v-else>
-        <section v-if="publishedVersion" class="current-version-panel" aria-labelledby="current-version-heading">
-          <div class="current-version-identity"><span>{{ document?.status === 'OFFLINE' ? '已保留的发布版本' : '当前线上版本' }}</span><h3 id="current-version-heading">v{{ publishedVersion.versionNo }}</h3><small>发布于 {{ formatTime(publishedVersion.publishedAt || publishedVersion.createdAt) }}</small></div>
-          <div class="current-version-meta"><div><el-tag :type="document?.status === 'OFFLINE' ? 'info' : 'success'">{{ zh(document?.status) }}</el-tag><el-tag effect="plain">{{ zh(publishedVersion.sourceType) }}</el-tag></div><strong class="version-file-name">{{ publishedVersion.sourceFileName || '未命名来源文件' }}</strong><span>{{ lineageLabel(publishedVersion) }}</span></div>
+        <section v-if="publishedVersion" aria-labelledby="current-version-heading" class="current-version-panel">
+          <div class="current-version-identity"><span>{{
+              document?.status === 'OFFLINE' ? '已保留的发布版本' : '当前线上版本'
+            }}</span>
+            <h3 id="current-version-heading">v{{ publishedVersion.versionNo }}</h3><small>发布于
+              {{ formatTime(publishedVersion.publishedAt || publishedVersion.createdAt) }}</small></div>
+          <div class="current-version-meta">
+            <div>
+              <el-tag :type="document?.status === 'OFFLINE' ? 'info' : 'success'">{{ zh(document?.status) }}</el-tag>
+              <el-tag effect="plain">{{ zh(publishedVersion.sourceType) }}</el-tag>
+            </div>
+            <strong class="version-file-name">{{
+                publishedVersion.sourceFileName || '未命名来源文件'
+              }}</strong><span>{{ lineageLabel(publishedVersion) }}</span></div>
           <div class="current-version-actions ui-action-row">
-            <el-button :icon="Plus" :loading="isActive(publishedVersion.id, 'create')" :disabled="actionsLocked && !isActive(publishedVersion.id, 'create')" :data-testid="`create-${publishedVersion.id}`" @click="createRevision(publishedVersion)">基于 v{{ publishedVersion.versionNo }} 创建修订</el-button>
-            <el-button v-if="document?.status === 'PUBLISHED'" type="warning" plain :loading="isActive(documentId, 'take-down')" :disabled="actionsLocked && !isActive(documentId, 'take-down')" :data-testid="`take-down-${publishedVersion.id}`" @click="takeDown">下架</el-button>
+            <el-button :data-testid="`create-${publishedVersion.id}`" :disabled="actionsLocked && !isActive(publishedVersion.id, 'create')"
+                       :icon="Plus"
+                       :loading="isActive(publishedVersion.id, 'create')" @click="createRevision(publishedVersion)">基于
+              v{{ publishedVersion.versionNo }} 创建修订
+            </el-button>
+            <el-button v-if="document?.status === 'PUBLISHED'" :data-testid="`take-down-${publishedVersion.id}`" :disabled="actionsLocked && !isActive(documentId, 'take-down')"
+                       :loading="isActive(documentId, 'take-down')"
+                       plain
+                       type="warning" @click="takeDown">下架
+            </el-button>
           </div>
         </section>
-        <div v-if="historyVersions.length" class="history-section-heading"><div><h3>草稿与历史版本</h3><span>{{ historyVersions.length }} 个版本，按版本号倒序排列</span></div></div>
-        <el-empty v-else description="暂无草稿或历史版本" :image-size="72" />
+        <div v-if="historyVersions.length" class="history-section-heading">
+          <div><h3>草稿与历史版本</h3><span>{{ historyVersions.length }} 个版本，按版本号倒序排列</span></div>
+        </div>
+        <el-empty v-else :image-size="72" description="暂无草稿或历史版本"/>
         <div v-if="historyVersions.length" class="version-history">
-          <article v-for="version in historyVersions" :key="version.id" :data-version-id="version.id" class="version-row" :class="{ 'latest-draft': isLatestDraft(version), 'branch-draft': isBranchDraft(version) }">
-            <div class="version-number"><strong>v{{ version.versionNo }}</strong><span>{{ formatTime(version.createdAt) }}</span></div>
-            <div class="version-meta"><div><el-tag :type="version.status === 'DRAFT' ? 'warning' : 'info'">{{ versionStatusLabel(version) }}</el-tag><el-tag effect="plain">{{ zh(version.sourceType) }}</el-tag></div><strong class="version-file-name">{{ version.sourceFileName || '未命名来源文件' }}</strong><span class="version-lineage">{{ lineageLabel(version) }}</span><span v-if="isBranchDraft(version)" class="version-branch-warning">不包含当前线上版本的后续变更，发布前请核对内容。</span></div>
+          <article v-for="version in historyVersions" :key="version.id" :class="{ 'latest-draft': isLatestDraft(version), 'branch-draft': isBranchDraft(version) }"
+                   :data-version-id="version.id"
+                   class="version-row">
+            <div class="version-number"><strong>v{{ version.versionNo }}</strong><span>{{
+                formatTime(version.createdAt)
+              }}</span></div>
+            <div class="version-meta">
+              <div>
+                <el-tag :type="version.status === 'DRAFT' ? 'warning' : 'info'">{{
+                    versionStatusLabel(version)
+                  }}
+                </el-tag>
+                <el-tag effect="plain">{{ zh(version.sourceType) }}</el-tag>
+              </div>
+              <strong class="version-file-name">{{ version.sourceFileName || '未命名来源文件' }}</strong><span
+                class="version-lineage">{{ lineageLabel(version) }}</span><span v-if="isBranchDraft(version)"
+                                                                                class="version-branch-warning">不包含当前线上版本的后续变更，发布前请核对内容。</span>
+            </div>
             <div class="version-row-actions ui-action-row">
               <template v-if="version.status === 'DRAFT'">
-                <el-button type="primary" :icon="EditPen" :disabled="actionsLocked" :data-testid="`edit-${version.id}`" @click="editVersion(version)">继续编辑</el-button>
-                <el-button type="success" plain :icon="CircleCheckFilled" :loading="isActive(version.id, 'publish')" :disabled="actionsLocked && !isActive(version.id, 'publish')" :data-testid="`publish-${version.id}`" @click="publish(version)">发布 v{{ version.versionNo }}</el-button>
-                <el-dropdown trigger="click" :disabled="actionsLocked" @command="handleMoreCommand(version, $event)"><el-button :icon="MoreFilled" :loading="isActive(version.id, 'create') || isActive(version.id, 'discard')" :disabled="actionsLocked" :data-testid="`more-${version.id}`">更多</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="create" :icon="Plus">基于 v{{ version.versionNo }} 创建修订</el-dropdown-item><el-dropdown-item command="discard" :icon="Delete" divided class="danger-command">丢弃草稿 v{{ version.versionNo }}</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
+                <el-button :data-testid="`edit-${version.id}`" :disabled="actionsLocked" :icon="EditPen" type="primary"
+                           @click="editVersion(version)">继续编辑
+                </el-button>
+                <el-button :data-testid="`publish-${version.id}`" :disabled="actionsLocked && !isActive(version.id, 'publish')" :icon="CircleCheckFilled" :loading="isActive(version.id, 'publish')"
+                           plain
+                           type="success" @click="publish(version)">发布 v{{
+                    version.versionNo
+                  }}
+                </el-button>
+                <el-dropdown :disabled="actionsLocked" trigger="click" @command="handleMoreCommand(version, $event)">
+                  <el-button :data-testid="`more-${version.id}`"
+                             :disabled="actionsLocked"
+                             :icon="MoreFilled" :loading="isActive(version.id, 'create') || isActive(version.id, 'discard')">更多
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item :icon="Plus" command="create">基于 v{{ version.versionNo }} 创建修订
+                      </el-dropdown-item>
+                      <el-dropdown-item :icon="Delete" class="danger-command" command="discard" divided>丢弃草稿
+                        v{{ version.versionNo }}
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </template>
-              <el-button v-else :icon="Plus" :loading="isActive(version.id, 'create')" :disabled="actionsLocked && !isActive(version.id, 'create')" :data-testid="`create-${version.id}`" @click="createRevision(version)">基于 v{{ version.versionNo }} 创建修订</el-button>
+              <el-button v-else :data-testid="`create-${version.id}`" :disabled="actionsLocked && !isActive(version.id, 'create')"
+                         :icon="Plus"
+                         :loading="isActive(version.id, 'create')" @click="createRevision(version)">基于
+                v{{ version.versionNo }} 创建修订
+              </el-button>
             </div>
           </article>
         </div>
       </template>
     </el-card>
-    <el-dialog v-model="metadataDialogVisible" title="编辑文档资料" width="min(560px, 92vw)" :close-on-click-modal="false">
+    <el-dialog v-model="metadataDialogVisible" :close-on-click-modal="false" title="编辑文档资料"
+               width="min(560px, 92vw)">
       <el-form label-position="top" @submit.prevent>
-        <el-form-item label="文档标题" required><el-input v-model="metadataForm.title" name="document-title" autocomplete="off" maxlength="500" show-word-limit /></el-form-item>
-        <el-form-item label="文档标识"><ReadonlyIdentifier :value="metadata?.code" /><span class="form-help">文档创建后不可修改。</span></el-form-item>
-        <el-form-item label="描述"><el-input v-model="metadataForm.description" name="document-description" autocomplete="off" type="textarea" :rows="4" maxlength="5000" show-word-limit /></el-form-item>
-        <el-form-item label="标签"><el-select v-model="metadataForm.tags" name="document-tags" multiple filterable allow-create default-first-option :multiple-limit="20" placeholder="输入标签后按回车…"><el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag" /></el-select><span class="form-help">最多 20 个，单个标签最多 50 个字符；标签忽略大小写去重。</span></el-form-item>
+        <el-form-item label="文档标题" required>
+          <el-input v-model="metadataForm.title" autocomplete="off" maxlength="500" name="document-title"
+                    show-word-limit/>
+        </el-form-item>
+        <el-form-item label="文档标识">
+          <ReadonlyIdentifier :value="metadata?.code"/>
+          <span class="form-help">文档创建后不可修改。</span></el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="metadataForm.description" :rows="4" autocomplete="off" maxlength="5000"
+                    name="document-description" show-word-limit type="textarea"/>
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-select v-model="metadataForm.tags" :multiple-limit="20" allow-create default-first-option filterable
+                     multiple name="document-tags" placeholder="输入标签后按回车…">
+            <el-option v-for="tag in metadataForm.tags" :key="tag" :label="tag" :value="tag"/>
+          </el-select>
+          <span class="form-help">最多 20 个，单个标签最多 50 个字符；标签忽略大小写去重。</span></el-form-item>
       </el-form>
-      <template #footer><div class="ui-action-row ui-action-row--end"><el-button :disabled="metadataSaving" @click="metadataDialogVisible = false">取消</el-button><el-button type="primary" :loading="metadataSaving" data-testid="save-document-metadata" @click="saveMetadata">保存并立即生效</el-button></div></template>
+      <template #footer>
+        <div class="ui-action-row ui-action-row--end">
+          <el-button :disabled="metadataSaving" @click="metadataDialogVisible = false">取消</el-button>
+          <el-button :loading="metadataSaving" data-testid="save-document-metadata" type="primary"
+                     @click="saveMetadata">保存并立即生效
+          </el-button>
+        </div>
+      </template>
     </el-dialog>
   </section>
 </template>

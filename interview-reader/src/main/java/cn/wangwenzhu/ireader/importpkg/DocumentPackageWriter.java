@@ -26,6 +26,23 @@ public class DocumentPackageWriter {
     private final AssetMapper assetMapper;
     private final ObjectMapper objectMapper;
 
+    private static Map<String, List<String>> blockTextBySection(List<DocumentPackage.BlockInfo> blocks) {
+        var result = new LinkedHashMap<String, List<String>>();
+        for (var block : blocks) {
+            result.computeIfAbsent(block.sectionKey(), ignored -> new ArrayList<>())
+                    .add(Objects.requireNonNullElse(block.plainText(), ""));
+        }
+        return result;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private static String opaqueAnchor() {
+        return "sec_" + UUID.randomUUID();
+    }
+
     public void writeNewVersion(String versionId, DocumentPackage documentPackage) {
         var sections = new ArrayList<>(documentPackage.sections());
         sections.sort(Comparator
@@ -114,15 +131,6 @@ public class DocumentPackageWriter {
         if (!assets.isEmpty()) assetMapper.insertBatchSelective(assets, WRITE_BATCH_SIZE);
     }
 
-    private static Map<String, List<String>> blockTextBySection(List<DocumentPackage.BlockInfo> blocks) {
-        var result = new LinkedHashMap<String, List<String>>();
-        for (var block : blocks) {
-            result.computeIfAbsent(block.sectionKey(), ignored -> new ArrayList<>())
-                    .add(Objects.requireNonNullElse(block.plainText(), ""));
-        }
-        return result;
-    }
-
     private ApiException invalidReference(String message) {
         return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DOCUMENT_PACKAGE_REFERENCE", message);
     }
@@ -137,13 +145,5 @@ public class DocumentPackageWriter {
 
     private String jsonOrNull(JsonNode value) {
         return value == null || value.isNull() ? null : json(value);
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
-    }
-
-    private static String opaqueAnchor() {
-        return "sec_" + UUID.randomUUID();
     }
 }

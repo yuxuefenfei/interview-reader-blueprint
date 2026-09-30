@@ -44,8 +44,11 @@ public class DeploymentCoordinator {
         try {
             var operation = store.begin(releaseId);
             executor.submit(() -> {
-                try { execute(operation.id()); }
-                finally { busy.set(false); }
+                try {
+                    execute(operation.id());
+                } finally {
+                    busy.set(false);
+                }
             });
             return operation;
         } catch (RuntimeException | IOException exception) {
@@ -64,11 +67,14 @@ public class DeploymentCoordinator {
             }
             store.update(operationId, OperationStatus.RUNNING, UpgradeStage.RECOVERING, "人工发起备份恢复");
             executor.submit(() -> {
-                try { rollback(operationId); }
-                catch (Exception exception) {
+                try {
+                    rollback(operationId);
+                } catch (Exception exception) {
                     LOG.error("Manual recovery failed operation={}", operationId, exception);
                     safeUpdate(operationId, OperationStatus.NEEDS_OPERATOR, UpgradeStage.RECOVERY_FAILED, "恢复失败；保留停写状态，请查看服务端日志");
-                } finally { busy.set(false); }
+                } finally {
+                    busy.set(false);
+                }
             });
             return store.operation(operationId);
         } catch (RuntimeException | IOException exception) {
@@ -96,7 +102,9 @@ public class DeploymentCoordinator {
                 } catch (Exception exception) {
                     LOG.error("Abort interrupted operation failed operation={}", operationId, exception);
                     safeUpdate(operationId, OperationStatus.NEEDS_OPERATOR, UpgradeStage.GATED_FAILURE, "无法安全开放写入；保留维护门禁");
-                } finally { busy.set(false); }
+                } finally {
+                    busy.set(false);
+                }
             });
             return store.operation(operationId);
         } catch (RuntimeException | IOException exception) {
@@ -110,8 +118,11 @@ public class DeploymentCoordinator {
         try {
             var operation = store.beginRecovery(backupId);
             executor.submit(() -> {
-                try { executePublishedRestore(operation.id(), backupId); }
-                finally { busy.set(false); }
+                try {
+                    executePublishedRestore(operation.id(), backupId);
+                } finally {
+                    busy.set(false);
+                }
             });
             return operation;
         } catch (RuntimeException | IOException exception) {
@@ -177,6 +188,7 @@ public class DeploymentCoordinator {
             } else safeUpdate(id, OperationStatus.FAILED, UpgradeStage.FAILED, "人工恢复预检失败；未改动主应用");
         }
     }
+
     private void execute(String id) {
         boolean gated = false;
         boolean stopped = false;
@@ -219,8 +231,9 @@ public class DeploymentCoordinator {
                 return;
             }
             if (stopped) {
-                try { rollback(id); }
-                catch (Exception recoveryFailure) {
+                try {
+                    rollback(id);
+                } catch (Exception recoveryFailure) {
                     LOG.error("Automatic rollback failed operation={}", id, recoveryFailure);
                     safeUpdate(id, OperationStatus.NEEDS_OPERATOR, UpgradeStage.ROLLBACK_FAILED, "自动回滚失败；保留停写状态，请查看服务端日志");
                 }
@@ -306,7 +319,8 @@ public class DeploymentCoordinator {
                     && HEALTH_UP.equals(status.readiness().path("components").path("db").path("status").asText())
                     && HEALTH_UP.equals(status.readiness().path("components").path("diskSpace").path("status").asText())
                     && status.drain().path("maintenance").asBoolean() == gated
-                    && (expectedCommit == null || expectedCommit.equals(status.drain().path("releaseCommit").asText()))) return;
+                    && (expectedCommit == null || expectedCommit.equals(status.drain().path("releaseCommit").asText())))
+                return;
             Thread.sleep(2000);
         }
         throw new IOException("主应用就绪检查超时");
@@ -330,10 +344,15 @@ public class DeploymentCoordinator {
     }
 
     private void safeUpdate(String id, OperationStatus status, UpgradeStage stage, String message) {
-        try { store.update(id, status, stage, message); }
-        catch (IOException exception) { LOG.error("Could not persist operation={}", id, exception); }
+        try {
+            store.update(id, status, stage, message);
+        } catch (IOException exception) {
+            LOG.error("Could not persist operation={}", id, exception);
+        }
     }
 
     @PreDestroy
-    void close() { executor.shutdownNow(); }
+    void close() {
+        executor.shutdownNow();
+    }
 }

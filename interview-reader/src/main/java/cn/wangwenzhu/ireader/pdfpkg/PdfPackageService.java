@@ -47,6 +47,192 @@ public class PdfPackageService {
 
     private final ObjectMapper objectMapper;
 
+    private static String normalizeHeading(String value) {
+        return value == null ? "" : value.replaceAll("[\\s\\p{P}\\p{S}]+", "").toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean looksLikePdf(byte[] bytes) {
+        return bytes.length >= 5
+                && bytes[0] == '%'
+                && bytes[1] == 'P'
+                && bytes[2] == 'D'
+                && bytes[3] == 'F'
+                && bytes[4] == '-';
+    }
+
+    private static String titleFromFileName(String fileName) {
+        return cleanTitle(baseName(fileName), "PDF Document");
+    }
+
+    private static String baseName(String fileName) {
+        return ImportDocumentNaming.baseName(fileName, List.of(".pdf"), "PDF Document");
+    }
+
+    private static String cleanTitle(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return value.strip().replaceAll("\\s+", " ");
+    }
+
+    private static String slug(String value) {
+        return ImportDocumentNaming.slug(value, "document");
+    }
+
+    private static boolean startsWithCjk(String value) {
+        return !value.isBlank() && isCjk(value.charAt(0));
+    }
+
+    private static boolean endsWithCjk(StringBuilder value) {
+        return !value.isEmpty() && isCjk(value.charAt(value.length() - 1));
+    }
+
+    @SuppressWarnings("UnnecessaryUnicodeEscape")
+    private static boolean isCjk(char value) {
+        return value >= '\u4e00' && value <= '\u9fff';
+    }
+
+    private static boolean isListLine(String line) {
+        return isOrderedListLine(line) || UNORDERED_LIST_PATTERN.matcher(line).matches();
+    }
+
+    private static boolean isOrderedListLine(String line) {
+        return ORDERED_LIST_PATTERN.matcher(line).matches();
+    }
+
+    private static String stripListMarker(String line) {
+        return line.replaceFirst("^\\s*(\\d+[.)]|\\(?[一二三四五六七八九十]+[.)、]|[•·*]|-|–|—)\\s+", "").strip();
+    }
+
+    private static boolean isTableLine(String line) {
+        if (line.length() < 5) {
+            return false;
+        }
+        if (line.chars().filter(value -> value == '|').count() >= 2) {
+            return true;
+        }
+        if (!TABLE_GAP_PATTERN.matcher(line).find()) {
+            return false;
+        }
+        var cells = line.split("\\s{2,}");
+        return cells.length >= 2 && Stream.of(cells).allMatch(cell -> !cell.isBlank() && cell.length() <= 80);
+    }
+
+    private static boolean isCodeLine(String rawText, String line) {
+        if (line.length() < 2) {
+            return false;
+        }
+        var hasCodePunctuation = line.contains("{")
+                || line.contains("}")
+                || line.endsWith(";")
+                || line.contains("->")
+                || line.contains("==")
+                || line.contains("!=");
+        return hasCodePunctuation
+                || line.matches("^@[A-Za-z][\\w.]*.*")
+                || CODE_KEYWORD_PATTERN.matcher(line).matches()
+                || rawText.startsWith("    ") && (line.contains("(") || line.contains("=") || line.contains(";"));
+    }
+
+    private static boolean isCodeContinuation(StringBuilder code, String line) {
+        if (code.isEmpty() || line.isBlank()) {
+            return false;
+        }
+        return line.matches("^(?://|/\\*|\\*|\\*/).*")
+                || line.matches("^@[A-Za-z][\\w.]*.*")
+                || line.matches("^(else|catch|finally)\\b.*")
+                || line.matches("^[)}\\],;]+$");
+    }
+
+    private static CodeProseSplit splitCodeAndProse(String rawText) {
+        var closingBrace = rawText.indexOf('}');
+        if (closingBrace < 0) {
+            return null;
+        }
+        var codeEnd = closingBrace;
+        var proseStart = closingBrace + 1;
+        while (proseStart < rawText.length()) {
+            var character = rawText.charAt(proseStart);
+            if (Character.isWhitespace(character)) {
+                proseStart++;
+                continue;
+            }
+            if (character == '}') {
+                codeEnd = proseStart;
+                proseStart++;
+                continue;
+            }
+            break;
+        }
+        if (proseStart >= rawText.length() || !isCjk(rawText.charAt(proseStart))) {
+            return null;
+        }
+        var code = rawText.substring(0, codeEnd + 1).stripTrailing();
+        var prose = rawText.substring(proseStart).strip();
+        return code.isBlank() || prose.isBlank() || !isCodeLine(code, code.strip()) ? null : new CodeProseSplit(code, prose);
+    }
+
+    private static HeadingAnnotationSplit splitHeadingAndAnnotation(String rawText) {
+        var annotationStart = rawText.indexOf('@');
+        if (annotationStart <= 0 || annotationStart == rawText.length() - 1) {
+            return null;
+        }
+        var heading = rawText.substring(0, annotationStart).strip();
+        var annotation = rawText.substring(annotationStart).strip();
+        if (heading.isBlank() || heading.chars().noneMatch(value -> isCjk((char) value)) || !annotation.matches("^@[A-Za-z][\\w.]*.*")) {
+            return null;
+        }
+        return new HeadingAnnotationSplit(heading, annotation);
+    }
+
+    private static boolean looksLikeRunningHeader(String line) {
+        return line.length() < 100 && line.contains("系统化解析") && line.contains("面试题");
+    }
+
+    private static void appendCodeLine(StringBuilder code, String rawText) {
+        if (!code.isEmpty()) {
+            code.append('\n');
+        }
+        code.append(rawText.stripTrailing());
+    }
+
+    private static String trimCode(String value) {
+        var lines = value.lines().toList();
+        var minIndent = lines.stream()
+                .filter(line -> !line.isBlank())
+                .mapToInt(PdfPackageService::leadingSpaces)
+                .min()
+                .orElse(0);
+        return lines.stream()
+                .map(line -> line.length() >= minIndent ? line.substring(minIndent).stripTrailing() : line.stripTrailing())
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("")
+                .strip();
+    }
+
+    private static int leadingSpaces(String value) {
+        var count = 0;
+        while (count < value.length() && value.charAt(count) == ' ') {
+            count++;
+        }
+        return count;
+    }
+
+    private static String inferLanguage(String text) {
+        var upper = text.toUpperCase(Locale.ROOT);
+        if (upper.contains("SELECT ") || upper.contains("UPDATE ") || upper.contains("INSERT ") || upper.contains("DELETE ")) {
+            return "sql";
+        }
+        if (text.contains("{") || text.contains(";") || text.contains("public ") || text.contains("class ")) {
+            return "java";
+        }
+        return "text";
+    }
+
+    private static String compact(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "");
+    }
+
     public PdfParseResult parse(byte[] fileBytes, String sourceFileName, String sourceSha256, String converterVersion) {
         if (!looksLikePdf(fileBytes)) {
             return new PdfParseResult(null, List.of(issue(ImportIssueSeverity.BLOCKING, "PDF_MAGIC_INVALID", "Uploaded file is not a PDF")), null);
@@ -295,9 +481,6 @@ public class PdfPackageService {
         return match;
     }
 
-    private static String normalizeHeading(String value) {
-        return value == null ? "" : value.replaceAll("[\\s\\p{P}\\p{S}]+", "").toLowerCase(Locale.ROOT);
-    }
     private PdfRawExtraction rawExtraction(
             PDDocument document,
             String sourceFileName,
@@ -636,188 +819,35 @@ public class PdfPackageService {
         return new ImportIssueDto(severity, code, message, null, null, null);
     }
 
-    private static boolean looksLikePdf(byte[] bytes) {
-        return bytes.length >= 5
-                && bytes[0] == '%'
-                && bytes[1] == 'P'
-                && bytes[2] == 'D'
-                && bytes[3] == 'F'
-                && bytes[4] == '-';
-    }
-
-    private static String titleFromFileName(String fileName) {
-        return cleanTitle(baseName(fileName), "PDF Document");
-    }
-
-    private static String baseName(String fileName) {
-        return ImportDocumentNaming.baseName(fileName, List.of(".pdf"), "PDF Document");
-    }
-
-    private static String cleanTitle(String value, String fallback) {
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        return value.strip().replaceAll("\\s+", " ");
-    }
-
-    private static String slug(String value) {
-        return ImportDocumentNaming.slug(value, "document");
-    }
-
-    private static boolean startsWithCjk(String value) {
-        return !value.isBlank() && isCjk(value.charAt(0));
-    }
-
-    private static boolean endsWithCjk(StringBuilder value) {
-        return !value.isEmpty() && isCjk(value.charAt(value.length() - 1));
-    }
-
-    @SuppressWarnings("UnnecessaryUnicodeEscape")
-    private static boolean isCjk(char value) {
-        return value >= '\u4e00' && value <= '\u9fff';
-    }
-
-    private static boolean isListLine(String line) {
-        return isOrderedListLine(line) || UNORDERED_LIST_PATTERN.matcher(line).matches();
-    }
-
-    private static boolean isOrderedListLine(String line) {
-        return ORDERED_LIST_PATTERN.matcher(line).matches();
-    }
-
-    private static String stripListMarker(String line) {
-        return line.replaceFirst("^\\s*(\\d+[.)]|\\(?[一二三四五六七八九十]+[.)、]|[•·*]|-|–|—)\\s+", "").strip();
-    }
-
-    private static boolean isTableLine(String line) {
-        if (line.length() < 5) {
-            return false;
-        }
-        if (line.chars().filter(value -> value == '|').count() >= 2) {
-            return true;
-        }
-        if (!TABLE_GAP_PATTERN.matcher(line).find()) {
-            return false;
-        }
-        var cells = line.split("\\s{2,}");
-        return cells.length >= 2 && Stream.of(cells).allMatch(cell -> !cell.isBlank() && cell.length() <= 80);
-    }
-
-    private static boolean isCodeLine(String rawText, String line) {
-        if (line.length() < 2) {
-            return false;
-        }
-        var hasCodePunctuation = line.contains("{")
-                || line.contains("}")
-                || line.endsWith(";")
-                || line.contains("->")
-                || line.contains("==")
-                || line.contains("!=");
-        return hasCodePunctuation
-                || line.matches("^@[A-Za-z][\\w.]*.*")
-                || CODE_KEYWORD_PATTERN.matcher(line).matches()
-                || rawText.startsWith("    ") && (line.contains("(") || line.contains("=") || line.contains(";"));
-    }
-
-    private static boolean isCodeContinuation(StringBuilder code, String line) {
-        if (code.isEmpty() || line.isBlank()) {
-            return false;
-        }
-        return line.matches("^(?://|/\\*|\\*|\\*/).*")
-                || line.matches("^@[A-Za-z][\\w.]*.*")
-                || line.matches("^(else|catch|finally)\\b.*")
-                || line.matches("^[)}\\],;]+$");
-    }
-
-    private static CodeProseSplit splitCodeAndProse(String rawText) {
-        var closingBrace = rawText.indexOf('}');
-        if (closingBrace < 0) {
-            return null;
-        }
-        var codeEnd = closingBrace;
-        var proseStart = closingBrace + 1;
-        while (proseStart < rawText.length()) {
-            var character = rawText.charAt(proseStart);
-            if (Character.isWhitespace(character)) {
-                proseStart++;
+    private void attachLineBounds(List<PdfBlockCandidate> candidates, int firstCandidate, List<PositionedLine> lines) {
+        var lineIndex = 0;
+        for (var index = firstCandidate; index < candidates.size(); index++) {
+            var candidate = candidates.get(index);
+            var target = compact(candidate.plainText());
+            if (target.isBlank() || lineIndex >= lines.size()) {
                 continue;
             }
-            if (character == '}') {
-                codeEnd = proseStart;
-                proseStart++;
-                continue;
+            var merged = "";
+            BlockBounds bounds = null;
+            while (lineIndex < lines.size()) {
+                var line = lines.get(lineIndex++);
+                merged += compact(line.text());
+                bounds = bounds == null ? line.bounds() : BlockBounds.merge(bounds, line.bounds());
+                if (merged.length() >= target.length() || !target.startsWith(merged)) {
+                    break;
+                }
             }
-            break;
+            candidates.set(index, new PdfBlockCandidate(candidate.blockType(), candidate.text(), candidate.items(), candidate.language(),
+                    candidate.pageNumber(), candidate.mediaBox(), bounds));
         }
-        if (proseStart >= rawText.length() || !isCjk(rawText.charAt(proseStart))) {
-            return null;
-        }
-        var code = rawText.substring(0, codeEnd + 1).stripTrailing();
-        var prose = rawText.substring(proseStart).strip();
-        return code.isBlank() || prose.isBlank() || !isCodeLine(code, code.strip()) ? null : new CodeProseSplit(code, prose);
     }
 
-    private static HeadingAnnotationSplit splitHeadingAndAnnotation(String rawText) {
-        var annotationStart = rawText.indexOf('@');
-        if (annotationStart <= 0 || annotationStart == rawText.length() - 1) {
-            return null;
-        }
-        var heading = rawText.substring(0, annotationStart).strip();
-        var annotation = rawText.substring(annotationStart).strip();
-        if (heading.isBlank() || heading.chars().noneMatch(value -> isCjk((char) value)) || !annotation.matches("^@[A-Za-z][\\w.]*.*")) {
-            return null;
-        }
-        return new HeadingAnnotationSplit(heading, annotation);
+    public record PdfParseResult(DocumentPackage documentPackage, List<ImportIssueDto> issues,
+                                 PdfRawExtraction rawExtraction) {
     }
 
-    private static boolean looksLikeRunningHeader(String line) {
-        return line.length() < 100 && line.contains("系统化解析") && line.contains("面试题");
-    }
-
-    private static void appendCodeLine(StringBuilder code, String rawText) {
-        if (!code.isEmpty()) {
-            code.append('\n');
-        }
-        code.append(rawText.stripTrailing());
-    }
-
-    private static String trimCode(String value) {
-        var lines = value.lines().toList();
-        var minIndent = lines.stream()
-                .filter(line -> !line.isBlank())
-                .mapToInt(PdfPackageService::leadingSpaces)
-                .min()
-                .orElse(0);
-        return lines.stream()
-                .map(line -> line.length() >= minIndent ? line.substring(minIndent).stripTrailing() : line.stripTrailing())
-                .reduce((left, right) -> left + "\n" + right)
-                .orElse("")
-                .strip();
-    }
-
-    private static int leadingSpaces(String value) {
-        var count = 0;
-        while (count < value.length() && value.charAt(count) == ' ') {
-            count++;
-        }
-        return count;
-    }
-
-    private static String inferLanguage(String text) {
-        var upper = text.toUpperCase(Locale.ROOT);
-        if (upper.contains("SELECT ") || upper.contains("UPDATE ") || upper.contains("INSERT ") || upper.contains("DELETE ")) {
-            return "sql";
-        }
-        if (text.contains("{") || text.contains(";") || text.contains("public ") || text.contains("class ")) {
-            return "java";
-        }
-        return "text";
-    }
-
-    public record PdfParseResult(DocumentPackage documentPackage, List<ImportIssueDto> issues, PdfRawExtraction rawExtraction) {
-    }
-
-    private record OutlineSection(String sectionKey, String parentKey, int level, String title, int pageStart, int sortOrder) {
+    private record OutlineSection(String sectionKey, String parentKey, int level, String title, int pageStart,
+                                  int sortOrder) {
     }
 
     public record PdfRawExtraction(
@@ -834,7 +864,8 @@ public class PdfPackageService {
     ) {
     }
 
-    public record RawOutline(String sectionKey, String parentKey, int level, String title, int pageStart, int sortOrder) {
+    public record RawOutline(String sectionKey, String parentKey, int level, String title, int pageStart,
+                             int sortOrder) {
     }
 
     public record RawPreflight(
@@ -857,7 +888,8 @@ public class PdfPackageService {
     public record RawFontStat(String fontName, float fontSize, int charCount) {
     }
 
-    public record RawPage(int pageNumber, float width, float height, int rotation, int charCount, int blockCount, boolean coveredByBlocks, String text) {
+    public record RawPage(int pageNumber, float width, float height, int rotation, int charCount, int blockCount,
+                          boolean coveredByBlocks, String text) {
     }
 
     private record CodeProseSplit(String code, String prose) {
@@ -895,33 +927,6 @@ public class PdfPackageService {
         }
     }
 
-    private void attachLineBounds(List<PdfBlockCandidate> candidates, int firstCandidate, List<PositionedLine> lines) {
-        var lineIndex = 0;
-        for (var index = firstCandidate; index < candidates.size(); index++) {
-            var candidate = candidates.get(index);
-            var target = compact(candidate.plainText());
-            if (target.isBlank() || lineIndex >= lines.size()) {
-                continue;
-            }
-            var merged = "";
-            BlockBounds bounds = null;
-            while (lineIndex < lines.size()) {
-                var line = lines.get(lineIndex++);
-                merged += compact(line.text());
-                bounds = bounds == null ? line.bounds() : BlockBounds.merge(bounds, line.bounds());
-                if (merged.length() >= target.length() || !target.startsWith(merged)) {
-                    break;
-                }
-            }
-            candidates.set(index, new PdfBlockCandidate(candidate.blockType(), candidate.text(), candidate.items(), candidate.language(),
-                    candidate.pageNumber(), candidate.mediaBox(), bounds));
-        }
-    }
-
-    private static String compact(String value) {
-        return value == null ? "" : value.replaceAll("\\s+", "");
-    }
-
     private static final class PositionedTextStripper extends PDFTextStripper {
         private final List<PositionedLine> lines = new ArrayList<>();
 
@@ -951,10 +956,15 @@ public class PdfPackageService {
             return List.copyOf(lines);
         }
     }
+
     private static final class FontStatsStripper extends PDFTextStripper {
         private final Map<FontKey, Integer> counts = new LinkedHashMap<>();
 
         private FontStatsStripper() {
+        }
+
+        private static float roundFontSize(float value) {
+            return Math.round(value * 10.0f) / 10.0f;
         }
 
         @Override
@@ -982,10 +992,6 @@ public class PdfPackageService {
                     })
                     .limit(25)
                     .toList();
-        }
-
-        private static float roundFontSize(float value) {
-            return Math.round(value * 10.0f) / 10.0f;
         }
     }
 

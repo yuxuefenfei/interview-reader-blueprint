@@ -12,7 +12,9 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** 文档导入任务持久化实体。 */
+/**
+ * 文档导入任务持久化实体。
+ */
 @Getter
 @Setter
 @Table("import_job")

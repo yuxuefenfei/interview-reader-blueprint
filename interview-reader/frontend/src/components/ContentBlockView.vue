@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {computed, type CSSProperties, nextTick, onBeforeUnmount, ref, watch} from "vue";
 import type {ContentBlock} from "../types/api";
 import type {ReaderTheme} from "../utils/readingComfort";
@@ -29,10 +29,33 @@ const imageLightboxStyle: CSSProperties = {
   padding: "max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))",
   background: "rgba(7, 15, 24, .92)",
 };
-const imageLightboxToolbarStyle: CSSProperties = { justifyContent: "flex-end", minHeight: "44px", color: "#f8fafc" };
-const imageLightboxButtonStyle: CSSProperties = { minHeight: "36px", padding: "0 11px", border: "1px solid rgba(255, 255, 255, .42)", borderRadius: "var(--radius-sm)", background: "rgba(255, 255, 255, .1)", color: "inherit", font: "inherit" };
-const imageLightboxStageStyle: CSSProperties = { minWidth: "0", minHeight: "0", overflow: "auto", display: "grid", placeItems: "center", padding: "16px" };
-const imageLightboxImageStyle = computed<CSSProperties>(() => ({ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", transformOrigin: "center", transition: "transform 140ms ease-out", transform: `scale(${imagePreviewScale.value})` }));
+const imageLightboxToolbarStyle: CSSProperties = {justifyContent: "flex-end", minHeight: "44px", color: "#f8fafc"};
+const imageLightboxButtonStyle: CSSProperties = {
+  minHeight: "36px",
+  padding: "0 11px",
+  border: "1px solid rgba(255, 255, 255, .42)",
+  borderRadius: "var(--radius-sm)",
+  background: "rgba(255, 255, 255, .1)",
+  color: "inherit",
+  font: "inherit"
+};
+const imageLightboxStageStyle: CSSProperties = {
+  minWidth: "0",
+  minHeight: "0",
+  overflow: "auto",
+  display: "grid",
+  placeItems: "center",
+  padding: "16px"
+};
+const imageLightboxImageStyle = computed<CSSProperties>(() => ({
+  display: "block",
+  maxWidth: "100%",
+  maxHeight: "100%",
+  objectFit: "contain",
+  transformOrigin: "center",
+  transition: "transform 140ms ease-out",
+  transform: `scale(${imagePreviewScale.value})`
+}));
 const codeText = computed(() => codeTextFromPayload(props.block.payload, props.block.plainText));
 const codeLanguageName = computed(() => codeLanguage(props.block.payload, props.block));
 const imageAssetKey = computed(() => typeof props.block.payload.assetKey === "string" ? props.block.payload.assetKey.trim() : "");
@@ -71,8 +94,8 @@ function itemsFromPayload(payload: Record<string, unknown>): string[] {
 function openImagePreview(event?: MouseEvent): void {
   if (!imageUrl.value || imageLoadFailed.value) return;
   previousFocus = event?.currentTarget instanceof HTMLElement
-    ? event.currentTarget
-    : document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      ? event.currentTarget
+      : document.activeElement instanceof HTMLElement ? document.activeElement : null;
   imagePreviewScale.value = 1;
   imagePreviewOpen.value = true;
   document.addEventListener("keydown", handleImagePreviewKeydown);
@@ -106,14 +129,14 @@ function handleImagePreviewKeydown(event: KeyboardEvent): void {
   if (event.key !== "Tab") return;
 
   const controls = [imagePreviewZoomOut.value, imagePreviewZoomIn.value, imagePreviewClose.value]
-    .filter((control): control is HTMLButtonElement => !!control && !control.disabled);
+      .filter((control): control is HTMLButtonElement => !!control && !control.disabled);
   if (controls.length === 0) return;
   event.preventDefault();
   const currentIndex = controls.indexOf(document.activeElement as HTMLButtonElement);
   const offset = event.shiftKey ? -1 : 1;
   const nextIndex = currentIndex < 0
-    ? event.shiftKey ? controls.length - 1 : 0
-    : (currentIndex + offset + controls.length) % controls.length;
+      ? event.shiftKey ? controls.length - 1 : 0
+      : (currentIndex + offset + controls.length) % controls.length;
   controls[nextIndex].focus();
 }
 
@@ -127,8 +150,8 @@ function tableColumns(payload: Record<string, unknown>): string[] {
 
 function tableRows(payload: Record<string, unknown>): string[][] {
   return Array.isArray(payload.rows)
-    ? payload.rows.map((row) => (Array.isArray(row) ? row.map(tableCellText) : [tableCellText(row)]))
-    : [];
+      ? payload.rows.map((row) => (Array.isArray(row) ? row.map(tableCellText) : [tableCellText(row)]))
+      : [];
 }
 
 function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): string {
@@ -138,45 +161,49 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
 </script>
 
 <template>
-  <article class="content-block" :data-block-id="block.id">
+  <article :data-block-id="block.id" class="content-block">
     <p v-if="block.blockType === 'paragraph'" class="paragraph">
-      <InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" :highlight="highlight" />
+      <InlineMarkdown :highlight="highlight" :text="textFromPayload(block.payload, block.plainText)"/>
     </p>
 
     <p v-else-if="block.blockType === 'heading_note'" class="heading-note">
-      <InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" :highlight="highlight" />
+      <InlineMarkdown :highlight="highlight" :text="textFromPayload(block.payload, block.plainText)"/>
     </p>
 
     <ul v-else-if="block.blockType === 'unordered_list'" class="reader-list">
-      <li v-for="item in itemsFromPayload(block.payload)" :key="item"><InlineMarkdown :text="item" :highlight="highlight" /></li>
+      <li v-for="item in itemsFromPayload(block.payload)" :key="item">
+        <InlineMarkdown :highlight="highlight" :text="item"/>
+      </li>
     </ul>
 
     <ol v-else-if="block.blockType === 'ordered_list'" class="reader-list">
-      <li v-for="item in itemsFromPayload(block.payload)" :key="item"><InlineMarkdown :text="item" :highlight="highlight" /></li>
+      <li v-for="item in itemsFromPayload(block.payload)" :key="item">
+        <InlineMarkdown :highlight="highlight" :text="item"/>
+      </li>
     </ol>
 
     <CodeBlockView
-      v-else-if="block.blockType === 'code'"
-      :block-id="block.id"
-      :code="codeText"
-      :language="codeLanguageName"
-      :theme="diagramTheme"
-      :wrap="wrapCode"
-      :show-wrap-toggle="showCodeWrapToggle"
-      @update:wrap="emit('update:wrapCode', $event)"
+        v-else-if="block.blockType === 'code'"
+        :block-id="block.id"
+        :code="codeText"
+        :language="codeLanguageName"
+        :show-wrap-toggle="showCodeWrapToggle"
+        :theme="diagramTheme"
+        :wrap="wrapCode"
+        @update:wrap="emit('update:wrapCode', $event)"
     />
 
     <div v-else-if="block.blockType === 'table'" class="table-wrap">
       <table>
         <thead v-if="tableColumns(block.payload).length">
-          <tr>
-            <th v-for="column in tableColumns(block.payload)" :key="column">{{ column }}</th>
-          </tr>
+        <tr>
+          <th v-for="column in tableColumns(block.payload)" :key="column">{{ column }}</th>
+        </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, rowIndex) in tableRows(block.payload)" :key="rowIndex">
-            <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
-          </tr>
+        <tr v-for="(row, rowIndex) in tableRows(block.payload)" :key="rowIndex">
+          <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
+        </tr>
         </tbody>
       </table>
     </div>
@@ -187,49 +214,65 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
     </figure>
 
     <blockquote v-else-if="block.blockType === 'quote'" class="callout">
-      <InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" :highlight="highlight" />
+      <InlineMarkdown :highlight="highlight" :text="textFromPayload(block.payload, block.plainText)"/>
     </blockquote>
 
     <aside v-else-if="block.blockType === 'callout'" class="callout">
-      <strong v-if="typeof block.payload.title === 'string'"><InlineMarkdown :text="block.payload.title" :highlight="highlight" /></strong>
-      <span><InlineMarkdown :text="textFromPayload(block.payload, block.plainText)" :highlight="highlight" /></span>
+      <strong v-if="typeof block.payload.title === 'string'">
+        <InlineMarkdown :highlight="highlight" :text="block.payload.title"/>
+      </strong>
+      <span><InlineMarkdown :highlight="highlight" :text="textFromPayload(block.payload, block.plainText)"/></span>
     </aside>
 
-    <FormulaBlock v-else-if="block.blockType === 'formula'" :latex="formulaLatex" />
+    <FormulaBlock v-else-if="block.blockType === 'formula'" :latex="formulaLatex"/>
 
-    <figure v-else-if="block.blockType === 'image'" class="image-block" :class="{ unavailable: !imageUrl || imageLoadFailed }">
-      <button v-if="imageUrl && !imageLoadFailed" type="button" style="width:100%;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;cursor:zoom-in" :aria-label="`查看大图：${imageAlt || '图片'}`" @click="openImagePreview">
-        <img :key="`${imageUrl}:${imageRetryKey}`" :src="imageUrl" :alt="imageDecorative ? '' : imageAlt" loading="lazy" decoding="async" @error="imageLoadFailed = true" />
+    <figure v-else-if="block.blockType === 'image'" :class="{ unavailable: !imageUrl || imageLoadFailed }"
+            class="image-block">
+      <button v-if="imageUrl && !imageLoadFailed" :aria-label="`查看大图：${imageAlt || '图片'}`"
+              style="width:100%;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;cursor:zoom-in"
+              type="button" @click="openImagePreview">
+        <img :key="`${imageUrl}:${imageRetryKey}`" :alt="imageDecorative ? '' : imageAlt" :src="imageUrl" decoding="async"
+             loading="lazy" @error="imageLoadFailed = true"/>
       </button>
       <div v-if="!imageUrl || imageLoadFailed" class="image-unavailable-message" role="status">
         <strong>{{ imageLoadFailed ? "图片加载失败" : "图片当前不可用" }}</strong>
         <span>{{ imageLoadFailed ? "请检查网络后重试。" : "当前内容没有可用的图片地址。" }}</span>
         <button v-if="imageUrl" type="button" @click="retryImageLoad">重新加载</button>
       </div>
-      <figcaption v-if="imageCaption || ((!imageUrl || imageLoadFailed) && !imageDecorative && imageAlt)">{{ imageCaption || imageAlt }}</figcaption>
+      <figcaption v-if="imageCaption || ((!imageUrl || imageLoadFailed) && !imageDecorative && imageAlt)">
+        {{ imageCaption || imageAlt }}
+      </figcaption>
     </figure>
 
-    <hr v-else-if="block.blockType === 'divider'" />
+    <hr v-else-if="block.blockType === 'divider'"/>
 
     <pre v-else class="fallback-block">{{ block.plainText || JSON.stringify(block.payload, null, 2) }}</pre>
 
     <Teleport to="body">
       <div
-        v-if="imagePreviewOpen && imageUrl"
-        :style="imageLightboxStyle"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="`图片预览：${imageAlt || '图片'}`"
-        @click.self="closeImagePreview"
+          v-if="imagePreviewOpen && imageUrl"
+          :aria-label="`图片预览：${imageAlt || '图片'}`"
+          :style="imageLightboxStyle"
+          aria-modal="true"
+          role="dialog"
+          @click.self="closeImagePreview"
       >
-        <div class="ui-action-row ui-action-row--nowrap" :style="imageLightboxToolbarStyle">
-          <button ref="imagePreviewZoomOut" type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale <= 1" aria-label="缩小图片" @click="adjustImagePreviewScale(-0.25)">−</button>
-          <output style="min-width:42px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums" aria-live="polite">{{ Math.round(imagePreviewScale * 100) }}%</output>
-          <button ref="imagePreviewZoomIn" type="button" :style="imageLightboxButtonStyle" :disabled="imagePreviewScale >= 3" aria-label="放大图片" @click="adjustImagePreviewScale(0.25)">＋</button>
-          <button ref="imagePreviewClose" type="button" :style="imageLightboxButtonStyle" aria-label="关闭图片预览" @click="closeImagePreview">关闭</button>
+        <div :style="imageLightboxToolbarStyle" class="ui-action-row ui-action-row--nowrap">
+          <button ref="imagePreviewZoomOut" :disabled="imagePreviewScale <= 1" :style="imageLightboxButtonStyle"
+                  aria-label="缩小图片" type="button" @click="adjustImagePreviewScale(-0.25)">−
+          </button>
+          <output aria-live="polite"
+                  style="min-width:42px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums">{{ Math.round(imagePreviewScale * 100) }}%
+          </output>
+          <button ref="imagePreviewZoomIn" :disabled="imagePreviewScale >= 3" :style="imageLightboxButtonStyle"
+                  aria-label="放大图片" type="button" @click="adjustImagePreviewScale(0.25)">＋
+          </button>
+          <button ref="imagePreviewClose" :style="imageLightboxButtonStyle" aria-label="关闭图片预览" type="button"
+                  @click="closeImagePreview">关闭
+          </button>
         </div>
         <div :style="imageLightboxStageStyle">
-          <img :src="imageUrl" :alt="imageDecorative ? '' : imageAlt" :style="imageLightboxImageStyle" />
+          <img :alt="imageDecorative ? '' : imageAlt" :src="imageUrl" :style="imageLightboxImageStyle"/>
         </div>
       </div>
     </Teleport>
