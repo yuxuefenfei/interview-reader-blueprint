@@ -41,7 +41,7 @@ class ConsoleStartupTest {
     }
 
     @Test
-    void pageAndPersistedOverviewWorkWithoutMainApplicationOrDatabase() throws Exception {
+    void pageAndPersistedOverviewWorkWithoutMainApplicationOrMainDatabase() throws Exception {
         mvc.perform(get("/api/overview")).andExpect(status().isUnauthorized());
         mvc.perform(get("/").header("Authorization", basic()))
                 .andExpect(status().isOk());

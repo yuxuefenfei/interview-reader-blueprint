@@ -115,10 +115,13 @@ conf/application.env 至少提供：
 │   ├── console.env
 │   └── mysql.cnf
 └── state/
-    ├── state.json
+    ├── console-state.mv.db
+    ├── state.json.migrated  # 仅旧版本迁移后存在
     ├── releases/
     └── backups/
 ```
+
+控制台的已验证版本、操作状态和阶段事件保存在 `UPGRADE_STATE_DIR/console-state.mv.db`（本机嵌入式 H2），不依赖主程序的 MySQL。首次启动新版本会一次性导入旧 `state.json`，再将原文件改名为 `state.json.migrated`；后续状态只写入 H2。迁移前请在控制台停机后备份整个 `state/` 目录；恢复时也应先停控制台并恢复整个目录，不能仅复制旧 JSON 或删除 H2 文件。旧版控制台不能读取新数据库，不可直接回退到旧 JAR 后继续操作。
 
 配置模板见 [console.env.example](../../deploy/upgrade-console/console.env.example)、[mysql.cnf.example](../../deploy/upgrade-console/mysql.cnf.example)、[systemd 单元](../../deploy/systemd/interview-reader-upgrade.service.example)与 [Nginx 模板](../../deploy/nginx/interview-reader-upgrade.conf.example)。`UPGRADE_PUBLIC_ORIGIN` 必须与实际 HTTPS 站点 Origin 完全一致。`UPGRADE_DB_NAME` 是要备份和恢复的数据库名；控制台会校验主应用连接与备份凭据连接的 MySQL 库名和 server_uuid，任何不一致都会阻断发布；MySQL 凭据仅用于该库，需有导出、DROP/CREATE 和恢复所需权限。`UPGRADE_INTERNAL_TOKEN` 与主应用同值，建议由 `openssl rand -hex 32` 生成，不要记录在终端共享日志或仓库中。
 
@@ -151,4 +154,4 @@ sudo -u ireader test -w /opt/ireader
 
 按顺序完成一次隔离环境演练：核对健康面板与门禁、上传 Actions 产物、正常升级、故意失败后的自动回滚、控制台中断后的人工恢复，并从同批次备份恢复数据库与文件。现网数据库迁移应先在生产同构 MySQL 副本上验证。控制台会在发布前再次核对 Actions 运行及校验值，拒绝非 main 分支、失败运行、过期或不匹配产物。
 
-若页面显示 `NEEDS_OPERATOR`，不要删除 `/opt/ireader/tmp/upgrade.maintenance`，也不要手工启动不匹配的 JAR。查看 `state.json`、操作事件及控制台日志；有同批次备份时从页面明确确认恢复。成功发布后的人工恢复会先备份当前状态，但会丢失选定恢复点之后的写入，页面要求再次确认。控制台在发布中断后不会猜测成功状态或自动开放写入。文件恢复时被替换的现有数据目录会保留为同级 `data.failed-*`，应在恢复点验收且再次备份后再人工清理，避免占满磁盘。
+若页面显示 `NEEDS_OPERATOR`，不要删除 `/opt/ireader/tmp/upgrade.maintenance`，也不要手工启动不匹配的 JAR。查看页面操作事件和控制台日志，必要时停机后检查 `console-state.mv.db`；有同批次备份时从页面明确确认恢复。成功发布后的人工恢复会先备份当前状态，但会丢失选定恢复点之后的写入，页面要求再次确认。控制台在发布中断后不会猜测成功状态或自动开放写入。文件恢复时被替换的现有数据目录会保留为同级 `data.failed-*`，应在恢复点验收且再次备份后再人工清理，避免占满磁盘。

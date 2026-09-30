@@ -10,3 +10,4 @@ frontend/dist/
 frontend/.env.local
 application.env
 src/main/resources/release-commit.txt
+*.iml
