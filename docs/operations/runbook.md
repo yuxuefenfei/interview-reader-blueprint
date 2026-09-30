@@ -135,8 +135,11 @@ sudo chmod 0640 /opt/ireader-upgrade/conf/console.env
 sudo chown ireader:ireader /opt/ireader-upgrade/conf/mysql.cnf /opt/ireader-upgrade/state
 sudo chmod 0600 /opt/ireader-upgrade/conf/mysql.cnf
 sudo chmod 0700 /opt/ireader-upgrade/state
+sudo install -d -o ireader -g ireader -m 0700 /opt/ireader-upgrade/state/releases /opt/ireader-upgrade/state/backups
 sudo -u ireader test -r /opt/ireader-upgrade/conf/mysql.cnf
 sudo -u ireader test -w /opt/ireader-upgrade/state
+sudo -u ireader test -w /opt/ireader-upgrade/state/releases
+sudo -u ireader test -w /opt/ireader-upgrade/state/backups
 sudo -u ireader test -w /opt/ireader
 ```
 

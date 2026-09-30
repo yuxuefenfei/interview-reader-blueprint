@@ -2,24 +2,27 @@ package com.example.interviewreader.upgradeconsole;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class DeploymentCoordinator {
+
     private static final Logger LOG = LoggerFactory.getLogger(DeploymentCoordinator.class);
     private final UpgradeSettings settings;
     private final StateStore store;
@@ -27,14 +30,6 @@ public class DeploymentCoordinator {
     private final BackupManager backup;
     private final java.util.concurrent.ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean busy = new AtomicBoolean();
-
-    public DeploymentCoordinator(UpgradeSettings settings, StateStore store, MainHealthClient health,
-                                 BackupManager backup) {
-        this.settings = settings;
-        this.store = store;
-        this.health = health;
-        this.backup = backup;
-    }
 
     public StateStore.Operation deploy(String releaseId) throws IOException {
         if (!busy.compareAndSet(false, true)) throw new IllegalStateException("已有操作正在执行");

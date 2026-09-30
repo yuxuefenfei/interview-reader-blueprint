@@ -2,6 +2,8 @@ package com.example.interviewreader.upgradeconsole;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Component;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -16,7 +18,6 @@ import java.time.Duration;
 import java.util.HexFormat;
 import java.util.jar.JarFile;
 import java.util.zip.ZipInputStream;
-import org.springframework.stereotype.Component;
 
 @Component
 public class GithubArtifactVerifier {

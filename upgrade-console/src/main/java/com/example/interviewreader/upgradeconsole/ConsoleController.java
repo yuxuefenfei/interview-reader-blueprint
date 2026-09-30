@@ -1,23 +1,21 @@
 package com.example.interviewreader.upgradeconsole;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
+@RequiredArgsConstructor
 public class ConsoleController {
+
     public record Confirmation(String backupId, boolean confirmDataRestore) {}
 
     private final UpgradeSettings settings;
@@ -25,15 +23,6 @@ public class ConsoleController {
     private final MainHealthClient health;
     private final GithubArtifactVerifier verifier;
     private final DeploymentCoordinator deployments;
-
-    public ConsoleController(UpgradeSettings settings, StateStore store, MainHealthClient health,
-                             GithubArtifactVerifier verifier, DeploymentCoordinator deployments) {
-        this.settings = settings;
-        this.store = store;
-        this.health = health;
-        this.verifier = verifier;
-        this.deployments = deployments;
-    }
 
     @GetMapping("/api/overview")
     public Map<String, Object> overview() {

@@ -2,6 +2,9 @@ package com.example.interviewreader.upgradeconsole;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -10,9 +13,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class MainHealthClient {
     public record Snapshot(Instant checkedAt, JsonNode overall, JsonNode liveness, JsonNode readiness,
                            JsonNode drain, boolean eligible, List<String> blockers) {}
@@ -20,11 +23,6 @@ public class MainHealthClient {
     private final UpgradeSettings settings;
     private final ObjectMapper json;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-
-    public MainHealthClient(UpgradeSettings settings, ObjectMapper json) {
-        this.settings = settings;
-        this.json = json;
-    }
 
     public Snapshot snapshot() {
         var overall = get("/actuator/health", false);

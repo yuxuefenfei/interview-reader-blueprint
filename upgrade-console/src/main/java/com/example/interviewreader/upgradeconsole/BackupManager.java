@@ -1,14 +1,14 @@
 package com.example.interviewreader.upgradeconsole;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -16,19 +16,14 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class BackupManager {
+
     private final UpgradeSettings settings;
     private final StateStore store;
     private final ObjectMapper json;
-
-    public BackupManager(UpgradeSettings settings, StateStore store, ObjectMapper json) {
-        this.settings = settings;
-        this.store = store;
-        this.json = json;
-    }
 
     public void precheck() throws IOException {
         var data = settings.dataDir().toAbsolutePath().normalize();
@@ -148,12 +143,17 @@ public class BackupManager {
 
     private void copyTree(Path from, Path to) throws IOException {
         Files.walkFileTree(from, new SimpleFileVisitor<>() {
-            @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+            @Override
+            @NonNull
+            public FileVisitResult preVisitDirectory(@NonNull Path dir, @NonNull BasicFileAttributes attrs) throws IOException {
                 if (Files.isSymbolicLink(dir)) throw new IOException("数据目录包含符号链接");
                 Files.createDirectories(to.resolve(from.relativize(dir)));
                 return FileVisitResult.CONTINUE;
             }
-            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+
+            @NonNull
+            @Override
+            public FileVisitResult visitFile(@NonNull Path file, @NonNull BasicFileAttributes attrs) throws IOException {
                 if (!attrs.isRegularFile() || Files.isSymbolicLink(file)) throw new IOException("数据目录包含非普通文件");
                 Files.copy(file, to.resolve(from.relativize(file)));
                 return FileVisitResult.CONTINUE;
