@@ -203,6 +203,8 @@ select:focus-visible {
 .admin-sidebar nav a:hover, .admin-sidebar-foot button:hover {
   background: var(--admin-sidebar-hover); color: var(--admin-sidebar-text-strong);
 }
+.admin-sidebar nav a[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.admin-sidebar nav a[aria-disabled="true"]:hover { background: transparent; color: var(--admin-sidebar-text); }
 .admin-sidebar nav a.router-link-active {
   background: color-mix(in srgb, var(--admin-sidebar-active), transparent 68%);
   color: var(--admin-sidebar-text-strong); box-shadow: none;

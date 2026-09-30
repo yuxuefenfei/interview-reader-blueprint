@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, Document, Upload, Reading, SwitchButton, Setting } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, Document, FolderAdd, RefreshRight, SwitchButton } from "@element-plus/icons-vue";
 import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ADMIN_BRAND_ICON_URL } from "../shared/branding";
@@ -37,21 +37,16 @@ watch(collapsed, (value) => localStorage.setItem("admin.sidebar.collapsed", Stri
         </el-tooltip>
         <el-tooltip content="导入中心" placement="right" :disabled="!collapsed">
           <router-link to="/admin/imports" aria-label="导入中心" active-class="router-link-active" exact-active-class="router-link-active">
-            <el-icon><Upload /></el-icon><span>导入中心</span>
+            <el-icon><FolderAdd /></el-icon><span>导入中心</span>
           </router-link>
         </el-tooltip>
-        <el-tooltip :content="upgradeConsoleUrl ? '在独立控制台打开系统升级' : '升级控制台地址未配置'" placement="right" :disabled="!collapsed">
-          <a :href="upgradeConsoleUrl || undefined" target="_blank" rel="noopener noreferrer" aria-label="系统升级" :aria-disabled="!upgradeConsoleUrl" title="系统升级">
-            <el-icon><Setting /></el-icon><span>系统升级</span>
+        <el-tooltip :content="upgradeConsoleUrl ? '在独立控制台打开系统升级' : '升级控制台地址未配置或无效'" placement="right" :disabled="!collapsed">
+          <a :href="upgradeConsoleUrl || undefined" target="_blank" rel="noopener noreferrer" aria-label="系统升级" :aria-disabled="!upgradeConsoleUrl" :title="upgradeConsoleUrl ? '在新窗口打开升级控制台' : '升级控制台地址未配置或无效'">
+            <el-icon><RefreshRight /></el-icon><span>系统升级</span>
           </a>
         </el-tooltip>
       </nav>
       <div class="admin-sidebar-foot">
-        <el-tooltip content="返回阅读器" placement="right" :disabled="!collapsed">
-          <button type="button" title="返回阅读器" @click="router.push('/reader')">
-            <el-icon><Reading /></el-icon><span>返回阅读器</span>
-          </button>
-        </el-tooltip>
         <el-tooltip content="退出登录" placement="right" :disabled="!collapsed">
           <button type="button" title="退出登录" @click="emit('logout')">
             <el-icon><SwitchButton /></el-icon><span>退出登录</span>

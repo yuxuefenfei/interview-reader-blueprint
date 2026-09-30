@@ -104,7 +104,7 @@ conf/application.env 至少提供：
 
 ## 8. 升级控制台部署与唯一入口
 
-升级服务是仓库中独立的 `upgrade-console/` Maven 项目，使用 Java 21 构建为独立 JAR，监听 `127.0.0.1:28081`。它不依赖主应用 JAR 或主数据库来展示历史和进度。主后台菜单中的“系统升级”通过 Actions 仓库变量 `UPGRADE_CONSOLE_URL` 构建为独立 HTTPS 站点链接；未配置该变量时菜单显示但不可进入。服务端以独立管理员凭据认证，并用 Origin 校验写接口。升级站点应仅允许 VPN 或指定内网访问。
+升级服务是仓库中独立的 `upgrade-console/` Maven 项目，使用 Java 21 构建为独立 JAR，监听 `127.0.0.1:28081`。它不依赖主应用 JAR 或主数据库来展示历史和进度。主后台菜单中的“系统升级”仅使用 Actions 仓库变量 `UPGRADE_CONSOLE_URL` 构建为独立 HTTPS 站点链接；未配置或地址无效时，main 的 verify 构建失败，避免发布无效入口。服务端以独立管理员凭据认证，并用 Origin 校验写接口。升级站点应仅允许 VPN 或指定内网访问。
 
 目录示例：
 
