@@ -145,6 +145,10 @@ sudo -u ireader test -w /opt/ireader
 
 最后一项必须通过：控制台需在 `/opt/ireader` 中原子替换固定 JAR。若目录当前不可写，可给 `ireader` 用户加精确 ACL（例如 `sudo setfacl -m u:ireader:rwx /opt/ireader`），避免更改整棵目录的属主。控制台与主 JVM 当前同为 `ireader` 用户，故应同时限制主站网络入口、升级站点与主机登录权限；后续若需更强的主机级隔离，应把文件切换和备份动作迁入受限的专用执行器。
 
-安装 [systemd 单元](../../deploy/systemd/interview-reader-upgrade.service.example)后以 `sudo systemctl enable --now interview-reader-upgrade` 启动独立服务，并通过 `sudo systemctl status interview-reader-upgrade` 检查；Nginx 配置通过 `sudo nginx -t` 后再重载。按顺序完成一次隔离环境演练：核对健康面板与门禁、上传 Actions 产物、正常升级、故意失败后的自动回滚、控制台中断后的人工恢复，并从同批次备份恢复数据库与文件。现网数据库迁移应先在生产同构 MySQL 副本上验证。控制台会在发布前再次核对 Actions 运行及校验值，拒绝非 main 分支、失败运行、过期或不匹配产物。
+安装 [systemd 单元](../../deploy/systemd/interview-reader-upgrade.service.example)后以 `sudo systemctl enable --now interview-reader-upgrade` 启动独立服务，并通过 `sudo systemctl status interview-reader-upgrade` 检查；Nginx 配置通过 `sudo nginx -t` 后再重载。
+
+控制台单元必须包含 `KillMode=process`。主程序由控制台调用 `daemon.sh start` 启动时，`nohup` 不会使它离开控制台的 systemd cgroup；默认的 `KillMode=control-group` 会在重启控制台时一并向主程序发送 SIGTERM。更新现网单元后执行 `sudo systemctl daemon-reload`，并用 `systemctl show -p KillMode interview-reader-upgrade.service`（若现网单元名不同，请使用实际名称）确认生效。重启控制台前，先确认页面没有 `RUNNING` 操作；`KillMode=process` 也会让正在运行的备份等子进程继续存活，因此不能在升级或恢复进行中重启控制台。长期应把主程序交给独立的 systemd 单元管理。
+
+按顺序完成一次隔离环境演练：核对健康面板与门禁、上传 Actions 产物、正常升级、故意失败后的自动回滚、控制台中断后的人工恢复，并从同批次备份恢复数据库与文件。现网数据库迁移应先在生产同构 MySQL 副本上验证。控制台会在发布前再次核对 Actions 运行及校验值，拒绝非 main 分支、失败运行、过期或不匹配产物。
 
 若页面显示 `NEEDS_OPERATOR`，不要删除 `/opt/ireader/tmp/upgrade.maintenance`，也不要手工启动不匹配的 JAR。查看 `state.json`、操作事件及控制台日志；有同批次备份时从页面明确确认恢复。成功发布后的人工恢复会先备份当前状态，但会丢失选定恢复点之后的写入，页面要求再次确认。控制台在发布中断后不会猜测成功状态或自动开放写入。文件恢复时被替换的现有数据目录会保留为同级 `data.failed-*`，应在恢复点验收且再次备份后再人工清理，避免占满磁盘。
