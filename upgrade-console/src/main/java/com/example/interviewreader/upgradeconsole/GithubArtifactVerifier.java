@@ -45,16 +45,7 @@ public class GithubArtifactVerifier {
         if (size < 100_000 || size > 150_000_000) throw new IllegalArgumentException("JAR 大小不符合要求");
         checkExecutableJar(jar);
         var run = apiJson(apiRoot + "/runs/" + runId);
-        if (!"success".equals(run.path("conclusion").asText())
-                || !"completed".equals(run.path("status").asText())
-                || !"push".equals(run.path("event").asText())
-                || !"main".equals(run.path("head_branch").asText())
-                || !"verify".equals(run.path("name").asText())
-                || !run.path("path").asText().startsWith(".github/workflows/verify.yml@")
-                || !(settings.githubOwner() + "/" + settings.githubRepo()).equals(
-                        run.path("head_repository").path("full_name").asText())) {
-            throw new IllegalArgumentException("只接受 main 分支成功完成的 verify 构建");
-        }
+        requireTrustedMainRun(run, settings.githubOwner() + "/" + settings.githubRepo());
         var commit = run.path("head_sha").asText();
         if (!commit.matches("[a-f0-9]{40}")) throw new IllegalArgumentException("构建提交信息缺失");
         var artifacts = apiJson(apiRoot + "/runs/" + runId + "/artifacts?per_page=100").path("artifacts");
@@ -75,6 +66,18 @@ public class GithubArtifactVerifier {
             throw new IllegalArgumentException("上传 JAR 与 GitHub Actions 校验值不一致");
         }
         return new Verified(commit, actual, size);
+    }
+
+    static void requireTrustedMainRun(JsonNode run, String repository) {
+        if (!"success".equals(run.path("conclusion").asText())
+                || !"completed".equals(run.path("status").asText())
+                || !"push".equals(run.path("event").asText())
+                || !"main".equals(run.path("head_branch").asText())
+                || !"verify".equals(run.path("name").asText())
+                || !".github/workflows/verify.yml".equals(run.path("path").asText())
+                || !repository.equals(run.path("head_repository").path("full_name").asText())) {
+            throw new IllegalArgumentException("只接受 main 分支成功完成的 verify 构建");
+        }
     }
 
     private void checkExecutableJar(Path jar) throws IOException {
