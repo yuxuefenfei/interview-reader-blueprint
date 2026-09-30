@@ -38,6 +38,13 @@ public class BackupManager {
                 || Files.isSymbolicLink(settings.appDir()) || Files.isSymbolicLink(settings.dbDefaultsFile())) {
             throw new IOException("升级路径不能是符号链接");
         }
+        var backups = state.resolve("backups");
+        if (!Files.isDirectory(backups) || Files.isSymbolicLink(backups)) throw new IOException("备份目录不可用");
+        try {
+            Files.delete(Files.createTempFile(backups, "precheck-", ".tmp"));
+        } catch (IOException exception) {
+            throw new IOException("备份目录不可写：" + backups, exception);
+        }
         var bytes = size(settings.dataDir());
         var free = Files.getFileStore(settings.stateDir()).getUsableSpace();
         if (free < bytes + 2_000_000_000L) throw new IOException("备份目标空间不足");
