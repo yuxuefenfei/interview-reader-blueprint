@@ -1,0 +1,31 @@
+package cn.wangwenzhu.ireader.document;
+
+import cn.wangwenzhu.ireader.document.DocumentDtos.DocumentSummary;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/reader/documents")
+@RequiredArgsConstructor
+public class DocumentController {
+    private final DocumentQueryService service;
+
+
+    @GetMapping
+    public DocumentDtos.DocumentPage list(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return service.listDocuments(query, cursor, limit);
+    }
+
+    @GetMapping("/{documentId}")
+    public DocumentSummary get(@PathVariable UUID documentId) {
+        return service.getDocument(documentId);
+    }
+
+
+}

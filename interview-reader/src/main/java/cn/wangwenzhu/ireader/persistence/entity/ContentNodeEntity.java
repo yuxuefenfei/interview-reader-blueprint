@@ -1,0 +1,39 @@
+package cn.wangwenzhu.ireader.persistence.entity;
+
+import cn.wangwenzhu.ireader.document.NodeType;
+import cn.wangwenzhu.ireader.document.SemanticRole;
+import com.mybatisflex.annotation.Column;
+import com.mybatisflex.annotation.Id;
+import com.mybatisflex.annotation.KeyType;
+import com.mybatisflex.annotation.Table;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.OffsetDateTime;
+
+/** 文档目录节点持久化实体。 */
+@Getter
+@Setter
+@Table("content_node")
+public class ContentNodeEntity {
+    @Id(keyType = KeyType.None)
+    private String id;
+    private String versionId;
+    private String parentId;
+    private String nodeKey;
+    private NodeType nodeType;
+    private SemanticRole semanticRole;
+    private String title;
+    private int level;
+    private String path;
+    private int sortOrder;
+    private String anchor;
+    private Integer sourcePageStart;
+    private Integer sourcePageEnd;
+    @Column(isLarge = true)
+    private String sourceBbox;
+    private String contentHash;
+    @Column(isLarge = true)
+    private String searchText;
+    private OffsetDateTime createdAt;
+}

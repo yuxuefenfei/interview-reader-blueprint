@@ -1,0 +1,38 @@
+package cn.wangwenzhu.ireader.persistence.entity;
+
+import cn.wangwenzhu.ireader.document.DocumentVersionStatus;
+import cn.wangwenzhu.ireader.document.SourceType;
+import com.mybatisflex.annotation.Column;
+import com.mybatisflex.annotation.Id;
+import com.mybatisflex.annotation.KeyType;
+import com.mybatisflex.annotation.Table;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.OffsetDateTime;
+
+/** 文档版本持久化实体。 */
+@Getter
+@Setter
+@Table("document_version")
+public class DocumentVersionEntity {
+    @Id(keyType = KeyType.None)
+    private String id;
+    private String documentId;
+    private int versionNo;
+    private String parentVersionId;
+    private Integer parentVersionNo;
+    private String originImportJobId;
+    private long draftRevision;
+    private SourceType sourceType;
+    private String sourceFileName;
+    private String sourceFileSha256;
+    private String converterVersion;
+    private String schemaVersion;
+    private DocumentVersionStatus status;
+    private String language;
+    @Column(isLarge = true)
+    private String metadata;
+    private OffsetDateTime publishedAt;
+    private OffsetDateTime createdAt;
+}

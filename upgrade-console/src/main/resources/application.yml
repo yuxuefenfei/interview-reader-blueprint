@@ -5,7 +5,7 @@ server:
   max-http-request-header-size: 16KB
 spring:
   application:
-    name: interview-reader-upgrade-console
+    name: upgrade-console
   servlet:
     multipart:
       max-file-size: 150MB

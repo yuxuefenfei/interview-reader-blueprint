@@ -1,0 +1,26 @@
+import {http} from "./http";
+import type {
+    AuthSession,
+    DeletedDocumentTombstone,
+    DocumentListResponse,
+    DocumentSummary,
+    NodeContent,
+    ReadingProgress,
+    SearchHit,
+    TocNode
+} from "../types/api";
+
+export const readerApi = {
+  session: () => http.get<AuthSession>("/auth/session").then(({ data }) => data),
+  login: (username: string, password: string) => http.post<AuthSession>("/auth/login", { username, password }).then(({ data }) => data),
+  logout: () => http.post<AuthSession>("/auth/logout").then(({ data }) => data),
+  deletedDocuments: () => http.get<DeletedDocumentTombstone[]>("/reader/document-deletions").then(({ data }) => data),
+  documents: (query = "", cursor: string | null = null, limit = 16, signal?: AbortSignal) => http.get<DocumentListResponse>("/reader/documents", { params: { query: query || undefined, cursor: cursor || undefined, limit }, signal }).then(({ data }) => data),
+  document: (documentId: string) => http.get<DocumentSummary>(`/reader/documents/${documentId}`).then(({ data }) => data),
+  toc: (versionId: string) => http.get<TocNode[]>(`/reader/versions/${versionId}/toc`).then(({ data }) => data),
+  content: (versionId: string, nodeId: string, afterSeq?: number, signal?: AbortSignal) => http.get<NodeContent>(`/reader/versions/${versionId}/nodes/${nodeId}/content`, { params: { afterSeq, limit: 100 }, signal }).then(({ data }) => data),
+  search: (q: string, documentId?: string, signal?: AbortSignal) => http.get<SearchHit[]>("/reader/search", { params: { q, documentId, limit: 12 }, signal }).then(({ data }) => data),
+  latestReadDocument: () => http.get<DocumentSummary>("/reader/reading-progress/latest-document").then(({ status, data }) => status === 204 ? null : data),
+  progress: (documentId: string) => http.get<ReadingProgress>(`/reader/reading-progress/${documentId}`).then(({ status, data }) => status === 204 ? null : data),
+  saveProgress: (documentId: string, progress: ReadingProgress) => http.put<ReadingProgress>(`/reader/reading-progress/${documentId}`, progress).then(({ data }) => data)
+};

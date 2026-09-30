@@ -26,6 +26,16 @@ server {
     deny all;
 
     location /actuator/ { return 404; }
+    # SSE needs an unbuffered, long-lived response for live upgrade logs.
+    location = /api/feed/stream {
+        proxy_pass http://interview_reader_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+    }
     location / {
         proxy_pass http://interview_reader_upgrade;
         proxy_set_header Host $host;

@@ -121,7 +121,12 @@ conf/application.env 至少提供：
     └── backups/
 ```
 
-控制台的已验证版本、操作状态和阶段事件保存在 `UPGRADE_STATE_DIR/console-state.mv.db`（本机嵌入式 H2），不依赖主程序的 MySQL。首次启动新版本会一次性导入旧 `state.json`，再将原文件改名为 `state.json.migrated`；后续状态只写入 H2。迁移前请在控制台停机后备份整个 `state/` 目录；恢复时也应先停控制台并恢复整个目录，不能仅复制旧 JSON 或删除 H2 文件。旧版控制台不能读取新数据库，不可直接回退到旧 JAR 后继续操作。
+控制台的已验证版本、操作状态、阶段事件与本次 `daemon.sh` 启停命令日志保存在 `UPGRADE_STATE_DIR/console-state.mv.db`（本机嵌入式
+H2），不依赖主程序的 MySQL。首次启动新版本会一次性导入旧 `state.json`，再将原文件改名为 `state.json.migrated`；后续状态只写入
+H2。迁移前请在控制台停机后备份整个 `state/` 目录；恢复时也应先停控制台并恢复整个目录，不能仅复制旧 JSON 或删除 H2
+文件。旧版控制台不能读取新数据库，不可直接回退到旧 JAR 后继续操作。新界面通过 `/api/feed/stream` 接收 SSE，断线时以 H2
+游标续传，历史记录经 `/api/operations/{id}/feed` 分页读取。更新 Nginx 配置时须保留该路径的 `proxy_buffering off`
+和长连接超时；主程序原始运行日志不进入此流。
 
 配置模板见 [console.env.example](../../deploy/upgrade-console/console.env.example)、[mysql.cnf.example](../../deploy/upgrade-console/mysql.cnf.example)、[systemd 单元](../../deploy/systemd/interview-reader-upgrade.service.example)与 [Nginx 模板](../../deploy/nginx/interview-reader-upgrade.conf.example)。`UPGRADE_PUBLIC_ORIGIN` 必须与实际 HTTPS 站点 Origin 完全一致。`UPGRADE_DB_NAME` 是要备份和恢复的数据库名；控制台会校验主应用连接与备份凭据连接的 MySQL 库名和 server_uuid，任何不一致都会阻断发布；MySQL 凭据仅用于该库，需有导出、DROP/CREATE 和恢复所需权限。`UPGRADE_INTERNAL_TOKEN` 与主应用同值，建议由 `openssl rand -hex 32` 生成，不要记录在终端共享日志或仓库中。
 

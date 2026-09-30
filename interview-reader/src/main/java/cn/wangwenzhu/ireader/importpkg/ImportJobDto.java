@@ -1,0 +1,18 @@
+package cn.wangwenzhu.ireader.importpkg;
+
+import cn.wangwenzhu.ireader.document.SourceType;
+import java.util.Map;
+import java.util.UUID;
+
+public record ImportJobDto(
+        UUID id,
+        UUID targetDocumentId,
+        SourceType sourceType,
+        ImportJobStatus status,
+        ImportStage currentStage,
+        int progress,
+        Map<String, Object> statistics,
+        String errorCode,
+        String errorMessage
+) {
+}

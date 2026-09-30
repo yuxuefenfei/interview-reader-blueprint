@@ -22,7 +22,7 @@ $env:Path="$env:JAVA_HOME/bin;$env:Path"
 
 ```powershell
 .\mvnw.cmd test
-.\mvnw.cmd -Dspring-boot.run.profiles=dev spring-boot:run
+.\mvnw.cmd -pl interview-reader -Dspring-boot.run.profiles=dev spring-boot:run
 ```
 
 启动后访问：
@@ -37,7 +37,7 @@ H2 数据文件默认写入 `./data/interview-reader`。
 前端开发模式：
 
 ```powershell
-cd frontend
+cd interview-reader/frontend
 npm ci
 npm run dev
 ```
@@ -52,10 +52,12 @@ Vite 会把 `/api` 代理到 `http://localhost:28080`。
 $env:JAVA_HOME='C:/Program Files/Java/jdk-21'
 $env:Path="$env:JAVA_HOME/bin;$env:Path"
 .\mvnw.cmd clean package
-java -jar target/interview-reader-1.0.3.jar --spring.profiles.active=dev
+java -jar interview-reader/target/interview-reader-1.0.4.jar --spring.profiles.active=dev
 ```
 
-`mvn package` 会先执行干净的前端依赖安装与生产构建，并把 Vue 产物打进主 JAR。`target/interview-reader-1.0.3.jar` 是可直接运行的 Spring Boot JAR；同目录的 `.jar.original` 是 Maven 保留的非独立运行薄包。
+`mvn package` 会先执行干净的前端依赖安装与生产构建，并把 Vue 产物打进主 JAR。
+`interview-reader/target/interview-reader-1.0.4.jar` 是可直接运行的 Spring Boot JAR；同目录的 `.jar.original` 是 Maven
+保留的非独立运行薄包。
 
 前端生产构建会包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器支持 Service Worker 时会缓存应用壳；已成功打开的章节正文会写入 IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。右侧复习面板提供“清理离线内容”，只清除正文缓存，不删除未同步进度队列。
 
@@ -71,12 +73,19 @@ PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度�
 
 ## 独立系统升级控制台
 
-`upgrade-console/` 单独构建、运行和保存状态；主 JAR 停机时仍可查看健康检查结果与升级进度。主后台菜单仅使用 Actions 仓库变量 `UPGRADE_CONSOLE_URL` 注入的 HTTPS 地址；未配置时升级入口不可打开。控制台核对 GitHub Actions 正式 JAR，按停写、排空、备份、进程停止、切换和就绪检查的顺序执行升级，验证失败时恢复同批次数据库、文件和旧 JAR。
+父项目 `interview-reader-blueprint` 统一管理 `interview-reader/` 与 `upgrade-console/` 两个 Maven 子项目及版本。两套 Vue
+前端分别位于子项目的 `frontend/`，构建后分别打入自己的 JAR。`upgrade-console/` 独立运行并保存状态；主 JAR
+停机时仍可查看健康检查结果与升级进度。主后台菜单仅使用 Actions 仓库变量 `UPGRADE_CONSOLE_URL` 注入的 HTTPS
+地址；未配置时升级入口不可打开。控制台核对 GitHub Actions 正式 JAR，按停写、排空、备份、进程停止、切换和就绪检查的顺序执行升级，验证失败时恢复同批次数据库、文件和旧
+JAR。
 
 ```powershell
-.\mvnw.cmd -f upgrade-console/pom.xml test
-.\mvnw.cmd -f upgrade-console/pom.xml package
+.\mvnw.cmd -pl upgrade-console test
+.\mvnw.cmd -pl upgrade-console package
 ```
+
+控制台操作记录与启停命令输出持久化到 `UPGRADE_STATE_DIR/console-state.mv.db`，页面使用 SSE 实时接收阶段与本次命令日志；
+`state.json` 仅用于旧数据的一次性迁移。`upgrade-console/frontend/` 可独立运行 `npm ci`、`npm run dev`，开发代理指向 28081。
 
 生产接入需要先安装新的主应用门禁和脚本、配置独立控制台的凭据与目录，并在隔离环境演练；仓库代码完成不表示现网已启用。配置与权限见[生产运行手册](docs/operations/runbook.md)，状态机和接口见[系统升级控制台](docs/architecture/system-upgrade.md)。
 ## 生产 MySQL Profile
@@ -87,7 +96,7 @@ PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度�
 $env:DATABASE_URL='jdbc:mysql://localhost:3306/interview_reader?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC'
 $env:DATABASE_USERNAME='interview_reader'
 $env:DATABASE_PASSWORD='<从秘密管理系统注入的强密码>'
-java -jar target/interview-reader-1.0.3.jar --spring.profiles.active=prod
+java -jar interview-reader/target/interview-reader-1.0.4.jar --spring.profiles.active=prod
 ```
 
 ## 登录配置
@@ -107,11 +116,13 @@ $env:INTERVIEW_READER_ALLOWED_ORIGINS='https://docs.wangwenzhu.cn'
 
 ## 配置与契约校验
 
-- 复制 `frontend/.env.example` 为 `frontend/.env.local` 后可覆盖本机 Vite 代理地址；`.env.local` 不提交版本库。
+- 复制 `interview-reader/frontend/.env.example` 为 `interview-reader/frontend/.env.local` 后可覆盖本机 Vite 代理地址；
+  `.env.local` 不提交版本库。
 - Spring 与 Nginx 示例的上传上限统一为 10 MiB；端口、上传值和前端代理默认值由契约脚本交叉校验。
-- `frontend/src/shared/runtimeConfig.ts` 统一维护前端开发端口与代理默认值，`runtimePolicy.ts` 统一维护轮询和离线缓存策略；`frontend/src/offline/database.ts` 统一维护 IndexedDB 名称、版本和 store。
+- `interview-reader/frontend/src/shared/runtimeConfig.ts` 统一维护前端开发端口与代理默认值，`runtimePolicy.ts`
+  统一维护轮询和离线缓存策略；`interview-reader/frontend/src/offline/database.ts` 统一维护 IndexedDB 名称、版本和 store。
 - `npm run contract:check` 会比较 OpenAPI、Java Controller、前后端枚举、TypeScript 响应字段、响应式断点和上传限制；前端生产构建与 CI 都会自动运行该检查。
-- `pom.xml` 会拒绝非 JDK 21 或低于 Maven 3.9 的构建环境，并通过 `npm ci` 使用锁文件安装前端依赖。
+- 父项目 `pom.xml` 会拒绝非 JDK 21 或低于 Maven 3.9 的构建环境，并通过 `npm ci` 使用锁文件安装前端依赖。
 - 生产部署、健康检查、指标、备份恢复与 Flyway 回滚流程见 [生产运行手册](docs/operations/runbook.md)。
 ## 已实现 API
 

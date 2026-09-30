@@ -19,22 +19,29 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install frontend dependencies
-        working-directory: frontend
+          cache-dependency-path: |
+            interview-reader/frontend/package-lock.json
+            upgrade-console/frontend/package-lock.json
+      - name: Install main frontend dependencies
+        working-directory: interview-reader/frontend
+        run: npm ci
+      - name: Install console frontend dependencies
+        working-directory: upgrade-console/frontend
         run: npm ci
       - name: Verify API contract
-        working-directory: frontend
+        working-directory: interview-reader/frontend
         run: |
           npm run api:generate
           git diff --exit-code -- src/generated/api
           npm run contract:check
-      - name: Lint frontend
-        working-directory: frontend
-        run: npm run lint
-      - name: Test frontend
-        working-directory: frontend
-        run: npm test
+      - name: Lint frontends
+        run: |
+          npm --prefix interview-reader/frontend run lint
+          npm --prefix upgrade-console/frontend run lint
+      - name: Test frontends
+        run: |
+          npm --prefix interview-reader/frontend test
+          npm --prefix upgrade-console/frontend test
       - name: Validate production upgrade URL
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
@@ -45,36 +52,39 @@ jobs:
             exit 1
           fi
           node -e 'const url = new URL(process.env.UPGRADE_CONSOLE_URL); if (url.protocol !== "https:" || url.username || url.password) { console.error("UPGRADE_CONSOLE_URL must be a credential-free HTTPS URL"); process.exit(1); }'
-      - name: Build frontend
+      - name: Build main frontend
         env:
           VITE_UPGRADE_CONSOLE_URL: ${{ vars.UPGRADE_CONSOLE_URL }}
-        working-directory: frontend
+        working-directory: interview-reader/frontend
         run: npm run build
-      - name: Test backend
+      - name: Build console frontend
+        working-directory: upgrade-console/frontend
+        run: npm run build
+      - name: Test backends
         run: ./mvnw --batch-mode -DskipFrontend=true test
       - name: Stamp production revision
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: printf '%s\n' "$GITHUB_SHA" > src/main/resources/release-commit.txt
-      - name: Package application
+        run: printf '%s\n' "$GITHUB_SHA" > interview-reader/src/main/resources/release-commit.txt
+      - name: Package applications
         run: ./mvnw --batch-mode -DskipFrontend=true -DskipTests package
-      - name: Verify packaged Vue entry
-        run: unzip -p target/interview-reader-*.jar BOOT-INF/classes/static/index.html | grep 'src="/assets/index-'
-      - name: Test and package upgrade console
-        run: ./mvnw --batch-mode -f upgrade-console/pom.xml package
+      - name: Verify packaged Vue entries
+        run: |
+          unzip -p interview-reader/target/interview-reader-*.jar BOOT-INF/classes/static/index.html | grep 'src="/assets/index-'
+          unzip -p upgrade-console/target/interview-reader-upgrade-console-*.jar BOOT-INF/classes/static/index.html | grep 'src="/assets/index-'
       - name: Prepare production artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          jars=(target/interview-reader-*.jar)
+          jars=(interview-reader/target/interview-reader-*.jar)
           test "${#jars[@]}" -eq 1
-          cp "${jars[0]}" target/interview-reader.jar
-          cd target
+          cp "${jars[0]}" interview-reader/target/interview-reader.jar
+          cd interview-reader/target
           sha256sum interview-reader.jar > production-jar.sha256
       - name: Publish production JAR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: production-jar
-          path: target/interview-reader.jar
+          path: interview-reader/target/interview-reader.jar
           if-no-files-found: error
           retention-days: 90
       - name: Publish production checksum
@@ -82,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: production-jar-sha256
-          path: target/production-jar.sha256
+          path: interview-reader/target/production-jar.sha256
           if-no-files-found: error
           retention-days: 90
       - name: Publish upgrade console JAR

@@ -4,7 +4,10 @@
 
 ## 1. 目标与目录
 
-升级控制台位于仓库 `upgrade-console/`，单独构建为 JAR，独立监听本机端口并拥有自己的静态页面与本地 H2 状态数据库。主后台菜单仅使用 Actions 仓库变量 `UPGRADE_CONSOLE_URL` 在构建时注入的 HTTPS 地址；未配置时升级入口不可打开。主 JAR 停止、Flyway 失败或数据库不可用时，控制台仍能显示已持久化的发布状态、备份 ID 和操作事件。
+升级控制台位于仓库 `upgrade-console/`，作为 `interview-reader-blueprint` 的 Maven 子项目构建为独立 JAR，独立监听本机端口；Vue
+界面位于 `upgrade-console/frontend/`，本地 H2 保存状态和日志。主后台菜单仅使用 Actions 仓库变量 `UPGRADE_CONSOLE_URL`
+在构建时注入的 HTTPS 地址；未配置时升级入口不可打开。主 JAR 停止、Flyway 失败或数据库不可用时，控制台仍能显示已持久化的发布状态、备份
+ID 和操作事件。
 
 | 路径 | 用途 |
 |---|---|
@@ -27,7 +30,7 @@
 
 ## 3. 健康面板与升级门禁
 
-控制台每三秒请求主应用的总体健康、存活、就绪和内部排空状态，页面展示：
+控制台按 15 秒间隔请求主应用的总体健康、存活、就绪和内部排空状态；升级阶段与命令日志经 SSE 即时推送，页面展示：
 
 - 存活、就绪、数据库和磁盘空间是否为 `UP`；
 - 正在执行的写请求，以及待排空的导入、删除任务；
@@ -40,7 +43,8 @@
 
 ## 4. 唯一发布入口与顺序
 
-单机一次只允许一个升级或恢复操作；独立状态目录持有进程锁，H2 事务持久化已验证版本、操作状态和阶段事件；首次启动自动导入旧 `state.json` 并保留 `state.json.migrated`。正常发布按固定顺序执行：
+单机一次只允许一个升级或恢复操作；独立状态目录持有进程锁，H2 事务持久化已验证版本、操作状态、阶段事件及本次 `daemon.sh`
+的标准输出和错误输出；首次启动自动导入旧 `state.json` 并保留 `state.json.migrated`。正常发布按固定顺序执行：
 
 1. **预检**：复核 Actions 产物、主应用健康、目录、数据库客户端、主应用与备份连接的 MySQL 实例身份和备份目标空间。
 2. **停写**：原子写入维护标记；主系统拒绝新写入。
@@ -63,14 +67,22 @@
 
 ## 6. 页面与接口
 
-| 方法与路径 | 用途 |
-|---|---|
-| `GET /api/overview` | 健康状态、升级依据、已验证产物及持久操作历史。 |
-| `POST /api/releases` | 上传 JAR 与 Actions 运行 ID，校验并暂存。 |
-| `POST /api/releases/{id}/deployments` | 重新核验并发起单次发布。 |
-| `GET /api/operations/{id}` | 查询阶段、状态、备份 ID 与事件。 |
-| `POST /api/operations/{id}/recover` | 中断操作的同批次备份恢复，需明确确认。 |
-| `POST /api/operations/{id}/abort` | 备份完成前中断时，核验旧版并恢复写入。 |
-| `POST /api/recoveries` | 成功发布后的人工恢复，需明确确认数据覆盖。 |
+| 方法与路径                                                 | 用途                                               |
+|------------------------------------------------------------|----------------------------------------------------|
+| `GET /api/overview`                                        | 兼容旧客户端的完整概览。                           |
+| `GET /api/dashboard`                                       | 首页健康摘要、最近操作与日志游标。                 |
+| `GET /api/releases`、`GET /api/releases/{id}`              | 搜索、分页查看已验证升级包与详情。                 |
+| `GET /api/releases/{id}/operations`、`GET /api/operations` | 分页查看升级包或全部操作记录。                     |
+| `GET /api/operations/{id}/feed`                            | 从 H2 分页读取阶段与启停命令日志，支持断线后查看。 |
+| `GET /api/feed/stream`                                     | SSE 推送新增记录，支持 `Last-Event-ID` 游标续传。  |
+| `POST /api/releases`                                       | 上传 JAR 与 Actions 运行 ID，校验并暂存。          |
+| `POST /api/releases/{id}/deployments`                      | 重新核验并发起单次发布。                           |
+| `GET /api/operations/{id}`                                 | 查询阶段、状态、备份 ID 与事件。                   |
+| `POST /api/operations/{id}/recover`                        | 中断操作的同批次备份恢复，需明确确认。             |
+| `POST /api/operations/{id}/abort`                          | 备份完成前中断时，核验旧版并恢复写入。             |
+| `POST /api/recoveries`                                     | 成功发布后的人工恢复，需明确确认数据覆盖。         |
+
+控制台首页紧凑展示健康依据、运行指标及最近操作的真实阶段和日志。上传升级包、升级包列表、操作记录分别在独立页面；列表与操作详情使用同一持久日志源。SSE
+只包含控制台阶段事件及本次启停命令输出，不读取主程序原始运行日志。Nginx 的 `/api/feed/stream` 代理需关闭缓冲并允许长连接。
 
 详细安装、配置权限和演练步骤见[生产运行手册](../operations/runbook.md)。
