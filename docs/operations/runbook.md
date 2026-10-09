@@ -211,3 +211,18 @@ MySQL 副本上验证。控制台会在发布前再次核对 Actions 运行及�
 JAR。查看页面操作事件和控制台日志，必要时停机后检查 `console-state.mv.db`
 ；有同批次备份时从页面明确确认恢复。成功发布后的人工恢复会先备份当前状态，但会丢失选定恢复点之后的写入，页面要求再次确认。控制台在发布中断后不会猜测成功状态或自动开放写入。文件恢复时被替换的现有数据目录会保留为同级
 `data.failed-*`，应在恢复点验收且再次备份后再人工清理，避免占满磁盘。
+
+### 升级控制台访问失败与实时日志断连
+
+先检查实际服务名对应的进程状态（下例使用现网常见名称 `ireader-upgrade.service`）：
+
+```bash
+systemctl status ireader-upgrade.service --no-pager -l
+systemctl show ireader-upgrade.service -p ActiveState -p SubState -p MainPID -p NRestarts -p Result
+curl --fail --show-error http://127.0.0.1:28081/actuator/health
+```
+
+- Nginx 日志出现 `access forbidden by rule` 表示请求被访问规则拒绝。核对该域名匹配的 `server`、`location` 以及 `include` 中的白名单和 `deny all`；公网出口可能因网络、VPN 切换而变化。确认可信运维出口后，将精确的 `allow <出口IP>/32;` 放在 `deny all;` 前，通过 `nginx -t` 后重载 Nginx。保持现有 Basic Auth，不用开放所有地址来解决 403。
+- 服务持续 `active/running` 且 PID 未变时，单个 `upgrade-feed-sse` 线程报错不能作为 JVM 退出的证据。SSE 在浏览器关闭、网络切换或代理关闭连接时会断连；浏览器使用 `Last-Event-ID` 自动重连，控制台从 H2 补发记录。
+- SSE 写入发生 `IOException` 后，连接收尾由 Servlet 容器与 Spring MVC 处理；再次调用 `complete()` 会与容器错误回调竞争。失效或已提交的流也不能改写成 JSON 错误响应。控制台已针对这两条路径加入断连处理；H2 读取失败仍保留服务端错误日志。[Spring MVC 异步请求说明](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-async.html)
+- 内存排查以 `free -m` 的 `available`、内核 OOM 日志和进程退出状态为依据。当前部署中主程序可能仍属于控制台 cgroup，`systemctl status` 的 Memory 包含该组进程，不能直接当作控制台 JVM 的独占内存。

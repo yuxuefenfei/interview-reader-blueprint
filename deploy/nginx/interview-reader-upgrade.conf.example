@@ -20,7 +20,8 @@ server {
     proxy_read_timeout 180s;
     add_header Cache-Control "no-store" always;
 
-    # 必须替换为实际 VPN 或内网网段；不可直接开放到公网。
+    # 按实际 VPN、内网网段或可信运维公网出口配置白名单，保留 deny all。
+    # 公网出口 IP 变化会返回 403；确认新出口后，在 deny all 前增加精确的 /32 规则。
     allow 127.0.0.1;
     allow 10.0.0.0/8;
     deny all;
