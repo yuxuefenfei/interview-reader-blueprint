@@ -10,12 +10,16 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 import java.util.Map;
 
 @Slf4j
 @RestControllerAdvice
 public class ConsoleErrors {
+
+    private static final DisconnectedClientHelper DISCONNECTED_CLIENTS =
+            new DisconnectedClientHelper(ConsoleErrors.class.getName());
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void disconnected(AsyncRequestNotUsableException exception, HttpServletResponse response) {
@@ -27,29 +31,32 @@ public class ConsoleErrors {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException exception,
                                                           HttpServletResponse response) {
-        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), response);
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), exception, response);
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> conflict(IllegalStateException exception,
                                                         HttpServletResponse response) {
-        return error(HttpStatus.CONFLICT, exception.getMessage(), response);
+        return error(HttpStatus.CONFLICT, exception.getMessage(), exception, response);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, String>> responseStatus(ResponseStatusException exception,
                                                               HttpServletResponse response) {
-        return error(exception.getStatusCode(), exception.getReason() == null ? "请求未通过" : exception.getReason(), response);
+        return error(exception.getStatusCode(), exception.getReason() == null ? "请求未通过" : exception.getReason(), exception, response);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> serverError(Exception exception, HttpServletResponse response) {
-        log.error("Upgrade console request failed", exception);
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "操作失败；请查看控制台服务端日志", response);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "操作失败；请查看控制台服务端日志", exception, response);
     }
 
-    private ResponseEntity<Map<String, String>> error(HttpStatusCode status, String message,
+    private ResponseEntity<Map<String, String>> error(HttpStatusCode status, String message, Exception exception,
                                                       HttpServletResponse response) {
+        // Async error dispatch can expose a raw or wrapped socket exception. Once the
+        // client is gone, leave status, headers and body untouched; only log at DEBUG/TRACE.
+        if (DISCONNECTED_CLIENTS.checkAndLogClientDisconnectedException(exception)) return null;
+        if (status.is5xxServerError()) log.error("Upgrade console request failed", exception);
         // A committed stream cannot be replaced with a JSON error document.
         if (response.isCommitted()) return null;
         var contentType = response.getContentType();
