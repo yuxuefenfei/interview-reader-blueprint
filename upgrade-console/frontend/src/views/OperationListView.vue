@@ -71,6 +71,7 @@ function allOperations(): void {
                      :description="release ? `Actions #${release.runId} 的升级与恢复记录` : '查看全部升级、回滚与人工恢复操作。'"
                      eyebrow="升级包 / 历史"
                      title="操作记录" @back="router.push('/releases')">
+      <template #meta><span v-if="release">Actions #{{ release.runId }}</span></template>
       <template #actions>
         <div class="ui-action-row">
           <el-button v-if="release" @click="allOperations">全部记录</el-button>

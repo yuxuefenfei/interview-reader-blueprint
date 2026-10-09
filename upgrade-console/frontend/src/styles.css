@@ -286,23 +286,93 @@ button:focus-visible, a:focus-visible {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 18px;
+    gap: 24px;
     min-height: 80px;
-    padding: 13px clamp(20px, 3vw, 42px);
-    border-bottom: 1px solid var(--line-100);
+    padding: 12px 32px;
+    border-bottom: 1px solid var(--line-200);
     background: rgba(255, 255, 255, .96);
     backdrop-filter: blur(10px);
 }
 
 .admin-page-header-leading {
+    min-width: max-content;
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 14px;
+}
+
+.has-dynamic-title .admin-page-header-leading {
     min-width: 0;
 }
 
 .admin-page-heading {
     min-width: 0;
+    flex: 1 1 auto;
+    display: grid;
+    gap: 4px;
+}
+
+.admin-page-title-line {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-page-title-line > :not(h1) {
+    flex: 0 0 auto;
+}
+
+.admin-page-title-line h1 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 22px;
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-page-meta {
+    color: var(--ink-500);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.admin-page-help-button.el-button {
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 4px;
+    color: var(--ink-500);
+    font-size: 16px;
+}
+
+.admin-page-help-button.el-button:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+}
+
+.admin-page-help-popper {
+    max-width: calc(100vw - 32px);
+}
+
+.admin-page-help-title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.admin-page-help-description {
+    margin: 0;
+    color: var(--ink-500);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
 }
 
 .eyebrow, .section-kicker {
@@ -312,26 +382,6 @@ button:focus-visible, a:focus-visible {
     font-size: 11px;
     font-weight: 750;
     letter-spacing: .06em;
-}
-
-.admin-page-title-line {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.admin-page-header h1 {
-    margin: 0;
-    font-size: 23px;
-    line-height: 1.2;
-    letter-spacing: -.02em;
-}
-
-.admin-page-description {
-    margin: 4px 0 0;
-    color: var(--ink-500);
-    font-size: 12px;
 }
 
 .admin-page-actions {
@@ -816,6 +866,10 @@ button:focus-visible, a:focus-visible {
     .admin-page-header {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .admin-page-header-leading {
+        width: 100%;
     }
 
     .admin-page-actions {

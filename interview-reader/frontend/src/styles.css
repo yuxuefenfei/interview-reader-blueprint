@@ -520,21 +520,22 @@ select:focus-visible {
 }
 
 .admin-page-header-leading {
-    min-width: 0;
+    min-width: max-content;
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     gap: 14px;
+}
+
+.has-dynamic-title .admin-page-header-leading {
+    min-width: 0;
 }
 
 .admin-page-heading {
     min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-.admin-page-heading > .eyebrow {
-    display: none;
+    flex: 1 1 auto;
+    display: grid;
+    gap: 4px;
 }
 
 .admin-page-title-line {
@@ -542,6 +543,10 @@ select:focus-visible {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.admin-page-title-line > :not(h1) {
+    flex: 0 0 auto;
 }
 
 .admin-page-title-line h1 {
@@ -555,15 +560,44 @@ select:focus-visible {
     white-space: nowrap;
 }
 
-.admin-page-description {
-    max-width: min(620px, 42vw);
-    margin: 0;
-    overflow: hidden;
+.admin-page-meta {
     color: var(--ink-500);
     font-size: 13px;
-    line-height: 1.45;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.admin-page-help-button.el-button {
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 4px;
+    color: var(--ink-500);
+    font-size: 16px;
+}
+
+.admin-page-help-button.el-button:focus-visible {
+    outline: 2px solid var(--brand-500);
+    outline-offset: 2px;
+}
+
+.admin-page-help-popper {
+    max-width: calc(100vw - 32px);
+}
+
+.admin-page-help-title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.admin-page-help-description {
+    margin: 0;
+    color: var(--ink-500);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
 }
 
 .admin-page-back {
@@ -2543,6 +2577,7 @@ select:focus-visible {
     line-height: 1.45;
 }
 
+.import-task-form .source-file-upload,
 .import-task-form .el-upload,
 .import-task-form .el-upload-dragger,
 .import-task-form .el-upload__tip {
@@ -3747,10 +3782,6 @@ select:focus-visible {
         padding-left: 24px;
     }
 
-    .admin-page-description {
-        display: none;
-    }
-
     .admin-page-header-leading {
         flex: 0 1 auto;
     }
@@ -3764,6 +3795,10 @@ select:focus-visible {
     .document-header-tools {
         width: 100%;
         max-width: 520px;
+    }
+
+    .document-header-search {
+        min-width: 120px;
     }
 
     .import-layout {

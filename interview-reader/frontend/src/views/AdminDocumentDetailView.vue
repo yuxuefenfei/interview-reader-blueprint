@@ -370,6 +370,7 @@ function message(value: unknown): string {
 <template>
   <section v-loading="loading" :aria-busy="loading || actionsLocked" class="admin-view document-detail-view">
     <AdminPageHeader
+        truncate-title
         :description="document ? `${document.code} · 共 ${document.versionCount} 个版本，${document.draftCount} 个草稿` : '加载文档版本与生命周期信息'"
         :title="document?.title || '文档详情'"
         back-label="返回文档管理"
@@ -382,6 +383,7 @@ function message(value: unknown): string {
                 effect="plain">{{ zh(document.status) }}
         </el-tag>
       </template>
+      <template #meta><span v-if="document">共 {{ document.versionCount }} 个版本 · {{ document.draftCount }} 个草稿</span></template>
       <template #actions>
         <el-button v-if="document?.status === 'OFFLINE' && document.currentVersionId" :disabled="actionsLocked && !isActive(documentId, 'restore')"
                    :icon="RefreshRight" :loading="isActive(documentId, 'restore')"

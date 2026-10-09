@@ -293,7 +293,7 @@ function message(value: unknown): string {
           <el-form-item label="源文件">
             <el-upload :auto-upload="false" :before-upload="selectFile" :limit="1" :on-change="(file: { raw?: UploadRawFile }) => file.raw && selectFile(file.raw)"
                        :show-file-list="true"
-                       drag>
+                       class="source-file-upload" drag>
               <el-icon class="upload-icon">
                 <UploadFilled/>
               </el-icon>

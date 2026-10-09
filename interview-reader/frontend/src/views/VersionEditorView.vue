@@ -952,6 +952,7 @@ function message(value: unknown): string {
 <template>
   <section v-loading="loading" class="admin-view editor-view">
     <AdminPageHeader
+        truncate-title
         :description="editor ? `v${editor.version.versionNo} · ${zh(editor.version.status)} · 修订 ${editor.version.draftRevision}` : '加载草稿版本信息'"
         :title="editor?.document.title || '草稿编辑器'"
         back-label="返回版本管理"
@@ -960,6 +961,7 @@ function message(value: unknown): string {
     >
       <template #status><span :class="`is-${saveState}`" class="editor-save-state"><i/>{{ saveStateLabel }}</span>
       </template>
+      <template #meta><span v-if="editor">v{{ editor.version.versionNo }} · {{ zh(editor.version.status) }} · 修订 {{ editor.version.draftRevision }}</span></template>
       <template #actions>
         <el-button :disabled="dirtyBlockCount === 0" :loading="saveState === 'saving'" data-testid="save-editor"
                    type="primary" @click="saveAllBlocks">保存
