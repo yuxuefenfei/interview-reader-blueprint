@@ -2,6 +2,8 @@ import {reactive, ref} from "vue";
 import {consoleApi, userMessage} from "./api";
 import type {Dashboard, FeedEntry, Operation} from "./types";
 
+export const HEALTH_REFRESH_INTERVAL_MS = 15_000;
+
 const dashboard = ref<Dashboard | null>(null);
 const loading = ref(false);
 const error = ref("");
@@ -101,7 +103,7 @@ async function start(): Promise<void> {
     };
     healthTimer = window.setInterval(() => {
         void refreshDashboard();
-    }, 15_000);
+    }, HEALTH_REFRESH_INTERVAL_MS);
 }
 
 function stop(): void {

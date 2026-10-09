@@ -40,7 +40,7 @@ export function shortId(value: string | null | undefined): string {
 
 export function statusTag(value: string): "success" | "danger" | "warning" | "info" {
     if (value === "SUCCEEDED" || value === "RESTORED") return "success";
-    if (value === "NEEDS_OPERATOR") return "danger";
-    if (value === "FAILED" || value === "ROLLED_BACK") return "warning";
+    if (value === "FAILED" || value === "NEEDS_OPERATOR") return "danger";
+    if (value === "ROLLED_BACK") return "warning";
     return "info";
 }
