@@ -3,6 +3,7 @@ import {defineComponent, nextTick, reactive} from "vue";
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import type {ContentBlock, DocumentSummary, NodeContent, TocNode} from "../types/api";
 import ReaderView from "../views/ReaderView.vue";
+import ContentBlockView from "../components/ContentBlockView.vue";
 
 const api = vi.hoisted(() => ({
     documents: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock("element-plus/es/components/message/index", () => ({ElMessage: messages}
 vi.mock("../components/ContentBlockView.vue", () => ({
     default: defineComponent({
         props: {block: {type: Object, required: true}},
+        emits: ["update:tablePreviewOpen"],
         template: '<div class="mock-content" :data-block-id="block.id">{{ block.plainText }}</div>',
     }),
 }));
@@ -337,6 +339,30 @@ describe("ReaderView request coordination", () => {
         wrapper.unmount();
     });
 
+    it("locks background scrolling and suspends search shortcuts while a table preview is open", async () => {
+        const currentNode = node("node-a");
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([currentNode]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockResolvedValue(content(currentNode, "block-a"));
+        const wrapper = mountReader();
+        await flushPromises();
+        const tableBlock = wrapper.getComponent(ContentBlockView);
+        expect(tableBlock.attributes("show-table-preview")).toBeDefined();
+        tableBlock.vm.$emit("update:tablePreviewOpen", true);
+        await nextTick();
+        expect(wrapper.get(".reader-page").classes()).toContain("reader-overlay-open");
+        window.dispatchEvent(new KeyboardEvent("keydown", {key: "k", ctrlKey: true}));
+        await nextTick();
+        expect(wrapper.find('input[name="reader-search"]').exists()).toBe(false);
+        tableBlock.vm.$emit("update:tablePreviewOpen", false);
+        await nextTick();
+        expect(wrapper.get(".reader-page").classes()).not.toContain("reader-overlay-open");
+        window.dispatchEvent(new KeyboardEvent("keydown", {key: "k", ctrlKey: true}));
+        await nextTick();
+        expect(wrapper.find('input[name="reader-search"]').exists()).toBe(true);
+        wrapper.unmount();
+    });
     it("searches the current document by default and exposes an explicit all-documents scope", async () => {
         const currentDocument = document("document-a", "version-a");
         const currentNode = node("node-a");

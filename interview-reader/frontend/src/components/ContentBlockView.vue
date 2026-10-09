@@ -5,6 +5,7 @@ import type {ReaderTheme} from "../utils/readingComfort";
 import CodeBlockView from "./CodeBlockView.vue";
 import FormulaBlock from "./FormulaBlock.vue";
 import InlineMarkdown from "./InlineMarkdown.vue";
+import TableBlockView from "./TableBlockView.vue";
 
 const props = defineProps<{
   block: ContentBlock;
@@ -12,9 +13,13 @@ const props = defineProps<{
   highlight?: string;
   wrapCode?: boolean;
   showCodeWrapToggle?: boolean;
+  showTablePreview?: boolean;
   diagramTheme?: ReaderTheme;
 }>();
-const emit = defineEmits<{ "update:wrapCode": [value: boolean] }>();
+const emit = defineEmits<{
+  "update:wrapCode": [value: boolean];
+  "update:tablePreviewOpen": [value: boolean];
+}>();
 
 const imageLoadFailed = ref(false);
 const imageRetryKey = ref(0);
@@ -193,20 +198,9 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
         @update:wrap="emit('update:wrapCode', $event)"
     />
 
-    <div v-else-if="block.blockType === 'table'" class="table-wrap">
-      <table>
-        <thead v-if="tableColumns(block.payload).length">
-        <tr>
-          <th v-for="column in tableColumns(block.payload)" :key="column">{{ column }}</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr v-for="(row, rowIndex) in tableRows(block.payload)" :key="rowIndex">
-          <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
+    <TableBlockView v-else-if="block.blockType === 'table'" :columns="tableColumns(block.payload)"
+                    :preview-enabled="showTablePreview" :rows="tableRows(block.payload)"
+                    @update:preview-open="emit('update:tablePreviewOpen', $event)"/>
 
     <figure v-else-if="block.blockType === 'table_snapshot'" class="table-snapshot">
       <figcaption>表格快照</figcaption>

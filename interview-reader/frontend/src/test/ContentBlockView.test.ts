@@ -110,6 +110,63 @@ describe("ContentBlockView", () => {
         expect(wrapper.find("td").text()).toBe("HashMap");
     });
 
+    it("opens a text table preview only from its button and restores focus when closed", async () => {
+        const wrapper = mount(ContentBlockView, {
+            attachTo: document.body,
+            props: {
+                showTablePreview: true,
+                block: block({
+                    blockType: "table",
+                    payload: {
+                        columns: ["层次", "典型类 / 扩展点", "主要责任", "典型设计思想"],
+                        rows: [["Boot 外层", "`SpringApplicationRunListener`", "组织 Environment", "观察者"]],
+                    },
+                }),
+            },
+        });
+        try {
+            await wrapper.get("td").trigger("click");
+            expect(wrapper.emitted("update:tablePreviewOpen")).toBeUndefined();
+            const trigger = wrapper.get(".table-preview-trigger");
+            await trigger.trigger("click");
+            await flushPromises();
+            const dialog = document.querySelector<HTMLElement>(".table-preview-dialog")!;
+            expect(dialog.textContent).toContain("SpringApplicationRunListener");
+            expect(dialog.textContent).not.toContain("`");
+            expect(dialog.querySelectorAll("th")).toHaveLength(4);
+            await vi.waitFor(() => expect(document.activeElement?.getAttribute("aria-label")).toBe("关闭表格预览"));
+            expect(wrapper.emitted("update:tablePreviewOpen")).toEqual([[true]]);
+            const shortcut = new KeyboardEvent("keydown", {key: "k", ctrlKey: true, bubbles: true, cancelable: true});
+            dialog.dispatchEvent(shortcut);
+            expect(shortcut.defaultPrevented).toBe(true);
+            dialog.querySelector<HTMLButtonElement>('[aria-label="关闭表格预览"]')!.click();
+            await flushPromises();
+            await vi.waitFor(() => expect(wrapper.emitted("update:tablePreviewOpen")).toEqual([[true], [false]]));
+            await vi.waitFor(() => expect(document.activeElement).toBe(trigger.element));
+        } finally {
+            wrapper.unmount();
+        }
+    });
+
+    it("leaves editor tables unchanged and releases the reader overlay when a preview unmounts", async () => {
+        const notify = vi.fn();
+        const wrapper = mount(ContentBlockView, {
+            attachTo: document.body,
+            props: {
+                block: block({blockType: "table", payload: {columns: [], rows: [["值"]]}}),
+                "onUpdate:tablePreviewOpen": notify,
+            },
+        });
+        expect(wrapper.find(".table-preview-trigger").exists()).toBe(false);
+        expect(wrapper.get("table").attributes("style")).toBeUndefined();
+        await wrapper.setProps({showTablePreview: true});
+        await wrapper.get(".table-preview-trigger").trigger("click");
+        await flushPromises();
+        expect(document.querySelector(".table-preview-dialog td")?.textContent).toBe("值");
+        wrapper.unmount();
+        expect(notify.mock.calls).toEqual([[true], [false]]);
+        expect(document.querySelector(".table-preview-dialog")).toBeNull();
+    });
     it("renders imported Markdown table cells without inline-code backticks", () => {
         const wrapper = mount(ContentBlockView, {
             props: {

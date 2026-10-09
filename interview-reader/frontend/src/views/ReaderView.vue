@@ -73,6 +73,7 @@ const documentSwitchError = ref("");
 const searchOpen = ref(false);
 const comfortOpen = ref(false);
 const mobileComfortOpen = ref(false);
+const tablePreviewOpen = ref(false);
 const query = ref("");
 const searchHits = ref<SearchHit[]>([]);
 const searchScope = ref<"document" | "all">("document");
@@ -1043,6 +1044,7 @@ function openSearch(): void {
 }
 
 function handleGlobalShortcut(event: KeyboardEvent): void {
+  if (tablePreviewOpen.value) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     openSearch();
@@ -1071,7 +1073,7 @@ function message(value: unknown): string {
       :class="[
       `theme-${theme}`,
       {
-        'reader-overlay-open': drawer || searchOpen || mobileComfortOpen,
+        'reader-overlay-open': drawer || searchOpen || mobileComfortOpen || tablePreviewOpen,
         'desktop-nav-collapsed': desktopNavCollapsed,
       },
     ]"
@@ -1264,7 +1266,8 @@ function message(value: unknown): string {
           <h1>{{ content.node.title }}</h1>
           <ContentBlockView v-for="block in content.blocks" :key="block.id" :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" :block="block"
                             :diagram-theme="theme" :highlight="searchHighlight" :wrap-code="comfort.codeWrap"
-                            show-code-wrap-toggle
+                            show-code-wrap-toggle show-table-preview
+                            @update:table-preview-open="tablePreviewOpen = $event"
                             @update:wrap-code="comfort.codeWrap = $event"/>
           <div v-if="content.nextAfterSeq" :ref="captureContentLoadSentinel" class="reader-load-more">
             <span v-if="loadingMore" role="status">正在载入后续内容…</span>
