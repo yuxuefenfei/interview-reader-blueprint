@@ -823,6 +823,7 @@ select:focus-visible {
     --reader-font-size: 18px;
     --reader-line-height: 1.85;
     --reader-column: 740px;
+    --toc-w: 320px;
     width: 100%;
     height: var(--reader-viewport-height, 100vh);
     min-height: var(--reader-viewport-height, 100vh);
@@ -1140,7 +1141,11 @@ select:focus-visible {
 }
 
 .toc-tree-root {
-    padding: 10px 6px 28px;
+    padding: 10px 8px 28px;
+}
+
+.toc-tree-root > .toc-item + .toc-item {
+    margin-top: 8px;
 }
 
 .toc-tree li {
@@ -1172,7 +1177,7 @@ select:focus-visible {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
-    padding: 7px 8px 7px calc(12px + var(--toc-indent, 0px));
+    padding: 9px 8px 9px calc(12px + var(--toc-indent, 0px));
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -1224,23 +1229,18 @@ select:focus-visible {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     font-size: 13.5px;
-    line-height: 1.38;
-    overflow-wrap: anywhere;
+    line-height: 1.5;
+    overflow-wrap: break-word;
 }
 
-.toc-node.has-children .toc-title {
-    font-weight: 700;
-}
-
-.toc-row:focus-within {
-    background: color-mix(in srgb, var(--reader-accent), transparent 90%);
-    color: var(--reader-accent);
+.toc-node.has-children .toc-title,
+.toc-tree-root > .toc-item > .toc-row .toc-title {
+    font-weight: 600;
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .toc-row:hover {
-        background: color-mix(in srgb, var(--reader-accent), transparent 90%);
-        color: var(--reader-accent);
+    .toc-row:not(.active):hover {
+        background: color-mix(in srgb, var(--reader-text), transparent 96%);
     }
 
     .reader-document-option:hover {
@@ -1257,6 +1257,10 @@ select:focus-visible {
 .toc-row.active {
     background: color-mix(in srgb, var(--reader-accent), transparent 88%);
     color: var(--reader-accent);
+    font-weight: 650;
+}
+
+.toc-row.active .toc-title {
     font-weight: 650;
 }
 
@@ -1280,11 +1284,6 @@ select:focus-visible {
     font-weight: 700;
     line-height: 1.5;
     white-space: nowrap;
-}
-
-.toc-node-status.current {
-    background: color-mix(in srgb, var(--reader-accent), transparent 84%);
-    color: var(--reader-accent);
 }
 
 .toc-node-status.loading {
@@ -1733,12 +1732,11 @@ select:focus-visible {
 }
 
 .reader-drawer-sticky .reader-document-selector {
-    height: 56px;
     padding-right: 16px;
     padding-left: 16px;
 }
 
-.reader-drawer-sticky .reader-document-selector-main output {
+.reader-drawer-sticky .reader-document-selector-meta output {
     width: 4ch;
     text-align: right;
 }
@@ -1761,10 +1759,11 @@ select:focus-visible {
 .reader-document-selector {
     width: 100%;
     min-width: 0;
-    height: 56px;
+    min-height: 88px;
     display: grid;
-    grid-template-rows: 1fr 2px;
-    padding: 0 10px 0 12px;
+    align-content: center;
+    gap: 10px;
+    padding: 12px;
     overflow: hidden;
     border: 0;
     background: transparent;
@@ -1780,7 +1779,7 @@ select:focus-visible {
 .reader-document-selector-main {
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto 20px;
+    grid-template-columns: minmax(0, 1fr) 20px;
     align-items: center;
     gap: 8px;
 }
@@ -1788,16 +1787,28 @@ select:focus-visible {
 .reader-document-selector-main strong {
     min-width: 0;
     overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     font-size: 14px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: break-word;
 }
 
-.reader-document-selector-main output {
+.reader-document-selector-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     color: var(--reader-muted);
     font-size: 11px;
+    line-height: 1.4;
+}
+
+.reader-document-selector-meta output {
+    min-width: 3ch;
     font-variant-numeric: tabular-nums;
-    line-height: 1;
+    text-align: right;
 }
 
 .reader-document-selector-chevron {
@@ -1808,7 +1819,9 @@ select:focus-visible {
 }
 
 .reader-document-selector-progress {
-    height: 2px;
+    min-width: 0;
+    flex: 1;
+    height: 3px;
     overflow: hidden;
     border-radius: 999px;
     background: var(--reader-line);
@@ -2226,8 +2239,7 @@ select:focus-visible {
     }
 
     .toc-tree-compact-groups .toc-row:not(.active):active {
-        background: color-mix(in srgb, var(--reader-accent), transparent 94%);
-        color: var(--reader-accent);
+        background: color-mix(in srgb, var(--reader-text), transparent 96%);
     }
 
     .reader-content {

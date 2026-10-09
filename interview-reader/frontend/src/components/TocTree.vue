@@ -88,7 +88,6 @@ function collapseFromKeyboard(node: TocNode): void {
           <span class="toc-title">{{ node.title }}</span>
           <span v-if="node.id === pendingNodeId" class="toc-node-status loading" role="status">加载中</span>
           <span v-else-if="node.id === failedNodeId" class="toc-node-status failed">失败，重试</span>
-          <span v-else-if="node.id === activeNodeId" class="toc-node-status current">当前</span>
         </button>
         <button
             v-if="node.children.length"

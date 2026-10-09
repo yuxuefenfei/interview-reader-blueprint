@@ -26,11 +26,14 @@ const progressStyle = computed(() => ({width: progressWidth(props.document?.prog
   >
     <span class="reader-document-selector-main">
       <strong :title="document?.title">{{ document?.title || "选择文档" }}</strong>
-      <output :aria-label="`文档阅读位置 ${progressLabel}`">{{ progressLabel }}</output>
       <ArrowRight aria-hidden="true" class="reader-document-selector-chevron"/>
     </span>
-    <span aria-hidden="true" class="reader-document-selector-progress">
-      <i :style="progressStyle"></i>
+    <span class="reader-document-selector-meta">
+      <span>阅读进度</span>
+      <span aria-hidden="true" class="reader-document-selector-progress">
+        <i :style="progressStyle"></i>
+      </span>
+      <output :aria-label="`文档阅读位置 ${progressLabel}`">{{ progressLabel }}</output>
     </span>
   </button>
 </template>

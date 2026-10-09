@@ -32,7 +32,9 @@ describe("TocTree", () => {
         const rootNavigation = wrapper.get('[data-toc-node-id="root"]');
         expect(rootNavigation.attributes("aria-label")).toBe("Root chapter");
         expect(wrapper.get('[data-toc-node-id="child"]').attributes("aria-current")).toBe("location");
-        expect(wrapper.get(".toc-node-status.current").text()).toBe("当前");
+        expect(wrapper.find(".toc-node-status.current").exists()).toBe(false);
+        expect(wrapper.findAll(".toc-row.active")).toHaveLength(1);
+        expect(wrapper.get('[data-toc-node-id="child"]').attributes("title")).toBe(child.title);
 
         await rootNavigation.trigger("pointerenter");
         expect(wrapper.emitted("prefetch")?.[0]).toEqual([root]);

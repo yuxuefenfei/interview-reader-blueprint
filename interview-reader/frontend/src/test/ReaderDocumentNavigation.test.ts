@@ -22,7 +22,8 @@ describe("reader document navigation", () => {
         });
 
         expect(wrapper.text()).toContain("Redis 高级面试题");
-        expect(wrapper.text()).toContain("46%");
+        expect(wrapper.get(".reader-document-selector-meta").text()).toContain("阅读进度");
+        expect(wrapper.get(".reader-document-selector-meta output").text()).toBe("46%");
         expect(wrapper.get(".reader-document-selector-chevron").element.tagName.toLowerCase()).toBe("svg");
         expect(wrapper.get(".reader-document-selector-progress i").attributes("style")).toContain("width: 45.6%");
         await wrapper.get("button").trigger("click");

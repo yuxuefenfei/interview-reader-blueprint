@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import {FullScreen} from "@element-plus/icons-vue";
 import {computed, type CSSProperties, nextTick, onBeforeUnmount, ref, watch} from "vue";
 
 const props = defineProps<{
@@ -55,7 +56,10 @@ onBeforeUnmount(() => {
 <template>
   <div :class="{ 'table-block--reader': previewEnabled }" class="table-block">
     <div v-if="previewEnabled" class="table-toolbar">
-      <button aria-haspopup="dialog" class="table-preview-trigger" type="button" @click.stop="openPreview">放大查看</button>
+      <button aria-haspopup="dialog" class="table-preview-trigger" title="在弹层中查看完整表格" type="button" @click.stop="openPreview">
+        <FullScreen aria-hidden="true" class="table-preview-icon" />
+        <span>放大查看</span>
+      </button>
     </div>
     <div :tabindex="previewEnabled ? 0 : undefined" :aria-label="previewEnabled ? '表格，可左右滚动' : undefined" class="table-wrap">
       <table :style="previewEnabled ? tableStyle : undefined">
@@ -106,12 +110,51 @@ onBeforeUnmount(() => {
 <style scoped>
 .table-block--reader {
   margin: 20px 0;
+  overflow: hidden;
+  border: 1px solid var(--reader-line);
+  border-radius: var(--radius-sm);
 }
 
 .table-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--reader-line);
+  background: var(--reader-code-bg, #fbfcfe);
+}
+
+.table-toolbar .table-preview-trigger {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--reader-muted);
+  font-size: 13px;
+}
+
+.table-preview-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.table-preview-trigger:focus-visible {
+  outline: 2px solid var(--reader-accent);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .table-toolbar .table-preview-trigger:hover {
+    background: color-mix(in srgb, var(--reader-accent), transparent 94%);
+    color: var(--reader-accent);
+  }
+}
+
+.table-block--reader > .table-wrap {
+  border: 0;
+  border-radius: 0;
 }
 
 .table-preview-trigger {
@@ -189,6 +232,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 760px) {
+  .table-toolbar .table-preview-trigger {
+    min-height: 44px;
+  }
+
   :global(.table-preview-dialog) {
     width: calc(100% - 16px);
     max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
