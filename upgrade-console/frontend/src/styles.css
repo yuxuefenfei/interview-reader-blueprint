@@ -940,6 +940,42 @@ button:focus-visible, a:focus-visible {
     color: var(--brand-500);
 }
 
+.upload-progress {
+    margin-bottom: 16px;
+}
+
+.upload-progress-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.upload-progress-state {
+    color: var(--ink-700);
+    font-weight: 600;
+}
+
+.upload-progress.is-failed .upload-progress-state {
+    color: var(--el-color-danger);
+}
+
+.upload-progress-size {
+    color: var(--ink-500);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .upload-progress .el-progress-bar__inner {
+        animation: none;
+        transition: none;
+    }
+}
+
 .upload-guide {
     padding: 24px;
 }

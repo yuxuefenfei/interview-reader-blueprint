@@ -1,5 +1,11 @@
 import type {Dashboard, FeedPage, Operation, Page, Release} from "./types";
 
+export interface UploadProgress {
+    phase: "uploading" | "verifying";
+    loaded: number;
+    total: number | null;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, {cache: "no-store", ...options});
     const body = await response.json().catch(() => ({}));
@@ -30,12 +36,37 @@ export const consoleApi = {
     operation: (id: string) => request<Operation>(`/api/operations/${encodeURIComponent(id)}`),
     feed: (id: string, beforeId = 0) =>
         request<FeedPage>(`/api/operations/${encodeURIComponent(id)}/feed?beforeId=${beforeId}`),
-    upload: (file: File, runId: number) => {
-        const form = new FormData();
-        form.append("file", file);
-        form.append("runId", String(runId));
-        return request<Release>("/api/releases", {method: "POST", body: form});
-    },
+    upload: (file: File, runId: number, onProgress?: (progress: UploadProgress) => void): Promise<Release> =>
+        new Promise((resolve, reject) => {
+            const form = new FormData();
+            form.append("file", file);
+            form.append("runId", String(runId));
+            const xhr = new XMLHttpRequest();
+            xhr.upload.addEventListener("progress", event => onProgress?.({
+                phase: "uploading", loaded: event.loaded, total: event.lengthComputable ? event.total : null
+            }));
+            // Only the request body is complete here; the final response confirms verification.
+            xhr.upload.addEventListener("load", event => onProgress?.({
+                phase: "verifying", loaded: event.lengthComputable ? event.loaded : file.size,
+                total: event.lengthComputable ? event.total : file.size
+            }));
+            xhr.addEventListener("load", () => {
+                const body = xhr.response as (Release & {error?: unknown}) | null;
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    if (body && typeof body.id === "string") resolve(body);
+                    else reject(new Error("未收到有效的验证结果，请查看升级包列表确认"));
+                } else {
+                    reject(new Error(typeof body?.error === "string" ? body.error : `请求失败（HTTP ${xhr.status}）`));
+                }
+            });
+            xhr.addEventListener("error", () => reject(new Error("上传连接失败，请检查网络后重试")));
+            xhr.addEventListener("abort", () => reject(new Error("上传已中止")));
+            xhr.addEventListener("timeout", () => reject(new Error("上传请求超时，请查看升级包列表确认结果")));
+            xhr.open("POST", "/api/releases");
+            xhr.responseType = "json";
+            // The browser sets the multipart boundary and sends existing same-origin credentials.
+            xhr.send(form);
+        }),
     deploy: (id: string) =>
         request<Operation>(`/api/releases/${encodeURIComponent(id)}/deployments`, {method: "POST"}),
     restorePublished: (backupId: string) =>

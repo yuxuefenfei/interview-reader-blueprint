@@ -1,24 +1,44 @@
 <script lang="ts" setup>
-import {ref} from "vue";
+import {computed, ref} from "vue";
 import {UploadFilled} from "@element-plus/icons-vue";
 import type {UploadFile} from "element-plus";
 import {ElMessage} from "element-plus/es/components/message/index";
 import {useRouter} from "vue-router";
 import AdminPageHeader from "../components/AdminPageHeader.vue";
-import {consoleApi, userMessage} from "../api";
-import {shortId} from "../format";
+import {consoleApi, userMessage, type UploadProgress} from "../api";
+import {formatBytes, shortId} from "../format";
 
 const router = useRouter();
 const selectedFile = ref<File | null>(null);
 const runIdText = ref("");
 const uploading = ref(false);
+type UploadPhase = UploadProgress["phase"] | "idle" | "failed" | "succeeded";
+const uploadPhase = ref<UploadPhase>("idle");
+const transfer = ref<UploadProgress>({phase: "uploading", loaded: 0, total: null});
+const phaseLabels: Record<UploadPhase, string> = {
+  idle: "", uploading: "正在上传升级包", verifying: "正在校验升级包",
+  failed: "上传或校验失败，可重试", succeeded: "升级包已验证"
+};
+const percentage = computed(() => {
+  if (transfer.value.phase === "verifying" || uploadPhase.value === "succeeded") return 100;
+  const {loaded, total} = transfer.value;
+  // Reserve 100% for upload completion rather than rounding an in-flight transfer up.
+  return total && total > 0 ? Math.min(99, Math.floor(loaded / total * 100)) : 0;
+});
+
+function resetProgress(): void {
+  uploadPhase.value = "idle";
+  transfer.value = {phase: "uploading", loaded: 0, total: selectedFile.value?.size ?? null};
+}
 
 function choose(file: UploadFile): void {
   selectedFile.value = file.raw ?? null;
+  resetProgress();
 }
 
 function remove(): void {
   selectedFile.value = null;
+  resetProgress();
 }
 
 function exceed(): void {
@@ -26,6 +46,7 @@ function exceed(): void {
 }
 
 async function upload(): Promise<void> {
+  if (uploading.value) return;
   const runId = Number(runIdText.value);
   if (!selectedFile.value) {
     ElMessage.warning("请选择正式构建的 JAR 文件");
@@ -43,12 +64,19 @@ async function upload(): Promise<void> {
     ElMessage.warning("JAR 文件不能超过 150 MB");
     return;
   }
+  resetProgress();
   uploading.value = true;
+  uploadPhase.value = "uploading";
   try {
-    const release = await consoleApi.upload(selectedFile.value, runId);
+    const release = await consoleApi.upload(selectedFile.value, runId, progress => {
+      transfer.value = progress;
+      uploadPhase.value = progress.phase;
+    });
+    uploadPhase.value = "succeeded";
     ElMessage.success(`升级包已验证：Actions #${release.runId} · ${shortId(release.commit)}`);
     await router.push("/releases");
   } catch (caught) {
+    uploadPhase.value = "failed";
     ElMessage.error(userMessage(caught, "上传验证失败"));
   } finally {
     uploading.value = false;
@@ -88,7 +116,31 @@ async function upload(): Promise<void> {
               </template>
             </el-upload>
           </el-form-item>
-          <el-button :disabled="!selectedFile" :loading="uploading" type="primary" @click="upload">上传并验证
+          <div
+            v-if="uploadPhase !== 'idle'"
+            class="upload-progress"
+            :class="{'is-failed': uploadPhase === 'failed'}"
+            aria-label="升级包上传状态"
+          >
+            <div class="upload-progress-meta">
+              <span class="upload-progress-state" role="status" aria-live="polite">{{ phaseLabels[uploadPhase] }}</span>
+              <span class="upload-progress-size">
+                已传 {{ formatBytes(transfer.loaded) }}<template v-if="transfer.total !== null">
+                  / {{ formatBytes(transfer.total) }} · {{ percentage }}%
+                </template>
+              </span>
+            </div>
+            <el-progress
+              :percentage="percentage"
+              :stroke-width="8"
+              :show-text="false"
+              :indeterminate="uploadPhase === 'verifying' || (uploading && transfer.total === null)"
+              :status="uploadPhase === 'failed' ? 'exception' : uploadPhase === 'succeeded' ? 'success' : ''"
+              aria-label="升级包上传进度"
+            />
+          </div>
+          <el-button :disabled="!selectedFile" :loading="uploading" type="primary" @click="upload">
+            {{ uploadPhase === 'verifying' ? '正在校验' : '上传并验证' }}
           </el-button>
         </el-form>
       </el-card>
