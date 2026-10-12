@@ -56,9 +56,12 @@ onBeforeUnmount(() => {
 <template>
   <div :class="{ 'table-block--reader': previewEnabled }" class="table-block">
     <div v-if="previewEnabled" class="table-toolbar">
-      <button aria-haspopup="dialog" class="table-preview-trigger" title="在弹层中查看完整表格" type="button" @click.stop="openPreview">
+      <span class="table-toolbar-label">table</span>
+      <button
+        aria-haspopup="dialog" aria-label="放大查看表格" class="table-preview-trigger" title="放大查看表格"
+        type="button" @click.stop="openPreview"
+      >
         <FullScreen aria-hidden="true" class="table-preview-icon" />
-        <span>放大查看</span>
       </button>
     </div>
     <div :tabindex="previewEnabled ? 0 : undefined" :aria-label="previewEnabled ? '表格，可左右滚动' : undefined" class="table-wrap">
@@ -117,18 +120,28 @@ onBeforeUnmount(() => {
 
 .table-toolbar {
   display: flex;
-  justify-content: flex-end;
-  padding: 4px 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--reader-line);
   background: var(--reader-code-bg, #fbfcfe);
 }
 
+.table-toolbar-label {
+  color: var(--reader-muted, var(--ink-500));
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .table-toolbar .table-preview-trigger {
-  min-height: 32px;
+  width: 28px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  justify-content: center;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--reader-muted);
@@ -233,6 +246,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 760px) {
   .table-toolbar .table-preview-trigger {
+    width: 44px;
     min-height: 44px;
   }
 
