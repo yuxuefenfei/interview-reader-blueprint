@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Provides bounded log pages and durable cursors for SSE reconnects.
+ * 提供大小受限的日志分页，以及用于 SSE 重连的持久化游标。
  */
 @Service
 @RequiredArgsConstructor

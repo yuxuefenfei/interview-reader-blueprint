@@ -22,7 +22,7 @@ const phaseLabels: Record<UploadPhase, string> = {
 const percentage = computed(() => {
   if (transfer.value.phase === "verifying" || uploadPhase.value === "succeeded") return 100;
   const {loaded, total} = transfer.value;
-  // Reserve 100% for upload completion rather than rounding an in-flight transfer up.
+  // 仅在上传完成时显示 100%，避免将传输中的进度向上取整为已完成。
   return total && total > 0 ? Math.min(99, Math.floor(loaded / total * 100)) : 0;
 });
 

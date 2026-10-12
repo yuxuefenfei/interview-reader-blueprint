@@ -10,7 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 /**
- * HTTP adapter for uploads, deployment commands and existing console responses.
+ * 为文件上传、部署命令和现有控制台响应提供 HTTP 适配。
  */
 @RestController
 @RequiredArgsConstructor

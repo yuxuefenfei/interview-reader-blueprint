@@ -399,8 +399,8 @@ public class PdfPackageService {
             candidatesBySection.put(section.sectionKey(), new ArrayList<>());
         }
 
-        // A page can contain several bookmarked sections. Parse it once, then let its headings move
-        // the active owner so a physical PDF block is never copied into sibling sections.
+        // 一页可能包含多个书签章节。只解析该页一次，再根据标题切换内容所属章节，
+        // 确保同一个 PDF 内容块不会被重复复制到同级章节。
         for (var page = 1; page <= pageCount; page++) {
             var currentPage = page;
             var pageSections = leafSections.stream()

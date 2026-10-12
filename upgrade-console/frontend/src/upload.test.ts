@@ -11,7 +11,7 @@ const {push, messages} = vi.hoisted(() => ({
 vi.mock("vue-router", () => ({useRouter: () => ({push})}));
 vi.mock("element-plus/es/components/message/index", () => ({ElMessage: messages}));
 
-/** Drive browser transport events without sending files to a server. */
+/** 模拟浏览器传输事件，无需向服务器发送文件。 */
 class UploadRequest extends EventTarget {
     static instances: UploadRequest[] = [];
     upload = new EventTarget();

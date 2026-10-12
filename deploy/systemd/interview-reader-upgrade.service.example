@@ -12,8 +12,8 @@ EnvironmentFile=/opt/ireader-upgrade/conf/console.env
 ExecStart=/usr/local/jdk/default/bin/java -Dfile.encoding=UTF-8 -jar /opt/ireader-upgrade/upgrade-console.jar
 Restart=on-failure
 RestartSec=5
-# The main app may be started by this console and remain in this unit's cgroup.
-# Stop only the console JVM when restarting this unit.
+# 主应用可能由此控制台启动，并留在该服务单元的 cgroup 中。
+# 重启此服务单元时，仅停止控制台 JVM。
 KillMode=process
 UMask=0077
 NoNewPrivileges=true

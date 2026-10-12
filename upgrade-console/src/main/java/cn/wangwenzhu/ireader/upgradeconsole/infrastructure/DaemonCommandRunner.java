@@ -17,7 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Streams each daemon invocation to H2 while retaining the existing diagnostic files.
+ * 将每次守护脚本调用的输出实时写入 H2，同时保留现有诊断文件。
  */
 @Component
 @RequiredArgsConstructor

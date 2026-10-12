@@ -12,7 +12,7 @@ import java.time.Duration;
 import java.util.UUID;
 
 /**
- * Public image bytes are available only while their owning version is the published reader version.
+ * 只有当图片所属版本为阅读端当前发布版本时，才允许公开访问图片内容。
  */
 @RestController
 @RequiredArgsConstructor
@@ -20,7 +20,7 @@ public class PublicImageAssetController {
     private final PublicImageAssetService service;
 
     /**
-     * Compatibility route for previously published HTML and cached links.
+     * 为此前发布的 HTML 和已缓存的链接提供兼容路由。
      */
     @GetMapping("/assets/versions/{versionId}/{assetKey}")
     public ResponseEntity<byte[]> image(@PathVariable UUID versionId, @PathVariable String assetKey) {

@@ -85,7 +85,7 @@ public final class ManagementDtos {
     }
 
     /**
-     * A successful image replacement updates both the block and the draft revision atomically.
+     * 图片替换成功时，以原子操作同时更新内容块和草稿修订号。
      */
     public record ImageBlockUploadResult(EditorBlock block, long draftRevision) {
     }

@@ -28,7 +28,7 @@ class ImportJobWorkerDrainTest {
                 while (release.getCount() > 0) {
                     try {
                         release.await();
-                    } catch (InterruptedException ignored) { /* Simulate a converter that has not stopped yet. */ }
+                    } catch (InterruptedException ignored) { /* 模拟尚未停止的转换器。 */ }
                 }
             });
             assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();

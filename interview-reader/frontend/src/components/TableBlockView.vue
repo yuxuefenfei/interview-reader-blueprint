@@ -30,14 +30,14 @@ function openPreview(event: MouseEvent): void {
 }
 
 async function focusPreviewClose(): Promise<void> {
-  // The dialog schedules its default focus after emitting open-auto-focus.
+  // 对话框在触发 open-auto-focus 事件后安排默认聚焦。
   await nextTick();
   await nextTick();
   previewClose.value?.focus();
 }
 
 function handlePreviewKeydown(event: KeyboardEvent): void {
-  // Keep the reader's document search shortcut from opening behind the dialog.
+  // 避免阅读端的文档搜索快捷键在对话框后方打开搜索界面。
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     event.stopPropagation();

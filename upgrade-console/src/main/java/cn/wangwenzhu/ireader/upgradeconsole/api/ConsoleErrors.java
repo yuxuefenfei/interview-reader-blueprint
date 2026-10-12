@@ -23,8 +23,8 @@ public class ConsoleErrors {
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void disconnected(AsyncRequestNotUsableException exception, HttpServletResponse response) {
-        // Declaring ServletResponse marks the void handler as resolved. Never write
-        // JSON or change headers on a response the servlet container has invalidated.
+        // 声明 ServletResponse 参数可将返回 void 的处理器标记为已处理；对于容器已置为无效的响应，
+        // 不得写入 JSON 或修改响应头。
         log.debug("Async response disconnected", exception);
     }
 
@@ -53,11 +53,11 @@ public class ConsoleErrors {
 
     private ResponseEntity<Map<String, String>> error(HttpStatusCode status, String message, Exception exception,
                                                       HttpServletResponse response) {
-        // Async error dispatch can expose a raw or wrapped socket exception. Once the
-        // client is gone, leave status, headers and body untouched; only log at DEBUG/TRACE.
+        // 异步错误分派可能暴露原始或经过包装的套接字异常。客户端一旦断开，
+        // 就应保持状态码、响应头和响应体不变，仅以 DEBUG/TRACE 级别记录日志。
         if (DISCONNECTED_CLIENTS.checkAndLogClientDisconnectedException(exception)) return null;
         if (status.is5xxServerError()) log.error("Upgrade console request failed", exception);
-        // A committed stream cannot be replaced with a JSON error document.
+        // 已提交的事件流响应不能替换为 JSON 错误文档。
         if (response.isCommitted()) return null;
         var contentType = response.getContentType();
         if (contentType != null && contentType.startsWith(MediaType.TEXT_EVENT_STREAM_VALUE)) {

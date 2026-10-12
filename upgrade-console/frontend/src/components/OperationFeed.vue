@@ -20,7 +20,7 @@ const stageScroll = useFollowScroll(stageTrack);
 const logScroll = useFollowScroll(terminal);
 const FOLLOW_DISTANCE_PX = 48;
 
-/** Each pane follows independently, so reading earlier stages never moves the command log. */
+/** 各面板独立跟随最新记录，查看较早阶段时不会移动命令日志。 */
 function useFollowScroll(node: Ref<HTMLElement | null>) {
   const following = ref(false);
 
@@ -52,14 +52,14 @@ watch(() => props.operationId, async (id) => {
   }
 }, {immediate: true});
 
-// Manual recovery resumes the same operation ID; a new run should follow by default as well.
+// 手动恢复沿用同一操作标识；新操作也应默认跟随最新记录。
 watch(running, (active) => {
   if (!active) return;
   stageScroll.resume();
   logScroll.resume();
 }, {flush: "post"});
 
-// Tail IDs change for live appends, but not when older records are prepended or SSE replays duplicates.
+// 实时追加记录会改变末尾记录标识；前插历史记录或 SSE 重放重复记录时，该标识保持不变。
 watch(() => stages.value.at(-1)?.id, () => {
   if (!loadingOlder.value && stageScroll.following.value) stageScroll.scrollToLatest();
 }, {flush: "post"});
@@ -78,7 +78,7 @@ async function loadOlder(): Promise<void> {
     await consoleState.loadOlder(id);
     await nextTick();
     if (id !== props.operationId) return;
-    // Anchor to an existing row: live output appended during the request must not shift the viewport.
+    // 以已有记录行作为定位锚点，避免请求期间追加的实时输出改变视口位置。
     for (const {node, anchor, offset, top} of positions) {
       if (node && anchor) node.scrollTop = top + anchor.offsetTop - offset;
     }

@@ -6,7 +6,7 @@ import org.slf4j.MDC;
 import java.util.UUID;
 
 /**
- * Maintains the trace identifier shared by an HTTP response and its server logs.
+ * 维护 HTTP 响应与对应服务端日志共用的追踪标识。
  */
 public final class RequestTrace {
     public static final String HEADER = "X-Trace-Id";

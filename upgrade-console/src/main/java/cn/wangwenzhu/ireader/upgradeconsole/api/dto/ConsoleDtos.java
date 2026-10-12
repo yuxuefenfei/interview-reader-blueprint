@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Wire DTOs preserve the existing JSON fields while hiding domain and H2 types.
+ * 接口传输 DTO 保留现有 JSON 字段，同时封装领域模型和 H2 类型。
  */
 public final class ConsoleDtos {
     private ConsoleDtos() {

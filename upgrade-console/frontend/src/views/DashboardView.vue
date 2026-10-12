@@ -13,7 +13,7 @@ const health = computed(() => dashboard.value?.health);
 const latest = computed(() => dashboard.value?.latestOperation);
 const running = computed(() => latest.value?.status === "RUNNING");
 const drain = computed(() => health.value?.drain);
-// Keyed panels move without remounting the feed, preserving scroll positions on completion.
+// 带有 key 的面板移动时不会重新挂载事件流组件，因此操作完成后仍保留滚动位置。
 const panelOrder = computed(() => running.value ? ["latest", "metrics"] : ["metrics", "latest"]);
 const restarting = computed(() => running.value && [
   "STOPPING", "SWITCHING", "STARTING", "READINESS", "ROLLING_BACK",

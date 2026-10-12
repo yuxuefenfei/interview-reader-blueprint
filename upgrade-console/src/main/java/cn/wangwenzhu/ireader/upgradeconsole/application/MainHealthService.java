@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Applies upgrade eligibility policy to the typed main-app status responses.
+ * 根据具有明确类型的主应用状态响应，判断是否满足升级条件。
  */
 @Component
 @RequiredArgsConstructor

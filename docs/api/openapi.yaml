@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Interview Reader API
   version: 0.2.0
-  description: Reader study APIs and isolated desktop administration APIs.
+  description: 阅读学习接口与独立的桌面管理接口。
 servers:
   - url: /api
 security:
@@ -14,7 +14,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Health" }
@@ -33,7 +33,7 @@ paths:
         "401": { $ref: "#/components/responses/Problem" }
         "403": { $ref: "#/components/responses/Problem" }
         "429":
-          description: Login attempt rate limit exceeded; Retry-After is returned in seconds
+          description: 登录尝试超过频率限制；Retry-After 返回以秒为单位的等待时间
           headers:
             Retry-After:
               schema: { type: integer, minimum: 1 }
@@ -63,7 +63,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentPage" }
@@ -73,7 +73,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Recent deletion tombstones
+          description: 最近的文档删除标记
           content:
             application/json:
               schema:
@@ -87,7 +87,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentSummary" }
@@ -100,7 +100,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -117,7 +117,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/NodeContent" }
@@ -131,7 +131,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -143,11 +143,11 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Most recently read document
+          description: 最近阅读的文档
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentSummary" }
-        "204": { description: No reading position has been saved }
+        "204": { description: 尚未保存阅读位置 }
   /reader/reading-progress/{documentId}:
     get:
       summary: Get the latest reading position
@@ -156,11 +156,11 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Latest reading position
+          description: 最新阅读位置
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReadingProgress" }
-        "204": { description: No reading position has been saved }
+        "204": { description: 尚未保存阅读位置 }
     put:
       summary: Save reading position
       parameters:
@@ -173,7 +173,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReadingProgress" }
@@ -188,7 +188,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "201":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Bookmark" }
@@ -199,7 +199,7 @@ paths:
         - { name: bookmarkId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         default: { $ref: "#/components/responses/Problem" }
-        "204": { description: Deleted }
+        "204": { description: 已删除 }
   /reader/notes:
     post:
       summary: Create a note
@@ -211,7 +211,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "201":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Note" }
@@ -228,7 +228,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReviewState" }
@@ -242,7 +242,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -258,7 +258,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AdminDocumentPage" }
@@ -270,7 +270,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AdminDocumentSummary" }
@@ -283,7 +283,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentMetadata" }
@@ -299,7 +299,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Metadata updated
+          description: 元数据已更新
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentMetadata" }
@@ -312,7 +312,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -325,7 +325,7 @@ paths:
         - $ref: "#/components/parameters/DocumentId"
       responses:
         default: { $ref: "#/components/responses/Problem" }
-        "204": { description: Taken down }
+        "204": { description: 已下架 }
         "409": { $ref: "#/components/responses/Problem" }
   /admin/documents/{documentId}/restore:
     post:
@@ -334,7 +334,7 @@ paths:
         - $ref: "#/components/parameters/DocumentId"
       responses:
         default: { $ref: "#/components/responses/Problem" }
-        "204": { description: Restored }
+        "204": { description: 已恢复 }
         "409": { $ref: "#/components/responses/Problem" }
   /admin/documents/{documentId}/deletion:
     post:
@@ -349,7 +349,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "202":
-          description: Deletion accepted or existing idempotent job returned
+          description: 已接受删除请求，或返回已存在的幂等任务
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DeletionJob" }
@@ -362,7 +362,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Deletion progress
+          description: 删除进度
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DeletionJob" }
@@ -374,7 +374,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "202":
-          description: Retry accepted
+          description: 已接受重试请求
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DeletionJob" }
@@ -387,7 +387,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "201":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VersionSummary" }
@@ -399,7 +399,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EditorSnapshot" }
@@ -409,7 +409,7 @@ paths:
         - $ref: "#/components/parameters/VersionId"
       responses:
         default: { $ref: "#/components/responses/Problem" }
-        "204": { description: Deleted }
+        "204": { description: 已删除 }
   /admin/versions/{versionId}/editor/nodes/{nodeId}/blocks:
     get:
       summary: Load one page of blocks for a draft node
@@ -421,7 +421,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/NodeBlocksPage" }
@@ -438,7 +438,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "201":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EditorBlock" }
@@ -457,7 +457,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EditorSnapshot" }
@@ -471,12 +471,12 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Updated editor snapshot
+          description: 更新后的编辑器快照
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EditorSnapshot" }
         "409":
-          description: Draft revision conflict, non-empty node, or last remaining node
+          description: 草稿修订号冲突、节点非空或仅剩最后一个节点
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -493,7 +493,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EditorSnapshot" }
@@ -512,7 +512,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EditorBlock" }
@@ -526,7 +526,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BlockMutationResult" }
@@ -553,7 +553,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Image attached to the block
+          description: 图片已绑定到内容块
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImageBlockUploadResult" }
@@ -566,7 +566,7 @@ paths:
         - { name: assetKey, in: path, required: true, schema: { type: string } }
       responses:
         default: { $ref: "#/components/responses/Problem" }
-        "200": { description: Image bytes }
+        "200": { description: 图片二进制内容 }
         "404": { $ref: "#/components/responses/Problem" }
   /admin/versions/{versionId}/editor/blocks/cleanup-empty:
     post:
@@ -581,7 +581,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BlockMutationResult" }
@@ -594,7 +594,7 @@ paths:
         - $ref: "#/components/parameters/VersionId"
       responses:
         default: { $ref: "#/components/responses/Problem" }
-        "204": { description: Published }
+        "204": { description: 已发布 }
         "409": { $ref: "#/components/responses/Problem" }
   /admin/import-jobs:
     post:
@@ -610,12 +610,12 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: PDF, XLSX, Markdown, or JSON package, up to 10 MiB; the server detects the source type.
+                  description: PDF、XLSX、Markdown 或 JSON 导入包，最大 10 MiB；由服务端识别来源类型。
                 targetDocumentId: { type: string, format: uuid }
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "202":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportJob" }
@@ -627,7 +627,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportJob" }
@@ -639,7 +639,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -653,7 +653,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportDocumentPreview" }
@@ -669,7 +669,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Staged metadata updated
+          description: 暂存元数据已更新
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ImportDocumentPreview" }
@@ -682,7 +682,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/JsonValue" }
@@ -694,7 +694,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Original source file
+          description: 原始来源文件
           content:
             application/pdf:
               schema: { type: string, format: binary }
@@ -708,7 +708,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentPackage" }
@@ -726,7 +726,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentPackage" }
@@ -744,7 +744,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentPackage" }
@@ -761,7 +761,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "201":
-          description: Successful response
+          description: 请求成功
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentVersion" }
@@ -776,7 +776,7 @@ paths:
       responses:
         default: { $ref: "#/components/responses/Problem" }
         "200":
-          description: Export content in the requested format
+          description: 按请求格式导出内容
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DocumentPackage" }
@@ -799,12 +799,12 @@ components:
     JobId: { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
   responses:
     AuthSession:
-      description: Authentication state
+      description: 身份认证状态
       content:
         application/json:
           schema: { $ref: "#/components/schemas/AuthSession" }
     Problem:
-      description: RFC 9457-compatible problem detail
+      description: 符合 RFC 9457 的问题详情
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -1244,7 +1244,7 @@ components:
         sortOrder: { type: integer }
         anchor:
           type: string
-          description: Server-generated stable internal identifier. Supplied values are ignored during import.
+          description: 由服务端生成的稳定内部标识；导入时忽略外部传入的值。
         sourcePageStart: { type: [ integer, "null" ] }
         sourcePageEnd: { type: [ integer, "null" ] }
         sourceBbox:

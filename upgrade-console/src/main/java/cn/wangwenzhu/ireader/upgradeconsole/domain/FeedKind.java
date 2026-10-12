@@ -1,7 +1,7 @@
 package cn.wangwenzhu.ireader.upgradeconsole.domain;
 
 /**
- * Distinguishes workflow decisions from command output in the operation log.
+ * 在操作日志中区分流程决策和命令输出。
  */
 public enum FeedKind {
     STAGE, COMMAND_STDOUT, COMMAND_STDERR

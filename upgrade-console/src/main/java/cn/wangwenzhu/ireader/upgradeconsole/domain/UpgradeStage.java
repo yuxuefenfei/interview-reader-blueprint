@@ -1,7 +1,7 @@
 package cn.wangwenzhu.ireader.upgradeconsole.domain;
 
 /**
- * Stable wire and database codes for every forward, rollback and recovery phase.
+ * 各升级、回滚和恢复阶段在接口传输和数据库存储中使用的稳定编码。
  */
 public enum UpgradeStage {
     PRECHECKING, STOP_WRITES, DRAINING, BACKING_UP, STOPPING, SWITCHING, STARTING,

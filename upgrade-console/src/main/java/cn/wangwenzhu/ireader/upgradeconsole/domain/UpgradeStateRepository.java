@@ -5,7 +5,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * The application uses this port for durable upgrade state and operation logs.
+ * 应用通过此接口持久化升级状态和操作日志。
  */
 public interface UpgradeStateRepository {
     UpgradeSnapshot snapshot();

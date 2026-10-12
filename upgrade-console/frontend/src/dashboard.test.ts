@@ -48,7 +48,7 @@ function seed(current = operation(), records = [entry(10), entry(11, "COMMAND_ST
     };
 }
 
-/** jsdom has no layout: model a scrollable viewport, including browser scrollTop clamping. */
+/** jsdom 不计算布局，因此模拟可滚动视口，并包含浏览器对 scrollTop 的范围限制。 */
 function viewport(node: HTMLElement, rowSelector: string): HTMLElement {
     let top = 0;
     Object.defineProperties(node, {
@@ -111,7 +111,7 @@ test("follows new stages and output independently, pausing only the pane the use
     await wrapper.get('[aria-label="升级阶段"] button').trigger("click");
     expect(stage.scrollTop).toBe(stage.scrollHeight - stage.clientHeight);
 
-    // Command output does not reposition the stage pane; duplicate tail IDs do not reposition either pane.
+    // 命令输出不会改变阶段面板的滚动位置；重复的末尾记录标识也不会改变任一面板的位置。
     stage.scrollTop = 90;
     append(entry(14, "COMMAND_STDOUT"));
     await nextTick();

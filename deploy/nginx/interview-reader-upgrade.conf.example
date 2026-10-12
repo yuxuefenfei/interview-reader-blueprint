@@ -27,7 +27,7 @@ server {
     deny all;
 
     location /actuator/ { return 404; }
-    # SSE needs an unbuffered, long-lived response for live upgrade logs.
+    # SSE 实时升级日志需要禁用响应缓冲，并保持长连接。
     location = /api/feed/stream {
         proxy_pass http://interview_reader_upgrade;
         proxy_set_header Host $host;

@@ -6,8 +6,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Keeps persisted upgrade transitions explicit. Error exits are allowed from every
- * running phase because the maintenance gate must take precedence over workflow order.
+ * 明确持久化的升级状态转换。每个运行阶段都允许因错误退出，
+ * 因为维护门禁必须优先于流程执行顺序。
  */
 public final class UpgradeFlow {
     private static final Map<UpgradeStage, Set<UpgradeStage>> NEXT = new EnumMap<>(UpgradeStage.class);

@@ -15,7 +15,7 @@ let stream: EventSource | null = null;
 let healthTimer: number | null = null;
 let refreshing = false;
 
-/** Operation output arrives by SSE; the slower dashboard refresh samples health metrics. */
+/** 操作输出通过 SSE 实时接收；刷新频率较低的仪表盘负责采集健康指标。 */
 async function refreshDashboard(): Promise<void> {
     if (refreshing) return;
     refreshing = true;

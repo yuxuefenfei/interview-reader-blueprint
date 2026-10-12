@@ -60,7 +60,7 @@ public class AdminDocumentController {
     }
 
     /**
-     * Small initial editor payload: document header and tree only, no block bodies.
+     * 精简编辑器初始响应：仅包含文档头信息和目录树，不包含内容块正文。
      */
     @GetMapping("/versions/{versionId}/editor")
     public ManagementDtos.EditorSnapshot editor(@PathVariable UUID versionId) {

@@ -19,12 +19,12 @@
 @REM ----------------------------------------------------------------------------
 
 @REM ----------------------------------------------------------------------------
-@REM Apache Maven Wrapper startup batch script, version 3.3.4
+@REM Apache Maven Wrapper 启动脚本，版本 3.3.4
 @REM
-@REM Optional ENV vars
-@REM   MVNW_REPOURL - repo url base for downloading maven distribution
-@REM   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
-@REM   MVNW_VERBOSE - true: enable verbose log; others: silence the output
+@REM 可选环境变量
+@REM   MVNW_REPOURL - 下载 Maven 发行包的仓库基础地址
+@REM   MVNW_USERNAME/MVNW_PASSWORD - 下载 Maven 所需的用户名和密码
+@REM   MVNW_VERBOSE - true：启用详细日志；其他值：静默输出
 @REM ----------------------------------------------------------------------------
 
 @IF "%__MVNW_ARG0_NAME__%"=="" (SET __MVNW_ARG0_NAME__=%~nx0)
@@ -50,7 +50,7 @@ if ($env:MVNW_VERBOSE -eq "true") {
   $VerbosePreference = "Continue"
 }
 
-# calculate distributionUrl, requires .mvn/wrapper/maven-wrapper.properties
+# 获取 distributionUrl，需要读取 .mvn/wrapper/maven-wrapper.properties
 $distributionUrl = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionUrl
 if (!$distributionUrl) {
   Write-Error "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
@@ -70,8 +70,8 @@ switch -wildcard -casesensitive ( $($distributionUrl -replace '^.*/','') ) {
   }
 }
 
-# apply MVNW_REPOURL and calculate MAVEN_HOME
-# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+# 应用 MVNW_REPOURL 并计算 MAVEN_HOME
+# Maven 主目录路径格式： ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
 if ($env:MVNW_REPOURL) {
   $MVNW_REPO_PATTERN = if ($USE_MVND -eq $False) { "/org/apache/maven/" } else { "/maven/mvnd/" }
   $distributionUrl = "$env:MVNW_REPOURL$MVNW_REPO_PATTERN$($distributionUrl -replace "^.*$MVNW_REPO_PATTERN",'')"
@@ -109,7 +109,7 @@ if (! $distributionUrlNameMain -or ($distributionUrlName -eq $distributionUrlNam
   Write-Error "distributionUrl is not valid, must end with *-bin.zip, but found $distributionUrl"
 }
 
-# prepare tmp dir
+# 准备临时目录
 $TMP_DOWNLOAD_DIR_HOLDER = New-TemporaryFile
 $TMP_DOWNLOAD_DIR = New-Item -Itemtype Directory -Path "$TMP_DOWNLOAD_DIR_HOLDER.dir"
 $TMP_DOWNLOAD_DIR_HOLDER.Delete() | Out-Null
@@ -122,7 +122,7 @@ trap {
 
 New-Item -Itemtype Directory -Path "$MAVEN_HOME_PARENT" -Force | Out-Null
 
-# Download and Install Apache Maven
+# 下载并安装 Apache Maven
 Write-Verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
 Write-Verbose "Downloading from: $distributionUrl"
 Write-Verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
@@ -134,7 +134,7 @@ if ($env:MVNW_USERNAME -and $env:MVNW_PASSWORD) {
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $webclient.DownloadFile($distributionUrl, "$TMP_DOWNLOAD_DIR/$distributionUrlName") | Out-Null
 
-# If specified, validate the SHA-256 sum of the Maven distribution zip file
+# 若指定校验值，则验证 Maven 发行包 ZIP 文件的 SHA-256 校验和
 $distributionSha256Sum = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionSha256Sum
 if ($distributionSha256Sum) {
   if ($USE_MVND) {
@@ -146,20 +146,20 @@ if ($distributionSha256Sum) {
   }
 }
 
-# unzip and move
+# 解压并移动
 Expand-Archive "$TMP_DOWNLOAD_DIR/$distributionUrlName" -DestinationPath "$TMP_DOWNLOAD_DIR" | Out-Null
 
-# Find the actual extracted directory name (handles snapshots where filename != directory name)
+# 查找实际解压出的目录名，兼容文件名与目录名不同的快照版本
 $actualDistributionDir = ""
 
-# First try the expected directory name (for regular distributions)
+# 首先尝试预期目录名，适用于常规发行版本
 $expectedPath = Join-Path "$TMP_DOWNLOAD_DIR" "$distributionUrlNameMain"
 $expectedMvnPath = Join-Path "$expectedPath" "bin/$MVN_CMD"
 if ((Test-Path -Path $expectedPath -PathType Container) -and (Test-Path -Path $expectedMvnPath -PathType Leaf)) {
   $actualDistributionDir = $distributionUrlNameMain
 }
 
-# If not found, search for any directory with the Maven executable (for snapshots)
+# 若未找到，则搜索包含 Maven 可执行文件的目录，适用于快照版本
 if (!$actualDistributionDir) {
   Get-ChildItem -Path "$TMP_DOWNLOAD_DIR" -Directory | ForEach-Object {
     $testPath = Join-Path $_.FullName "bin/$MVN_CMD"

@@ -22,8 +22,8 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Owns the process lock and the file-backed H2 transaction boundary. Existing
- * state.json data is imported once, then all state and feed cursors live in H2.
+ * 负责管理进程锁和基于文件存储的 H2 事务边界。已有的
+ * state.json 数据只导入一次，之后所有状态和事件流游标均存储在 H2 中。
  */
 @Component
 public class StateStore implements UpgradeStateRepository {
@@ -485,7 +485,7 @@ public class StateStore implements UpgradeStateRepository {
     }
 
     /**
-     * Feed positions are durable SSE cursors and remain monotonic across restarts.
+     * 事件流位置用作持久化的 SSE 游标，并在进程重启后保持单调递增。
      */
     public synchronized long lastFeedId() throws IOException {
         try (var query = db.prepareStatement("SELECT COALESCE(MAX(position), 0) FROM operation_feed");
@@ -548,7 +548,7 @@ public class StateStore implements UpgradeStateRepository {
     }
 
     /**
-     * Adds historical stage events when opening a database created before the feed table existed.
+     * 打开尚未包含事件流表的旧数据库时，补充历史阶段事件。
      */
     private void backfillFeed() throws IOException {
         write(() -> {

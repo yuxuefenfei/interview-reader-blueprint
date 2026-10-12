@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.zip.ZipInputStream;
 
 /**
- * Owns GitHub HTTP details; release trust decisions belong to the verifier.
+ * 封装 GitHub 的 HTTP 通信细节；发布版本是否可信由验证器判定。
  */
 @Component
 public class GithubActionsClient {

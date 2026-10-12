@@ -12,7 +12,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 /**
- * Only this client knows the local main-app URLs and internal-token header.
+ * 本地主应用的地址和内部令牌请求头仅由此客户端封装。
  */
 @Component
 public class MainStatusApiClient {
@@ -59,7 +59,7 @@ public class MainStatusApiClient {
                 return json.createObjectNode();
             return json.readTree(response.body());
         } catch (Exception ignored) {
-            // A missing or restarting main process is an unavailable health result.
+            // 主进程不存在或正在重启时，健康检查结果为不可用。
             return json.createObjectNode();
         }
     }

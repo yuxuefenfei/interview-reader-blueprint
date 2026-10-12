@@ -30,8 +30,8 @@ export default defineConfig(({mode}) => {
             vueUsePureAnnotationCompatibility,
             Components({
                 dts: mode === "development" ? "src/generated/components.d.ts" : false,
-                // Component styles belong to the production chunks. Unit tests stub the
-                // widgets and must not ask Node's native ESM loader to execute CSS files.
+                // 组件样式应打包到生产资源中。单元测试使用组件替身，
+                // 不能让 Node 的原生 ESM 加载器执行 CSS 文件。
                 resolvers: [ElementPlusResolver({importStyle: mode === "test" ? false : "css"})]
             }),
             vue()

@@ -14,7 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * Coordinates console use cases without exposing HTTP uploads or persistence records.
+ * 协调控制台业务流程，并封装 HTTP 上传细节和持久化记录。
  */
 @Service
 @RequiredArgsConstructor

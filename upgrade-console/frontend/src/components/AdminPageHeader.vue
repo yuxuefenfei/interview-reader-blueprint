@@ -13,7 +13,7 @@ withDefaults(defineProps<{
 const emit = defineEmits<{ back: [] }>();
 const helpOpen = ref(false);
 
-// Help remains dismissible after keyboard focus moves to another header control.
+// 键盘焦点移至其他页头控件后，仍可关闭帮助提示。
 watch(helpOpen, (open, _, onCleanup) => {
   if (!open) return;
   const closeOnEscape = (event: KeyboardEvent) => {

@@ -32,8 +32,8 @@ public class DocumentPackageNormalizer {
     }
 
     /**
-     * Generates opaque, immutable section anchors at the import boundary. External anchor values are deliberately
-     * ignored so titles and import-package details can never affect stable reading links.
+     * 在导入边界生成不透明且不可变的章节锚点；主动忽略外部传入的锚点，
+     * 确保标题和导入包细节不会影响稳定的阅读链接。
      */
     public NormalizationResult normalize(DocumentPackage source, SourceType importSourceType) {
         if (source == null) {
@@ -48,8 +48,8 @@ public class DocumentPackageNormalizer {
     }
 
     /**
-     * Upgrades a snapshot created before opaque anchors were introduced. This is intentionally idempotent: packages
-     * that already have only opaque anchors keep the exact values generated when the job was first processed.
+     * 升级引入不透明锚点之前创建的快照。此操作保持幂等：
+     * 若导入包已经全部使用不透明锚点，则保留任务首次处理时生成的原始值。
      */
     public NormalizationResult upgradeLegacyAnchors(DocumentPackage source) {
         if (source == null || source.sections() == null || source.sections().stream()

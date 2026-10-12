@@ -45,7 +45,7 @@ export const consoleApi = {
             xhr.upload.addEventListener("progress", event => onProgress?.({
                 phase: "uploading", loaded: event.loaded, total: event.lengthComputable ? event.total : null
             }));
-            // Only the request body is complete here; the final response confirms verification.
+            // 此时仅完成请求体上传；验证结果仍需由最终响应确认。
             xhr.upload.addEventListener("load", event => onProgress?.({
                 phase: "verifying", loaded: event.lengthComputable ? event.loaded : file.size,
                 total: event.lengthComputable ? event.total : file.size
@@ -64,7 +64,7 @@ export const consoleApi = {
             xhr.addEventListener("timeout", () => reject(new Error("上传请求超时，请查看升级包列表确认结果")));
             xhr.open("POST", "/api/releases");
             xhr.responseType = "json";
-            // The browser sets the multipart boundary and sends existing same-origin credentials.
+            // 由浏览器设置 multipart 边界，并携带现有的同源凭据。
             xhr.send(form);
         }),
     deploy: (id: string) =>

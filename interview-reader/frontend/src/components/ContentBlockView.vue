@@ -73,8 +73,8 @@ const imageUrl = computed(() => {
   return typeof props.block.payload.src === "string" ? props.block.payload.src : typeof props.block.payload.url === "string" ? props.block.payload.url : "";
 });
 
-// A block keeps its component instance while the editor broadcasts a new asset key.
-// Retry the image when that immutable resource URL changes instead of retaining an old load failure.
+// 编辑器广播新的资源键时，内容块会保留原有组件实例。
+// 不可变资源的 URL 变化时重新加载图片，避免保留之前的加载失败状态。
 watch(imageUrl, () => {
   imageLoadFailed.value = false;
   imageRetryKey.value = 0;

@@ -830,7 +830,7 @@ function persistExpandedTocNodeIds(): void {
   try {
     localStorage.setItem(tocExpansionStorageKey(documentId), JSON.stringify(expandedTocNodeIds.value));
   } catch {
-    // Reading still works when storage is unavailable (for example, private browsing quota limits).
+    // 本地存储不可用时仍可正常阅读，例如隐私浏览模式下达到存储配额限制。
   }
 }
 
@@ -918,7 +918,7 @@ function loadDesktopNavCollapsed(): boolean {
     const stored = localStorage.getItem("reader.desktopNav.collapsed");
     if (stored === "true" || stored === "false") return stored === "true";
   } catch {
-    // Use the responsive default if storage is unavailable.
+    // 本地存储不可用时，使用响应式布局的默认值。
   }
   return window.innerWidth < 1100;
 }
@@ -928,7 +928,7 @@ async function toggleDesktopNav(): Promise<void> {
   try {
     localStorage.setItem("reader.desktopNav.collapsed", String(desktopNavCollapsed.value));
   } catch {
-    // The current session can still use the selected layout.
+    // 当前会话仍可使用所选布局。
   }
   if (!desktopNavCollapsed.value) {
     await nextTick();

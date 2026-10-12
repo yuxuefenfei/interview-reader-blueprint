@@ -43,7 +43,7 @@ public class SourceFileStorage {
     }
 
     /**
-     * Idempotently deletes one object only when its resolved path remains under the configured storage root.
+     * 仅当解析后的路径仍位于配置的存储根目录下时，才以幂等方式删除该对象。
      */
     public void deleteIfManaged(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {

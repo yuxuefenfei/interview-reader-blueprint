@@ -63,7 +63,7 @@ public class UpgradeStatusController {
              var rows = statement.executeQuery("SELECT DATABASE(), @@server_uuid")) {
             if (rows.next()) return new DatabaseIdentity(rows.getString(1), rows.getString(2));
         } catch (Exception ignored) {
-            // Readiness reports the database failure; the console refuses an unknown backup target.
+            // 就绪检查会报告数据库故障；控制台会拒绝未知的备份目标。
         }
         return new DatabaseIdentity("unknown", "unknown");
     }

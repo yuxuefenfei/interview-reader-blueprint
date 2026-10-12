@@ -258,8 +258,8 @@ public class VersionRevisionService {
     }
 
     /**
-     * Removes an empty structural node without removing its subtree.
-     * Direct children are promoted into the deleted node's position and the complete tree is normalized afterwards.
+     * 删除空的结构节点，并保留其子树。
+     * 将直接子节点提升至被删除节点的位置，随后规范化整棵目录树。
      */
     @Transactional
     public ManagementDtos.EditorSnapshot deleteNode(UUID versionId, UUID nodeId, long draftRevision) {
@@ -398,8 +398,8 @@ public class VersionRevisionService {
     }
 
     /**
-     * Stores a verified image and attaches it to one image block in the same draft-revision update.
-     * This avoids a temporary, unreferenced upload when a browser refreshes between two requests.
+     * 在同一次草稿修订更新中，存储已验证的图片并将其绑定到指定图片块。
+     * 避免浏览器在两次请求之间刷新时，留下未被引用的临时上传文件。
      */
     @Transactional
     public ManagementDtos.ImageBlockUploadResult replaceBlockImage(
@@ -668,7 +668,7 @@ public class VersionRevisionService {
                 return new Integer[]{image.getWidth(), image.getHeight()};
             }
         } catch (IOException ignored) {
-            // Header validation above remains authoritative for WebP when no ImageIO WebP reader is installed.
+            // 未安装 ImageIO WebP 读取器时，仍以上述文件头校验结果作为 WebP 的判定依据。
         }
         return new Integer[]{null, null};
     }
@@ -686,7 +686,7 @@ public class VersionRevisionService {
     }
 
     /**
-     * Removes assets created by this editor only after no image block in the draft references them.
+     * 仅当草稿中的所有图片块都不再引用资源时，才删除由该编辑器创建的资源。
      */
     private void cleanupUnusedEditorImages(String versionId) {
         var referencedKeys = contentBlockMapper.selectListByQuery(QueryWrapper.create()

@@ -14,7 +14,7 @@ import java.util.HexFormat;
 import java.util.jar.JarFile;
 
 /**
- * Verifies a local JAR against one successful, trusted main-branch build.
+ * 使用一次成功且可信的主分支构建，校验本地 JAR。
  */
 @Component
 @RequiredArgsConstructor
@@ -31,7 +31,7 @@ public class GithubArtifactVerifier {
     private static final String BOOT_MAIN_CLASS = "org.springframework.boot.loader.launch.JarLauncher";
     private static final String APPLICATION_CLASS =
             "BOOT-INF/classes/cn/wangwenzhu/ireader/InterviewReaderApplication.class";
-    // Previously verified releases may still contain the pre-rename entry point.
+    // 此前已验证的发布版本可能仍包含重命名前的入口类。
     private static final String LEGACY_APPLICATION_CLASS =
             "BOOT-INF/classes/com/example/interviewreader/InterviewReaderApplication.class";
     private final UpgradeSettings settings;

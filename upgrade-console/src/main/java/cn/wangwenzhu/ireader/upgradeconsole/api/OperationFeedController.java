@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  *
- * Same-origin Basic Auth protects both historical log pages and the live stream.
+ * 通过同源 HTTP 基本认证保护历史日志分页和实时事件流。
  */
 @Slf4j
 @RestController
@@ -36,7 +36,7 @@ public class OperationFeedController {
     }
 
     /**
-     * Replays committed H2 rows after the browser cursor before waiting for new rows.
+     * 先重放浏览器游标之后已提交的 H2 记录，再等待新记录。
      */
     @GetMapping(value = "/api/feed/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@RequestParam(defaultValue = "0") long afterId,
@@ -68,7 +68,7 @@ public class OperationFeedController {
                 try {
                     entries = feed.after(position);
                 } catch (IOException | RuntimeException storageFailure) {
-                    // A persistence failure is a server error, not a client disconnect.
+                    // 持久化失败应作为服务端错误处理，不能视为客户端断开连接。
                     log.error("Failed to read persisted SSE feed after cursor {}", position, storageFailure);
                     finish(emitter, connected, storageFailure);
                     return;
@@ -86,11 +86,11 @@ public class OperationFeedController {
                 if (entries.size() < 100) Thread.sleep(POLL_INTERVAL_MILLIS);
             }
         } catch (IOException disconnected) {
-            // Tomcat/Spring own error completion after a failed write. Completing again
-            // races AsyncListener.onError and attempts to reuse an invalid AsyncContext.
+            // 写入失败后的错误结束流程由 Tomcat/Spring 负责；再次结束请求
+            // 会与 AsyncListener.onError 发生竞争，并尝试复用已失效的 AsyncContext。
             log.debug("SSE client disconnected after cursor {}", position, disconnected);
         } catch (IllegalStateException completed) {
-            // Completion can win the race between the connected check and send().
+            // 在连接状态检查与 send() 调用之间，请求可能已被并发结束。
             log.debug("SSE response is no longer writable after cursor {}", position, completed);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -104,7 +104,7 @@ public class OperationFeedController {
     }
 
     /**
-     * Completes only application-initiated termination; null means normal cancellation.
+     * 仅结束由应用发起的终止流程；null 表示正常取消。
      */
     private void finish(SseEmitter emitter, AtomicBoolean connected, Throwable failure) {
         if (!connected.getAndSet(false)) return;
@@ -112,7 +112,7 @@ public class OperationFeedController {
             if (failure == null) emitter.complete();
             else emitter.completeWithError(failure);
         } catch (IllegalStateException disconnected) {
-            // A container error may complete the request immediately after our check.
+            // 完成状态检查后，容器错误可能立即结束该请求。
             log.debug("SSE request already completed", disconnected);
         }
     }

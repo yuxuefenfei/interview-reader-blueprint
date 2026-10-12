@@ -1,46 +1,46 @@
-/* ── Design tokens ──────────────────────────────────────────── */
+/* ── 设计变量 ──────────────────────────────────────────── */
 :root {
-    /* Brand */
+    /* 品牌色 */
     --brand-500: #0f766e;
     --brand-600: #0b6059;
     --brand-700: #075d56;
     --brand-100: #e7f7f3;
     --brand-050: #f3fbf8;
-    /* Ink */
+    /* 文字颜色 */
     --ink-900: #172033;
     --ink-700: #334155;
     --ink-500: #667085;
     --ink-300: #98a2b3;
-    /* Lines */
+    /* 分隔线 */
     --line-200: #dce4e9;
     --line-100: #e8eef2;
-    /* Surface */
+    /* 背景层 */
     --surface-0: #f3f6f8;
     --surface-1: #ffffff;
     --surface-2: #fbfcfd;
-    /* Semantic */
+    /* 语义状态色 */
     --danger-600: #b42318;
     --danger-050: #fff7f7;
     --warning-600: #a15c07;
-    /* Radius */
+    /* 圆角 */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
-    /* Controls */
+    /* 控件 */
     --action-gap: 8px;
     --action-control-height: 32px;
-    /* Admin sidebar */
+    /* 管理侧栏 */
     --admin-sidebar-bg: #071c2f;
     --admin-sidebar-hover: #112f48;
     --admin-sidebar-active: #0f766e;
     --admin-sidebar-text: #9fb2c3;
     --admin-sidebar-text-strong: #ffffff;
-    /* Layout */
+    /* 布局 */
     --header-h: 64px;
     --toc-w: 280px;
 }
 
-/* ── Element Plus primary override ─────────────────────────── */
+/* ── Element Plus 主色覆盖 ─────────────────────────── */
 :root {
     --el-color-primary: #0f766e;
     --el-color-primary-light-3: #3d9a92;
@@ -52,7 +52,7 @@
     --el-font-family: inherit;
 }
 
-/* ── Base ───────────────────────────────────────────────────── */
+/* ── 基础样式 ───────────────────────────────────────────────────── */
 * {
     box-sizing: border-box;
 }
@@ -135,7 +135,7 @@ select:focus-visible {
     outline-offset: -2px;
 }
 
-/* ── Skip link ──────────────────────────────────────────────── */
+/* ── 跳转到主内容的链接 ──────────────────────────────────────────────── */
 .skip-link {
     position: fixed;
     z-index: 10000;
@@ -155,7 +155,7 @@ select:focus-visible {
     transform: translateY(0);
 }
 
-/* ── App-level banners ──────────────────────────────────────── */
+/* ── 应用级横幅 ──────────────────────────────────────── */
 .app-status-banner, .app-update-banner {
     position: fixed;
     z-index: 9999;
@@ -188,7 +188,7 @@ select:focus-visible {
     cursor: pointer;
 }
 
-/* ── Boot / Login ───────────────────────────────────────────── */
+/* ── 启动与登录 ───────────────────────────────────────────── */
 .boot-screen, .login-page {
     min-height: 100vh;
     display: grid;
@@ -248,7 +248,7 @@ select:focus-visible {
     width: 100%;
 }
 
-/* ── Brand mark ─────────────────────────────────────────────── */
+/* ── 品牌标识 ─────────────────────────────────────────────── */
 .brand-mark {
     width: 34px;
     height: 34px;
@@ -258,7 +258,7 @@ select:focus-visible {
     object-fit: contain;
 }
 
-/* ── Admin layout ───────────────────────────────────────────── */
+/* ── 管理后台布局 ───────────────────────────────────────────── */
 .admin-layout {
     --admin-sidebar-width: 236px;
     --admin-header-height: 80px;
@@ -801,7 +801,7 @@ select:focus-visible {
     max-width: none;
 }
 
-/* ── Reader page ─────────────────────────────────────────────── */
+/* ── 阅读页面 ─────────────────────────────────────────────── */
 .reader-page {
     --reader-bg: #f5f7f8;
     --reader-surface: #fff;
@@ -892,7 +892,7 @@ select:focus-visible {
     background: var(--reader-surface);
 }
 
-/* Desktop reading progress bar */
+/* 桌面端阅读进度条 */
 .reader-header-progress {
     position: absolute;
     left: 0;
@@ -1018,8 +1018,8 @@ select:focus-visible {
     margin-left: auto;
 }
 
-/* Keep the responsive account menu stronger than Element Plus' lazy-loaded
-   .el-dropdown { display: inline-flex } rule. */
+/* 确保响应式账户菜单的样式优先级高于 Element Plus 延迟加载的
+   .el-dropdown { display: inline-flex } 规则。 */
 .reader-header-actions > .reader-account-menu {
     display: none;
 }
@@ -1133,7 +1133,7 @@ select:focus-visible {
     height: 100%;
 }
 
-/* TOC tree */
+/* 目录树 */
 .toc-tree {
     margin: 0;
     padding: 0;
@@ -1303,7 +1303,7 @@ select:focus-visible {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, #c2410c, transparent 58%);
 }
 
-/* Content area */
+/* 内容区域 */
 .reader-content {
     min-width: 0;
     overflow: auto;
@@ -1380,7 +1380,7 @@ select:focus-visible {
     margin: 6px 0;
 }
 
-/* Code block */
+/* 代码块 */
 .code-block {
     width: 100%;
     min-width: 0;
@@ -1531,7 +1531,7 @@ select:focus-visible {
     color: var(--code-symbol);
 }
 
-/* Table */
+/* 表格 */
 .table-wrap {
     margin: 20px 0;
     overflow: auto;
@@ -1559,7 +1559,7 @@ select:focus-visible {
     border-bottom: 0;
 }
 
-/* Callout */
+/* 提示块 */
 .callout {
     display: grid;
     gap: 6px;
@@ -1570,7 +1570,7 @@ select:focus-visible {
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
-/* Formula & images */
+/* 公式与图片 */
 .image-block {
     display: grid;
     gap: 8px;
@@ -1628,7 +1628,7 @@ select:focus-visible {
     cursor: pointer;
 }
 
-/* Pagination */
+/* 分页 */
 .chapter-pagination {
     width: min(100%, var(--reader-column));
     display: flex;
@@ -2362,7 +2362,7 @@ select:focus-visible {
     }
 }
 
-/* Admin workspace refresh: dense operational surfaces with clear primary actions. */
+/* 管理工作区样式更新：紧凑呈现操作信息，并突出主要操作。 */
 .document-table .el-table__row {
     cursor: pointer;
 }
@@ -3923,7 +3923,7 @@ select:focus-visible {
     }
 }
 
-/* ── Login card enter animation ─────────────────────────────── */
+/* ── 登录卡片入场动画 ─────────────────────────────── */
 @media (prefers-reduced-motion: no-preference) {
     .login-card-enter {
         animation: login-card-in 160ms ease-out both;
@@ -3941,7 +3941,7 @@ select:focus-visible {
     }
 }
 
-/* ── Reader header tools and comfort panel ─────────────────── */
+/* ── 阅读页头工具与舒适度设置面板 ─────────────────── */
 .reader-header-search-trigger, .reader-comfort-button, .reader-theme-trigger {
     display: inline-flex;
     align-items: center;
