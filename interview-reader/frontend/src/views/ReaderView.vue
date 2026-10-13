@@ -1081,7 +1081,7 @@ function message(value: unknown): string {
       class="reader-page"
   >
     <header class="reader-header">
-      <button :aria-expanded="drawer" aria-label="打开目录" class="reader-menu-button" type="button"
+      <button :aria-expanded="drawer" aria-label="打开目录" class="ui-button ui-button--icon reader-menu-button" type="button"
               @click="drawer = true">
         <el-icon>
           <Tickets/>
@@ -1096,7 +1096,7 @@ function message(value: unknown): string {
       <div class="reader-header-actions ui-action-row ui-action-row--nowrap">
         <button
             aria-label="搜索文档内容"
-            class="reader-header-search-trigger"
+            class="ui-button reader-header-search-trigger"
             title="搜索文档内容"
             type="button"
             @click="openSearch"
@@ -1107,13 +1107,13 @@ function message(value: unknown): string {
             <Search/>
           </el-icon>
         </button>
-        <el-popover v-model:visible="comfortOpen" :width="340" placement="bottom-end" popper-class="reader-comfort-popper"
+        <el-popover v-model:visible="comfortOpen" :width="340" placement="bottom-end" :popper-class="`reader-comfort-popper theme-${theme}`"
                     trigger="click">
           <template #reference>
             <button
                 :aria-expanded="comfortOpen"
                 aria-label="阅读设置"
-                class="reader-comfort-button reader-comfort-desktop"
+                class="ui-button reader-comfort-button reader-comfort-desktop"
                 title="阅读设置"
                 type="button"
             >
@@ -1136,7 +1136,7 @@ function message(value: unknown): string {
         <button
             :aria-expanded="mobileComfortOpen"
             aria-label="阅读设置"
-            class="reader-comfort-button reader-comfort-mobile"
+            class="ui-button ui-button--icon reader-comfort-button reader-comfort-mobile"
             title="阅读设置"
             type="button"
             @click="mobileComfortOpen = true"
@@ -1152,7 +1152,7 @@ function message(value: unknown): string {
         </el-button>
         <el-dropdown v-if="props.online !== false" class="reader-account-menu" placement="bottom-end" trigger="click"
                      @command="handleAccountCommand">
-          <button aria-label="账户菜单" class="reader-theme-trigger" title="账户菜单" type="button">
+          <button aria-label="账户菜单" class="ui-button reader-theme-trigger" title="账户菜单" type="button">
             <el-icon>
               <User/>
             </el-icon>
@@ -1189,7 +1189,7 @@ function message(value: unknown): string {
 
     <aside :class="{ collapsed: desktopNavCollapsed }" class="reader-desktop-nav">
       <template v-if="desktopNavCollapsed">
-        <button aria-label="展开文档目录" class="reader-desktop-nav-expand" type="button" @click="toggleDesktopNav">
+        <button aria-label="展开文档目录" class="ui-button ui-button--text ui-button--icon reader-desktop-nav-expand" type="button" @click="toggleDesktopNav">
           <Expand aria-hidden="true"/>
         </button>
         <div :aria-valuenow="Math.round(currentDocumentProgressRatio * 100)" aria-label="文档阅读位置" aria-valuemax="100" aria-valuemin="0"
@@ -1200,7 +1200,7 @@ function message(value: unknown): string {
       <template v-else-if="desktopNavView === 'toc'">
         <div class="reader-desktop-nav-header">
           <ReaderDocumentSelector :document="navigationDocument" @open="showDesktopDocumentsView"/>
-          <button aria-label="收起文档侧栏" class="reader-desktop-nav-collapse" title="收起文档侧栏" type="button"
+          <button aria-label="收起文档侧栏" class="ui-button ui-button--text ui-button--icon reader-desktop-nav-collapse" title="收起文档侧栏" type="button"
                   @click="toggleDesktopNav">
             <Fold aria-hidden="true"/>
           </button>
@@ -1224,12 +1224,12 @@ function message(value: unknown): string {
       </template>
       <template v-else>
         <div class="reader-desktop-nav-header document-browser-header">
-          <button aria-label="返回当前文档目录" class="reader-drawer-back" type="button" @click="showDesktopTocView">
+          <button aria-label="返回当前文档目录" class="ui-button ui-button--text reader-drawer-back" type="button" @click="showDesktopTocView">
             <ArrowLeftBold aria-hidden="true" class="reader-drawer-back-icon"/>
             返回目录
           </button>
           <strong>切换文档</strong>
-          <button aria-label="收起文档侧栏" class="reader-desktop-nav-collapse" title="收起文档侧栏" type="button"
+          <button aria-label="收起文档侧栏" class="ui-button ui-button--text ui-button--icon reader-desktop-nav-collapse" title="收起文档侧栏" type="button"
                   @click="toggleDesktopNav">
             <Fold aria-hidden="true"/>
           </button>
@@ -1271,7 +1271,7 @@ function message(value: unknown): string {
                             @update:wrap-code="comfort.codeWrap = $event"/>
           <div v-if="content.nextAfterSeq" :ref="captureContentLoadSentinel" class="reader-load-more">
             <span v-if="loadingMore" role="status">正在载入后续内容…</span>
-            <button v-else-if="contentLoadError" type="button" @click="loadMoreContent">载入失败，点击重试</button>
+            <button v-else-if="contentLoadError" class="ui-button" type="button" @click="loadMoreContent">载入失败，点击重试</button>
             <span v-else class="sr-only">继续阅读时将自动载入后续内容</span>
           </div>
         </article>
@@ -1307,7 +1307,7 @@ function message(value: unknown): string {
           <div class="reader-drawer-sticky">
             <header>
               <strong>文档目录</strong>
-              <el-button :icon="Close" aria-label="关闭目录" circle @click="drawer = false"/>
+              <el-button aria-label="关闭目录" class="ui-close-button" @click="drawer = false"><Close aria-hidden="true" /></el-button>
             </header>
             <ReaderDocumentSelector :document="navigationDocument" @open="showMobileDocumentsView"/>
           </div>
@@ -1332,7 +1332,7 @@ function message(value: unknown): string {
         <template v-else>
           <div class="reader-drawer-sticky">
             <header>
-              <button aria-label="返回当前文档目录" class="reader-drawer-back" type="button" @click="showMobileTocView">
+              <button aria-label="返回当前文档目录" class="ui-button ui-button--text reader-drawer-back" type="button" @click="showMobileTocView">
                 <ArrowLeftBold aria-hidden="true" class="reader-drawer-back-icon"/>
                 返回目录
               </button>
@@ -1368,14 +1368,14 @@ function message(value: unknown): string {
       <section class="reader-search-sheet">
         <header>
           <strong>搜索文档内容</strong>
-          <el-button :icon="Close" aria-label="关闭搜索" circle @click="searchOpen = false"/>
+          <el-button aria-label="关闭搜索" class="ui-close-button" @click="searchOpen = false"><Close aria-hidden="true" /></el-button>
         </header>
         <div aria-label="搜索范围" class="comfort-option-grid"
              role="group" style="width:max-content;grid-template-columns:repeat(2,minmax(0,1fr))">
-          <button :aria-pressed="searchScope === 'document'" :class="{ active: searchScope === 'document' }"
+          <button class="ui-button" :aria-pressed="searchScope === 'document'" :class="{ active: searchScope === 'document' }"
                   type="button" @click="setSearchScope('document')">当前文档
           </button>
-          <button :aria-pressed="searchScope === 'all'" :class="{ active: searchScope === 'all' }" type="button"
+          <button class="ui-button" :aria-pressed="searchScope === 'all'" :class="{ active: searchScope === 'all' }" type="button"
                   @click="setSearchScope('all')">全部文档
           </button>
         </div>
@@ -1399,7 +1399,7 @@ function message(value: unknown): string {
           <template v-else-if="searchLoading">正在搜索“{{ query.trim() }}”…</template>
           <template v-else-if="searchError">
             <span>{{ searchError }}</span>
-            <button type="button" @click="searchNow">重新搜索</button>
+            <button class="ui-button ui-button--text" type="button" @click="searchNow">重新搜索</button>
           </template>
           <template v-else-if="searchCompletedTerm && searchHits.length === 0">没有找到“{{
               searchCompletedTerm
@@ -1437,7 +1437,7 @@ function message(value: unknown): string {
       <section class="reader-mobile-comfort-sheet">
         <header>
           <strong>阅读设置</strong>
-          <el-button :icon="Close" aria-label="关闭阅读设置" circle @click="mobileComfortOpen = false"/>
+          <el-button aria-label="关闭阅读设置" class="ui-close-button" @click="mobileComfortOpen = false"><Close aria-hidden="true" /></el-button>
         </header>
         <ReaderComfortSettings
             v-model:code-wrap="comfort.codeWrap"

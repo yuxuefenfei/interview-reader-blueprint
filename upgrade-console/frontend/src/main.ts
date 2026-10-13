@@ -8,6 +8,7 @@ import "element-plus/es/components/message-box/style/css";
 import App from "./App.vue";
 import router from "./router";
 import "./styles.css";
+import "../../../frontend-shared/buttons.css";
 
 const app = createApp(App).use(router);
 app.use(ElLoading);

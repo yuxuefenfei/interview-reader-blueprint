@@ -107,7 +107,7 @@ async function loadSavedPreview(force = false): Promise<void> {
       <div><p class="eyebrow">弹出预览</p><strong>{{ document?.title || "草稿预览" }}</strong></div>
       <div class="detached-preview-actions ui-action-row ui-action-row--nowrap"><span
           :class="{ live: connected }">{{ statusLabel }}</span>
-        <el-button :icon="RefreshRight" aria-label="刷新已保存草稿" circle title="刷新已保存草稿"
+        <el-button :icon="RefreshRight" aria-label="刷新已保存草稿" class="ui-button--icon" title="刷新已保存草稿"
                    @click="loadSavedPreview(true)"/>
       </div>
     </header>

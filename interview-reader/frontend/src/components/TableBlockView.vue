@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {FullScreen} from "@element-plus/icons-vue";
+import {Close, FullScreen} from "@element-plus/icons-vue";
 import {computed, type CSSProperties, nextTick, onBeforeUnmount, ref, watch} from "vue";
 
 const props = defineProps<{
@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
     <div v-if="previewEnabled" class="table-toolbar">
       <span class="table-toolbar-label">table</span>
       <button
-        aria-haspopup="dialog" aria-label="放大查看表格" class="table-preview-trigger" title="放大查看表格"
+        aria-haspopup="dialog" aria-label="放大查看表格" class="ui-button ui-button--text ui-button--icon table-preview-trigger" title="放大查看表格"
         type="button" @click.stop="openPreview"
       >
         <FullScreen aria-hidden="true" class="table-preview-icon" />
@@ -87,9 +87,11 @@ onBeforeUnmount(() => {
         <div class="table-preview-header">
           <span>表格预览</span>
           <button
-            ref="previewClose" aria-label="关闭表格预览" class="table-preview-trigger" type="button"
+            ref="previewClose" aria-label="关闭表格预览" class="ui-button ui-button--icon ui-close-button" type="button"
             @click="previewOpen = false"
-          >关闭</button>
+          >
+            <Close aria-hidden="true" />
+          </button>
         </div>
       </template>
       <div aria-label="完整表格，可滚动查看" class="table-wrap table-preview-scroll" tabindex="0">
@@ -135,51 +137,14 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.table-toolbar .table-preview-trigger {
-  width: 28px;
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--reader-muted);
-  font-size: 13px;
-}
-
 .table-preview-icon {
   width: 16px;
   height: 16px;
 }
 
-.table-preview-trigger:focus-visible {
-  outline: 2px solid var(--reader-accent);
-  outline-offset: -2px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .table-toolbar .table-preview-trigger:hover {
-    background: color-mix(in srgb, var(--reader-accent), transparent 94%);
-    color: var(--reader-accent);
-  }
-}
-
 .table-block--reader > .table-wrap {
   border: 0;
   border-radius: 0;
-}
-
-.table-preview-trigger {
-  min-height: 44px;
-  padding: 6px 12px;
-  border: 1px solid var(--reader-line, #dce4e9);
-  border-radius: var(--radius-sm);
-  background: var(--reader-surface, #fff);
-  color: var(--reader-accent, #0f766e);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
 }
 
 .table-block--reader > .table-wrap,
@@ -245,11 +210,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 760px) {
-  .table-toolbar .table-preview-trigger {
-    width: 44px;
-    min-height: 44px;
-  }
-
   :global(.table-preview-dialog) {
     width: calc(100% - 16px);
     max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));

@@ -58,7 +58,7 @@ async function deploy(release: Release): Promise<void> {
     await ElMessageBox.confirm(
         `确认升级至 Actions #${release.runId}（提交 ${shortId(release.commit)}）？控制台将停写、排空、备份、切换 JAR 并检查新版本。`,
         "确认开始升级",
-        {type: "warning", confirmButtonText: "开始升级", cancelButtonText: "取消"}
+        {type: "warning", confirmButtonType: "primary", confirmButtonText: "开始升级", cancelButtonText: "取消"}
     );
   } catch {
     return;
@@ -91,7 +91,7 @@ function records(release: Release): void {
                     name="release-search" placeholder="搜索提交或运行 ID…" @clear="load(true)"
                     @keyup.enter="load(true)"/>
           <el-tooltip content="刷新升级包" placement="bottom">
-            <el-button :icon="RefreshRight" :loading="loading" aria-label="刷新升级包" circle @click="load(true)"/>
+            <el-button :icon="RefreshRight" :loading="loading" aria-label="刷新升级包" class="ui-button--icon" @click="load(true)"/>
           </el-tooltip>
           <el-button :icon="Upload" type="primary" @click="router.push('/upload')">上传升级包</el-button>
         </div>

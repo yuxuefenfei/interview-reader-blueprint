@@ -72,7 +72,7 @@ function message(value: unknown): string {
                     clearable name="admin-document-search" placeholder="搜索文档名称或标识…" @clear="load(true)"
                     @keyup.enter="load(true)"/>
           <el-tooltip content="刷新文档" placement="bottom">
-            <el-button :icon="RefreshRight" :loading="loading" aria-label="刷新文档" circle @click="load(true)"/>
+            <el-button :icon="RefreshRight" :loading="loading" aria-label="刷新文档" class="ui-button--icon" @click="load(true)"/>
           </el-tooltip>
           <el-button :icon="Upload" type="primary" @click="router.push('/admin/imports')">导入文档</el-button>
         </div>

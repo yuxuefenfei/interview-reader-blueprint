@@ -87,7 +87,7 @@ onBeforeUnmount(() => loadObserver?.disconnect());
       <div v-if="documents.length === 0 && !loading" class="reader-toc-state">没有匹配的文档</div>
       <div v-if="loadError" class="reader-document-load-state" role="alert">
         <span>{{ loadError }}</span>
-        <button type="button" @click="emit('loadMore')">重试</button>
+        <button class="ui-button" type="button" @click="emit('loadMore')">重试</button>
       </div>
       <div v-else-if="loading" class="reader-document-load-state" role="status">正在加载文档…</div>
       <div v-if="hasMore" ref="loadSentinel" aria-hidden="true" class="reader-document-load-sentinel"></div>

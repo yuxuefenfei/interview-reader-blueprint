@@ -127,6 +127,6 @@ function applyUpdate(): void {
   </div>
   <div v-if="ready && authenticated && updateAvailable" class="app-update-banner" role="status">
     <span>新版本已准备好。</span>
-    <button type="button" @click="applyUpdate">刷新并更新</button>
+    <button class="ui-button" type="button" @click="applyUpdate">刷新并更新</button>
   </div>
 </template>

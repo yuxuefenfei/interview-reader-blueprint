@@ -55,8 +55,7 @@ async function copyIdentifier(): Promise<void> {
           :class="{ 'is-copied': copyLabel === '已复制' }"
           :disabled="!value"
           :icon="copyLabel === '已复制' ? Check : CopyDocument"
-          circle
-          class="readonly-identifier-copy"
+          class="readonly-identifier-copy ui-button ui-button--text ui-button--icon"
           text
           @click="copyIdentifier"
       />
@@ -91,17 +90,7 @@ async function copyIdentifier(): Promise<void> {
 }
 
 .readonly-identifier-copy {
-  width: 28px;
-  min-height: 28px;
-  height: 28px;
   flex: 0 0 auto;
-  color: var(--ink-300);
-}
-
-.readonly-identifier-copy:hover,
-.readonly-identifier-copy:focus-visible {
-  color: var(--brand-500);
-  background: var(--brand-050);
 }
 
 .readonly-identifier-copy.is-copied {

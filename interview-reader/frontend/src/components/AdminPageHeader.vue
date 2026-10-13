@@ -41,7 +41,7 @@ watch(helpOpen, (open, _, onCleanup) => {
             <template #reference>
               <el-button
                 :aria-label="`${title}：查看页面说明`" :icon="QuestionFilled"
-                class="admin-page-help-button" text
+                class="admin-page-help-button ui-button ui-button--text ui-button--icon" text
               />
             </template>
             <p class="admin-page-help-title">{{ title }}</p>

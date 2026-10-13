@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import {Close} from "@element-plus/icons-vue";
 import {computed, type CSSProperties, nextTick, onBeforeUnmount, ref, watch} from "vue";
 import type {ContentBlock} from "../types/api";
 import type {ReaderTheme} from "../utils/readingComfort";
@@ -35,15 +36,6 @@ const imageLightboxStyle: CSSProperties = {
   background: "rgba(7, 15, 24, .92)",
 };
 const imageLightboxToolbarStyle: CSSProperties = {justifyContent: "flex-end", minHeight: "44px", color: "#f8fafc"};
-const imageLightboxButtonStyle: CSSProperties = {
-  minHeight: "36px",
-  padding: "0 11px",
-  border: "1px solid rgba(255, 255, 255, .42)",
-  borderRadius: "var(--radius-sm)",
-  background: "rgba(255, 255, 255, .1)",
-  color: "inherit",
-  font: "inherit"
-};
 const imageLightboxStageStyle: CSSProperties = {
   minWidth: "0",
   minHeight: "0",
@@ -223,7 +215,7 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
     <figure v-else-if="block.blockType === 'image'" :class="{ unavailable: !imageUrl || imageLoadFailed }"
             class="image-block">
       <button v-if="imageUrl && !imageLoadFailed" :aria-label="`查看大图：${imageAlt || '图片'}`"
-              style="width:100%;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;cursor:zoom-in"
+              class="ui-media-button"
               type="button" @click="openImagePreview">
         <img :key="`${imageUrl}:${imageRetryKey}`" :alt="imageDecorative ? '' : imageAlt" :src="imageUrl" decoding="async"
              loading="lazy" @error="imageLoadFailed = true"/>
@@ -231,7 +223,7 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
       <div v-if="!imageUrl || imageLoadFailed" class="image-unavailable-message" role="status">
         <strong>{{ imageLoadFailed ? "图片加载失败" : "图片当前不可用" }}</strong>
         <span>{{ imageLoadFailed ? "请检查网络后重试。" : "当前内容没有可用的图片地址。" }}</span>
-        <button v-if="imageUrl" type="button" @click="retryImageLoad">重新加载</button>
+        <button v-if="imageUrl" class="ui-button" type="button" @click="retryImageLoad">重新加载</button>
       </div>
       <figcaption v-if="imageCaption || ((!imageUrl || imageLoadFailed) && !imageDecorative && imageAlt)">
         {{ imageCaption || imageAlt }}
@@ -247,22 +239,24 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
           v-if="imagePreviewOpen && imageUrl"
           :aria-label="`图片预览：${imageAlt || '图片'}`"
           :style="imageLightboxStyle"
+          class="image-preview-dialog"
           aria-modal="true"
           role="dialog"
           @click.self="closeImagePreview"
       >
         <div :style="imageLightboxToolbarStyle" class="ui-action-row ui-action-row--nowrap">
-          <button ref="imagePreviewZoomOut" :disabled="imagePreviewScale <= 1" :style="imageLightboxButtonStyle"
+          <button ref="imagePreviewZoomOut" :disabled="imagePreviewScale <= 1" class="ui-button ui-button--icon"
                   aria-label="缩小图片" type="button" @click="adjustImagePreviewScale(-0.25)">−
           </button>
           <output aria-live="polite"
                   style="min-width:42px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums">{{ Math.round(imagePreviewScale * 100) }}%
           </output>
-          <button ref="imagePreviewZoomIn" :disabled="imagePreviewScale >= 3" :style="imageLightboxButtonStyle"
+          <button ref="imagePreviewZoomIn" :disabled="imagePreviewScale >= 3" class="ui-button ui-button--icon"
                   aria-label="放大图片" type="button" @click="adjustImagePreviewScale(0.25)">＋
           </button>
-          <button ref="imagePreviewClose" :style="imageLightboxButtonStyle" aria-label="关闭图片预览" type="button"
-                  @click="closeImagePreview">关闭
+          <button ref="imagePreviewClose" class="ui-button ui-button--icon ui-close-button" aria-label="关闭图片预览" type="button"
+                  @click="closeImagePreview">
+            <Close aria-hidden="true" />
           </button>
         </div>
         <div :style="imageLightboxStageStyle">

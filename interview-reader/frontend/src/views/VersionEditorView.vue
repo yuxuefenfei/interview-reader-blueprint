@@ -5,7 +5,7 @@ import {
   EditPen,
   FolderOpened,
   FullScreen,
-  Hide,
+  Close,
   InfoFilled,
   MoreFilled,
   Plus,
@@ -467,7 +467,7 @@ async function canCloseNodeProperties(): Promise<boolean> {
         "当前节点属性尚未保存，关闭后本次修改将丢失。",
         "放弃节点修改？",
         {
-          confirmButtonText: "放弃修改",
+          confirmButtonType: "danger", confirmButtonText: "放弃修改",
           cancelButtonText: "继续编辑",
           type: "warning"
         }
@@ -556,7 +556,7 @@ async function deleteSelectedNode(): Promise<void> {
   try {
     await ElMessageBox.confirm(detail, "删除结构节点", {
       type: "warning",
-      confirmButtonText: "删除节点",
+      confirmButtonType: "danger", confirmButtonText: "删除节点",
       cancelButtonText: "取消"
     });
     if (!await flushPendingBlockSave()) return;
@@ -888,7 +888,7 @@ async function deleteActiveBlock(): Promise<void> {
   try {
     await ElMessageBox.confirm(`将删除“${blockSummary(block)}”，无法恢复。`, "删除内容块", {
       type: "warning",
-      confirmButtonText: "删除",
+      confirmButtonType: "danger", confirmButtonText: "删除",
       cancelButtonText: "取消"
     });
     if (!await flushPendingBlockSave()) return;
@@ -910,7 +910,7 @@ async function cleanupEmptyBlocks(): Promise<void> {
   try {
     await ElMessageBox.confirm("将删除当前草稿中所有没有有效内容的块。", "清理空内容块", {
       type: "warning",
-      confirmButtonText: "清理",
+      confirmButtonType: "danger", confirmButtonText: "清理",
       cancelButtonText: "取消"
     });
     if (!await flushPendingBlockSave()) return;
@@ -931,7 +931,7 @@ async function discard(): Promise<void> {
   try {
     await ElMessageBox.confirm("将永久删除这份草稿，无法恢复。", "丢弃草稿", {
       type: "warning",
-      confirmButtonText: "丢弃",
+      confirmButtonType: "danger", confirmButtonText: "丢弃",
       cancelButtonText: "取消"
     });
     blockSaveQueue.cancelPending();
@@ -1030,7 +1030,7 @@ function message(value: unknown): string {
             <div class="block-heading-actions ui-action-row"><span>{{
                 blocks.length
               }} 个块 · {{ dirtyBlockCount ? `${dirtyBlockCount} 个未保存` : saveStateLabel }}</span>
-              <el-button v-if="emptyBlockCount" :icon="Delete" :loading="cleaningEmptyBlocks" plain type="warning"
+              <el-button v-if="emptyBlockCount" :icon="Delete" :loading="cleaningEmptyBlocks" plain type="danger"
                          @click="cleanupEmptyBlocks">清理空块（{{ emptyBlockCount }}）
               </el-button>
               <el-button :icon="Plus" :loading="creatingBlock" plain type="primary" @click="addBlock">新增内容块
@@ -1123,12 +1123,12 @@ function message(value: unknown): string {
                   <el-radio-button value="block">当前块</el-radio-button>
                   <el-radio-button value="node">当前节点</el-radio-button>
                 </el-radio-group>
-                <el-button :icon="RefreshRight" aria-label="还原实时预览位置" circle title="还原到右侧"
+                <el-button :icon="RefreshRight" aria-label="还原实时预览位置" class="ui-button--icon" title="还原到右侧"
                            @click="resetPreviewPosition"/>
-                <el-button :icon="Hide" aria-label="隐藏实时预览" circle title="隐藏实时预览"
+                <el-button :icon="Close" aria-label="隐藏实时预览" class="ui-close-button" title="隐藏实时预览"
                            @click="previewVisible = false"/>
               </div>
-              <button aria-label="拖动实时预览" class="preview-drag-handle" type="button"
+              <button aria-label="拖动实时预览" class="preview-drag-handle ui-button ui-button--text ui-button--icon" type="button"
                       @pointerdown="startPreviewDrag">
                 <el-icon>
                   <Rank/>
@@ -1182,7 +1182,7 @@ function message(value: unknown): string {
                 <span class="node-property-step">01</span>
                 <h3 id="node-basic-heading">基本信息</h3>
                 <el-tooltip content="标题会同步显示在目录与阅读页中。" placement="top">
-                  <button aria-label="基本信息说明" class="node-property-info" type="button">
+                  <button aria-label="基本信息说明" class="node-property-info ui-button ui-button--text ui-button--icon" type="button">
                     <InfoFilled aria-hidden="true"/>
                   </button>
                 </el-tooltip>
@@ -1207,7 +1207,7 @@ function message(value: unknown): string {
                 <span class="node-property-step">02</span>
                 结构类型
                 <el-tooltip content="决定该节点在目录层级中的结构定位。" placement="top">
-                  <button aria-label="结构类型说明" class="node-property-info" type="button"><InfoFilled
+                  <button aria-label="结构类型说明" class="node-property-info ui-button ui-button--text ui-button--icon" type="button"><InfoFilled
                       aria-hidden="true"/></button>
                 </el-tooltip>
               </span>
@@ -1229,7 +1229,7 @@ function message(value: unknown): string {
                 <span class="node-property-step">03</span>
                 内容语义
                 <el-tooltip content="可选，用于描述该节点在阅读内容中的作用。" placement="top">
-                  <button aria-label="内容语义说明" class="node-property-info" type="button"><InfoFilled
+                  <button aria-label="内容语义说明" class="node-property-info ui-button ui-button--text ui-button--icon" type="button"><InfoFilled
                       aria-hidden="true"/></button>
                 </el-tooltip>
               </span>

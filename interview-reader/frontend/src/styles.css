@@ -28,7 +28,7 @@
     --radius-lg: 12px;
     /* 控件 */
     --action-gap: 8px;
-    --action-control-height: 32px;
+    --action-control-height: var(--ui-button-height);
     /* 管理侧栏 */
     --admin-sidebar-bg: #071c2f;
     --admin-sidebar-hover: #112f48;
@@ -114,15 +114,11 @@ button, a {
     margin-left: 0;
 }
 
-.ui-action-row--compact > button {
-    min-height: 28px;
-}
-
 button:focus-visible,
 input:not(.el-input__inner):not(.el-select__input):focus-visible,
 textarea:not(.el-textarea__inner):focus-visible,
 select:focus-visible {
-    outline: 2px solid var(--brand-500);
+    outline: 2px solid var(--reader-accent, var(--brand-500));
     outline-offset: 2px;
 }
 
@@ -177,15 +173,6 @@ select:focus-visible {
     align-items: center;
     gap: 12px;
     background: var(--brand-600);
-}
-
-.app-update-banner button {
-    padding: 5px 9px;
-    border: 1px solid rgba(255, 255, 255, .7);
-    border-radius: 5px;
-    background: transparent;
-    color: #fff;
-    cursor: pointer;
 }
 
 /* ── 启动与登录 ───────────────────────────────────────────── */
@@ -349,7 +336,7 @@ select:focus-visible {
     gap: 13px;
     padding: 0 14px;
     border: 0;
-    border-radius: 9px;
+    border-radius: var(--ui-button-radius);
     background: transparent;
     color: var(--admin-sidebar-text);
     font-weight: 400;
@@ -410,6 +397,8 @@ select:focus-visible {
     border-top: 1px solid rgba(159, 178, 195, .08);
     background: #0c2942;
     color: #d9e5ef;
+    border-radius: var(--ui-button-radius);
+    font-size: 14px;
     font-weight: 400;
     white-space: nowrap;
     cursor: pointer;
@@ -564,20 +553,6 @@ select:focus-visible {
     color: var(--ink-500);
     font-size: 13px;
     line-height: 1.4;
-}
-
-.admin-page-help-button.el-button {
-    width: 28px;
-    height: 28px;
-    margin: 0;
-    padding: 4px;
-    color: var(--ink-500);
-    font-size: 16px;
-}
-
-.admin-page-help-button.el-button:focus-visible {
-    outline: 2px solid var(--brand-500);
-    outline-offset: 2px;
 }
 
 .admin-page-help-popper {
@@ -802,7 +777,7 @@ select:focus-visible {
 }
 
 /* ── 阅读页面 ─────────────────────────────────────────────── */
-.reader-page {
+.reader-page, .reader-comfort-popper {
     --reader-bg: #f5f7f8;
     --reader-surface: #fff;
     --reader-text: #182230;
@@ -823,6 +798,9 @@ select:focus-visible {
     --reader-font-size: 18px;
     --reader-line-height: 1.85;
     --reader-column: 740px;
+}
+
+.reader-page {
     --toc-w: 320px;
     width: 100%;
     height: var(--reader-viewport-height, 100vh);
@@ -840,7 +818,7 @@ select:focus-visible {
     --toc-w: 48px;
 }
 
-.reader-page.theme-dark {
+:is(.reader-page, .reader-comfort-popper).theme-dark {
     --reader-bg: #101820;
     --reader-surface: #17232e;
     --reader-text: #e9f0f5;
@@ -860,7 +838,7 @@ select:focus-visible {
     --code-symbol: #fda4af;
 }
 
-.reader-page.theme-sepia {
+:is(.reader-page, .reader-comfort-popper).theme-sepia {
     --reader-bg: #f3efe6;
     --reader-surface: #faf6ee;
     --reader-text: #2c261c;
@@ -983,14 +961,8 @@ select:focus-visible {
     }
 }
 
-.reader-menu-button {
+.reader-menu-button.ui-button {
     display: none;
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--reader-line);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: inherit;
 }
 
 .reader-heading {
@@ -1063,41 +1035,8 @@ select:focus-visible {
     white-space: nowrap;
 }
 
-.reader-desktop-nav-collapse, .reader-desktop-nav-expand {
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--reader-muted);
-}
-
 .reader-desktop-nav-collapse {
-    width: 40px;
-    height: 56px;
-    border-left: 1px solid var(--reader-line);
-    border-radius: 0;
-}
-
-.reader-desktop-nav-expand {
-    width: 40px;
-    height: 44px;
-}
-
-.reader-desktop-nav-collapse svg, .reader-desktop-nav-expand svg {
-    width: 18px;
-    height: 18px;
-}
-
-.reader-desktop-nav-collapse:hover, .reader-desktop-nav-expand:hover {
-    background: color-mix(in srgb, var(--reader-accent), transparent 90%);
-    color: var(--reader-accent);
-}
-
-.reader-desktop-nav-collapse:focus-visible, .reader-desktop-nav-expand:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--reader-accent), transparent 38%);
-    outline-offset: 1px;
+    justify-self: center;
 }
 
 .reader-desktop-rail-progress {
@@ -1407,31 +1346,7 @@ select:focus-visible {
     text-transform: lowercase;
 }
 
-.code-copy {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--reader-muted, var(--ink-500));
-    transition: background-color 120ms, color 120ms;
-}
-
-.code-copy:hover {
-    background: var(--brand-100);
-    color: var(--brand-700);
-}
-
-.code-copy.active {
-    background: color-mix(in srgb, var(--reader-accent, var(--brand-500)), transparent 86%);
-    color: var(--reader-accent, var(--brand-700));
-}
-
 .code-toolbar-button {
-    width: auto;
-    padding: 0 8px;
     white-space: nowrap;
 }
 
@@ -1442,7 +1357,6 @@ select:focus-visible {
 }
 
 .code-copy svg {
-    width: 16px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -1620,12 +1534,6 @@ select:focus-visible {
 
 .image-unavailable-message button {
     margin-top: 4px;
-    padding: 5px 9px;
-    border: 1px solid var(--reader-line);
-    border-radius: var(--radius-sm);
-    background: var(--reader-surface);
-    color: var(--reader-accent);
-    cursor: pointer;
 }
 
 /* 分页 */
@@ -1661,16 +1569,6 @@ select:focus-visible {
     color: var(--reader-muted);
     font-size: 12px;
     text-align: center;
-}
-
-.reader-load-more button {
-    min-height: 36px;
-    padding: 0 12px;
-    border: 1px solid var(--reader-line);
-    border-radius: var(--radius-sm);
-    background: var(--reader-surface);
-    color: var(--reader-accent);
-    font: inherit;
 }
 
 .reader-overlay-drawer {
@@ -1747,15 +1645,6 @@ select:focus-visible {
     justify-content: space-between;
 }
 
-.reader-drawer header .el-button, .reader-search-sheet > header .el-button, .reader-mobile-comfort-sheet > header .el-button {
-    --el-button-bg-color: transparent;
-    --el-button-border-color: var(--reader-line);
-    --el-button-text-color: var(--reader-text);
-    --el-button-hover-bg-color: color-mix(in srgb, var(--reader-accent), transparent 88%);
-    --el-button-hover-border-color: var(--reader-accent);
-    --el-button-hover-text-color: var(--reader-text);
-}
-
 .reader-document-selector {
     width: 100%;
     min-width: 0;
@@ -1766,6 +1655,7 @@ select:focus-visible {
     padding: 12px;
     overflow: hidden;
     border: 0;
+    border-radius: var(--ui-button-radius);
     background: transparent;
     color: var(--reader-text);
     text-align: left;
@@ -1834,7 +1724,7 @@ select:focus-visible {
     background: var(--reader-accent);
 }
 
-.reader-document-selector:focus-visible, .reader-drawer-back:focus-visible, .reader-document-option:focus-visible {
+.reader-document-selector:focus-visible, .reader-document-option:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--reader-accent), transparent 38%);
     outline-offset: -2px;
 }
@@ -1873,27 +1763,13 @@ select:focus-visible {
     white-space: nowrap;
 }
 
-.reader-drawer-back {
-    min-height: 44px;
+.reader-drawer-back.ui-button {
     justify-self: start;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 8px 0 2px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--reader-accent);
-    font-size: 13px;
-    font-weight: 650;
-    line-height: 1;
+    padding: 0 6px;
 }
 
 .reader-drawer-back-icon {
-    flex: 0 0 14px;
-    width: 14px;
-    height: 14px;
-    transform: translateY(-1px);
+    flex: 0 0 auto;
 }
 
 .reader-document-filter input {
@@ -2026,16 +1902,6 @@ select:focus-visible {
     text-align: center;
 }
 
-.reader-document-load-state button {
-    min-height: 32px;
-    padding: 0 10px;
-    border: 1px solid var(--reader-line);
-    border-radius: var(--radius-sm);
-    background: var(--reader-surface);
-    color: var(--reader-accent);
-    font: inherit;
-}
-
 .reader-document-load-sentinel {
     height: 1px;
 }
@@ -2092,14 +1958,6 @@ select:focus-visible {
     font-size: 12px;
 }
 
-.reader-search-feedback button {
-    padding: 2px 0;
-    border: 0;
-    background: transparent;
-    color: var(--reader-accent);
-    cursor: pointer;
-}
-
 .reader-search-groups, .reader-search-group {
     display: grid;
     gap: 10px;
@@ -2135,17 +1993,9 @@ select:focus-visible {
         gap: 6px;
     }
 
-    .reader-menu-button {
-        display: grid;
-        place-items: center;
+    .reader-menu-button.ui-button {
+        display: inline-flex;
         flex: 0 0 auto;
-        width: 44px;
-        height: 44px;
-        border: 0;
-    }
-
-    .reader-menu-button .el-icon {
-        font-size: 21px;
     }
 
     .reader-heading {
@@ -2173,7 +2023,7 @@ select:focus-visible {
         display: none !important;
     }
 
-    .reader-comfort-mobile {
+    .reader-comfort-mobile.ui-button {
         display: inline-flex;
     }
 
@@ -2285,17 +2135,7 @@ select:focus-visible {
 
     .chapter-pagination .chapter-nav-button {
         min-width: 78px;
-        min-height: 44px;
         margin: 0;
-        padding: 0 12px;
-        border-color: transparent;
-        border-radius: 999px;
-        background: transparent;
-        box-shadow: none;
-        color: var(--reader-muted);
-        opacity: .72;
-        -webkit-tap-highlight-color: transparent;
-        transition: background-color 140ms ease, color 140ms ease, opacity 140ms ease;
     }
 
     .chapter-pagination .chapter-nav-button > span {
@@ -2308,18 +2148,6 @@ select:focus-visible {
 
     .chapter-pagination .chapter-nav-next {
         justify-self: end;
-    }
-
-    .chapter-pagination .chapter-nav-button:not(.is-disabled):active,
-    .chapter-pagination .chapter-nav-button:not(.is-disabled):focus-visible {
-        background: color-mix(in srgb, var(--reader-accent), transparent 88%);
-        color: var(--reader-accent);
-        opacity: 1;
-    }
-
-    .chapter-pagination .chapter-nav-button:not(.is-disabled):focus-visible {
-        outline: 2px solid color-mix(in srgb, var(--reader-accent), transparent 48%);
-        outline-offset: 2px;
     }
 
     .chapter-pagination .chapter-nav-button.is-disabled {
@@ -2882,14 +2710,6 @@ select:focus-visible {
     letter-spacing: -.01em;
 }
 
-.node-property-drawer .el-drawer__close-btn {
-    color: #65758a;
-}
-
-.node-property-drawer .el-drawer__close-btn:hover {
-    color: #0f766e;
-}
-
 .node-property-drawer .el-drawer__body {
     padding: 0;
     overflow-x: hidden;
@@ -2996,29 +2816,9 @@ select:focus-visible {
     letter-spacing: .06em;
 }
 
-.node-property-info {
-    width: 22px;
-    height: 22px;
-    display: inline-grid;
+.node-property-info.ui-button {
     flex: 0 0 auto;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: #8795a6;
     cursor: help;
-}
-
-.node-property-info:hover,
-.node-property-info:focus-visible {
-    background: #edf7f5;
-    color: #0f766e;
-}
-
-.node-property-info svg {
-    width: 14px;
-    height: 14px;
 }
 
 .node-property-form .el-form-item {
@@ -3284,7 +3084,7 @@ select:focus-visible {
     min-width: 0;
     padding: 10px;
     border: 1px solid transparent;
-    border-radius: 5px;
+    border-radius: var(--ui-button-radius);
     background: transparent;
     color: #28384a;
     cursor: pointer;
@@ -3526,23 +3326,9 @@ select:focus-visible {
     white-space: nowrap;
 }
 
-.preview-drag-handle {
+.preview-drag-handle.ui-button {
     touch-action: none;
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: #64748b;
     cursor: grab;
-}
-
-.preview-drag-handle:hover {
-    background: #eef4f5;
-    color: #0f766e;
 }
 
 .preview-drag-handle:active {
@@ -3942,22 +3728,7 @@ select:focus-visible {
 }
 
 /* ── 阅读页头工具与舒适度设置面板 ─────────────────── */
-.reader-header-search-trigger, .reader-comfort-button, .reader-theme-trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 32px;
-    padding: 0 12px;
-    border: 1px solid var(--reader-line);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--reader-muted);
-    font-size: 13px;
-    cursor: pointer;
-    transition: background-color 120ms, color 120ms, border-color 120ms;
-}
-
-.reader-header-search-trigger {
+.reader-header-search-trigger.ui-button {
     width: clamp(190px, 18vw, 250px);
     justify-content: flex-start;
 }
@@ -3985,11 +3756,9 @@ select:focus-visible {
 
 .reader-theme-trigger {
     min-width: 92px;
-    justify-content: center;
-    color: var(--reader-text);
 }
 
-.reader-comfort-mobile {
+.reader-comfort-mobile.ui-button {
     display: none;
 }
 
@@ -3998,25 +3767,7 @@ select:focus-visible {
     color: var(--reader-muted);
 }
 
-.reader-header-search-trigger:hover, .reader-comfort-button:hover,
-.reader-comfort-button[aria-expanded="true"], .reader-theme-trigger:hover {
-    background: var(--brand-100);
-    color: var(--brand-700);
-    border-color: var(--brand-500);
-}
-
-.reader-header-search-trigger .el-icon, .reader-comfort-button .el-icon, .reader-theme-trigger .el-icon {
-    flex: 0 0 auto;
-    font-size: 15px;
-}
-
-.reader-page.theme-dark .reader-header-actions button:hover,
-.reader-page.theme-dark .reader-comfort-button[aria-expanded="true"] {
-    background: #1b3c3d;
-    color: #b4fff0;
-}
-
-.reader-page.theme-dark {
+:is(.reader-page, .reader-comfort-popper).theme-dark {
     color-scheme: dark;
 }
 
@@ -4024,6 +3775,15 @@ select:focus-visible {
     background: var(--brand-100);
     color: var(--brand-700);
     font-weight: 700;
+}
+
+.reader-comfort-popper.el-popper.is-light {
+    --el-bg-color-overlay: var(--reader-surface);
+    --el-text-color-regular: var(--reader-text);
+    --el-border-color-light: var(--reader-line);
+    background: var(--reader-surface);
+    color: var(--reader-text);
+    border-color: var(--reader-line);
 }
 
 .reader-comfort-panel {
@@ -4052,15 +3812,6 @@ select:focus-visible {
 
 .reader-comfort-panel > header span {
     color: var(--reader-muted, var(--ink-500));
-    font-size: 12px;
-}
-
-.reader-comfort-panel > header button {
-    padding: 2px 0;
-    border: 0;
-    background: transparent;
-    color: var(--brand-600);
-    cursor: pointer;
     font-size: 12px;
 }
 
@@ -4100,30 +3851,6 @@ select:focus-visible {
     grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
-.comfort-option-grid button {
-    min-height: 34px;
-    padding: 5px 7px;
-    border: 1px solid var(--reader-line, var(--line-200));
-    border-radius: var(--radius-sm);
-    background: var(--reader-surface, var(--surface-1));
-    color: var(--reader-text, var(--ink-700));
-    cursor: pointer;
-    font-size: 12px;
-    transition: background-color 120ms, border-color 120ms, color 120ms;
-}
-
-.comfort-option-grid button:hover {
-    border-color: var(--brand-500);
-    color: var(--brand-700);
-}
-
-.comfort-option-grid button.active {
-    border-color: var(--brand-500);
-    background: var(--brand-100);
-    color: var(--brand-700);
-    font-weight: 700;
-}
-
 @media (max-width: 1100px) and (min-width: 761px) {
     .reader-comfort-button > span,
     .reader-header-actions > .reader-admin-link,
@@ -4141,17 +3868,15 @@ select:focus-visible {
         display: none;
     }
 
-    .reader-comfort-mobile {
+    .reader-comfort-mobile.ui-button {
         display: inline-flex;
     }
 
-    .reader-header-search-trigger, .reader-theme-trigger, .reader-comfort-mobile {
-        width: 44px;
-        min-width: 44px;
-        min-height: 44px;
+    .reader-header-search-trigger.ui-button, .reader-theme-trigger.ui-button, .reader-comfort-mobile.ui-button {
+        width: var(--ui-button-height);
+        min-width: var(--ui-button-height);
         justify-content: center;
         padding: 0;
-        border: 0;
     }
 
     .reader-header-search-trigger .reader-search-placeholder,
@@ -4161,10 +3886,6 @@ select:focus-visible {
         display: none;
     }
 
-    .reader-header-search-trigger .el-icon, .reader-theme-trigger .el-icon, .reader-comfort-mobile .el-icon {
-        font-size: 21px;
-    }
-
     .reader-comfort-popper {
         max-width: calc(100vw - 24px);
     }
@@ -4172,5 +3893,20 @@ select:focus-visible {
     .reader-comfort-drawer .el-drawer__body {
         overflow: auto;
         padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+}
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+    .comfort-option-grid.font-options {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* iOS 聚焦小字号表单时会缩放视口，手机及触屏设备统一使用 16px。 */
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    textarea:not([disabled]),
+    select:not([disabled]) {
+        font-size: 16px;
     }
 }

@@ -1,0 +1,313 @@
+/* 两个前端共用的操作按钮规格；导航行和媒体点击区域保留各自布局。 */
+:root {
+    --ui-button-height: 32px;
+    --ui-button-large-height: 40px;
+    --ui-button-radius: 6px;
+    --ui-button-icon-size: 16px;
+}
+
+:where(.ui-button),
+.el-button,
+.ui-close-button,
+.el-dialog .el-dialog__headerbtn,
+.el-message-box .el-message-box__headerbtn,
+.el-drawer .el-drawer__close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.ui-button,
+.el-button.el-button,
+.ui-close-button,
+.el-dialog .el-dialog__headerbtn,
+.el-message-box .el-message-box__headerbtn,
+.el-drawer .el-drawer__close-btn {
+    --ui-control-accent: var(--reader-accent, var(--brand-500, #0f766e));
+    --ui-control-text: var(--reader-text, var(--ink-700, #334155));
+    --ui-control-muted: var(--reader-muted, var(--ink-500, #667085));
+    --ui-control-line: var(--reader-line, var(--line-200, #dce4e9));
+    --ui-control-surface: var(--reader-surface, var(--surface-1, #fff));
+    --ui-control-hover: color-mix(in srgb, var(--ui-control-accent) 10%, var(--ui-control-surface));
+    --ui-control-active: color-mix(in srgb, var(--ui-control-accent) 18%, var(--ui-control-surface));
+    min-height: var(--ui-button-height);
+    height: var(--ui-button-height);
+    padding: 0 12px;
+    border-radius: var(--ui-button-radius);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    text-transform: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+
+.el-button.el-button--large {
+    min-height: var(--ui-button-large-height);
+    height: var(--ui-button-large-height);
+}
+
+.ui-button {
+    border: 1px solid var(--ui-control-line);
+    background: var(--ui-control-surface);
+    color: var(--ui-control-text);
+}
+
+.el-button:not(:is(.el-button--primary, .el-button--danger, .el-button--warning, .el-button--success, .el-button--info)) {
+    --el-button-text-color: var(--ui-control-text);
+    --el-button-bg-color: var(--ui-control-surface);
+    --el-button-border-color: var(--ui-control-line);
+    --el-button-hover-text-color: var(--ui-control-accent);
+    --el-button-hover-bg-color: var(--ui-control-hover);
+    --el-button-hover-border-color: var(--ui-control-accent);
+    --el-button-active-text-color: var(--ui-control-accent);
+    --el-button-active-bg-color: var(--ui-control-active);
+    --el-button-active-border-color: var(--ui-control-accent);
+}
+
+.ui-button:not(:disabled):hover {
+    border-color: var(--ui-control-accent);
+    background: var(--ui-control-hover);
+    color: var(--ui-control-accent);
+}
+
+.ui-button:not(:disabled):active,
+.ui-button.active,
+.ui-button[aria-pressed="true"],
+.ui-button[aria-expanded="true"] {
+    border-color: var(--ui-control-accent);
+    background: var(--ui-control-active);
+    color: var(--ui-control-accent);
+}
+
+.ui-button.ui-button--text,
+.el-button.el-button.is-text,
+.el-button.el-button.is-link {
+    border-color: transparent;
+    background: transparent;
+    color: var(--ui-control-accent);
+}
+
+.ui-button.ui-button--text:not(:disabled):hover,
+.el-button.el-button.is-text:not(.is-disabled):hover,
+.el-button.el-button.is-link:not(.is-disabled):hover {
+    border-color: transparent;
+    background: var(--ui-control-hover);
+}
+
+.ui-button.ui-button--text:not(:disabled):active,
+.el-button.el-button.is-text:not(.is-disabled):active,
+.el-button.el-button.is-link:not(.is-disabled):active {
+    border-color: transparent;
+    background: var(--ui-control-active);
+}
+
+.ui-button.ui-button--text:is(.active, [aria-pressed="true"], [aria-expanded="true"]) {
+    border-color: transparent;
+    background: var(--ui-control-active);
+    color: var(--ui-control-accent);
+}
+
+.ui-button.ui-button--icon,
+.el-button.ui-button--icon,
+.el-button.el-button.is-circle,
+.ui-close-button,
+.el-button.ui-close-button,
+.el-dialog .el-dialog__headerbtn,
+.el-message-box .el-message-box__headerbtn,
+.el-drawer .el-drawer__close-btn {
+    flex-shrink: 0;
+    width: var(--ui-button-height);
+    min-width: var(--ui-button-height);
+    padding: 0;
+    border-radius: var(--ui-button-radius);
+}
+
+.ui-button--icon.ui-button--text {
+    color: var(--ui-control-muted);
+}
+
+.ui-button > svg,
+.ui-close-button svg,
+.el-button .el-icon,
+.ui-button .el-icon {
+    flex-shrink: 0;
+    width: var(--ui-button-icon-size);
+    height: var(--ui-button-icon-size);
+    font-size: var(--ui-button-icon-size);
+}
+
+.el-button.el-button > .el-icon + span {
+    margin-left: 0;
+}
+
+.ui-close-button,
+.el-button.ui-close-button,
+.el-dialog .el-dialog__headerbtn,
+.el-message-box .el-message-box__headerbtn,
+.el-drawer .el-drawer__close-btn {
+    margin: 0;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ui-control-muted);
+}
+
+.ui-close-button:not(:disabled):hover,
+.el-dialog .el-dialog__headerbtn:hover,
+.el-message-box .el-message-box__headerbtn:hover,
+.el-drawer .el-drawer__close-btn:hover {
+    border-color: transparent;
+    background: var(--ui-control-hover);
+    color: var(--ui-control-accent);
+}
+
+.ui-close-button:not(:disabled):active,
+.el-dialog .el-dialog__headerbtn:active,
+.el-message-box .el-message-box__headerbtn:active,
+.el-drawer .el-drawer__close-btn:active {
+    background: var(--ui-control-active);
+}
+
+.el-dialog .el-dialog__headerbtn,
+.el-message-box .el-message-box__headerbtn {
+    top: 8px;
+    right: 8px;
+}
+
+.el-dialog .el-dialog__header.show-close,
+.el-message-box .el-message-box__header {
+    min-height: var(--ui-button-height);
+    padding-right: calc(var(--ui-button-height) + 8px);
+}
+
+.el-dialog .el-dialog__headerbtn .el-dialog__close,
+.el-message-box .el-message-box__headerbtn .el-message-box__close,
+.el-drawer .el-drawer__close-btn .el-drawer__close {
+    color: inherit;
+    font-size: var(--ui-button-icon-size);
+}
+
+.el-dialog .el-dialog__headerbtn:is(:hover, :focus) .el-dialog__close,
+.el-message-box .el-message-box__headerbtn:is(:hover, :focus) .el-message-box__close,
+.el-drawer .el-drawer__close-btn:is(:hover, :focus) .el-drawer__close {
+    color: inherit;
+}
+
+.ui-button:focus-visible,
+.el-button.el-button:focus-visible,
+.ui-close-button:focus-visible,
+.el-dialog .el-dialog__headerbtn:focus-visible,
+.el-message-box .el-message-box__headerbtn:focus-visible,
+.el-drawer .el-drawer__close-btn:focus-visible {
+    outline: 2px solid var(--ui-control-accent);
+    outline-offset: 2px;
+}
+
+.ui-button:disabled,
+.el-button.el-button.is-disabled,
+.ui-close-button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.el-button.el-button.is-loading {
+    cursor: progress;
+}
+
+/* 实心按钮悬停时加深品牌色，维持白色文字的可读性。 */
+.el-button.el-button--primary:not(.is-plain) {
+    --el-button-hover-bg-color: var(--brand-600, #0b6059);
+    --el-button-hover-border-color: var(--brand-600, #0b6059);
+    --el-button-active-bg-color: var(--brand-700, #075d56);
+    --el-button-active-border-color: var(--brand-700, #075d56);
+}
+
+/* 与已有语义一致：实心危险操作和描边危险操作使用同一红色。 */
+.el-button.el-button--danger {
+    --ui-control-accent: #b42318;
+    --el-button-bg-color: #b42318;
+    --el-button-border-color: #b42318;
+    --el-button-hover-bg-color: #cf392e;
+    --el-button-hover-border-color: #cf392e;
+    --el-button-active-bg-color: #912018;
+    --el-button-active-border-color: #912018;
+}
+
+.el-button.el-button--danger.is-plain {
+    --el-button-text-color: #b42318;
+    --el-button-bg-color: #fff7f7;
+    --el-button-border-color: #e8b4af;
+    --el-button-hover-text-color: #fff;
+    --el-button-active-text-color: #fff;
+}
+
+.el-button.el-button--danger.is-text,
+.el-button.el-button--danger.is-link {
+    color: #b42318;
+}
+
+.el-button.el-button--warning {
+    --ui-control-accent: #a15c07;
+    --el-button-bg-color: #a15c07;
+    --el-button-border-color: #a15c07;
+    --el-button-hover-bg-color: #a8630a;
+    --el-button-hover-border-color: #a8630a;
+    --el-button-active-bg-color: #814a06;
+    --el-button-active-border-color: #814a06;
+}
+
+.el-button.el-button--warning.is-plain {
+    --el-button-text-color: #a15c07;
+    --el-button-bg-color: #fff9ed;
+    --el-button-border-color: #dec49f;
+    --el-button-hover-text-color: #fff;
+    --el-button-active-text-color: #fff;
+}
+
+.el-button.el-button--warning.is-text,
+.el-button.el-button--warning.is-link {
+    color: #a15c07;
+}
+
+.ui-media-button {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-button-radius);
+    background: transparent;
+    cursor: zoom-in;
+}
+
+.image-preview-dialog,
+.app-update-banner,
+.admin-sidebar {
+    --reader-surface: var(--admin-sidebar-bg, #071c2f);
+    --reader-text: #f8fafc;
+    --reader-muted: #cbd5e1;
+    --reader-line: #475569;
+    --reader-accent: #5eead4;
+}
+
+.app-update-banner {
+    --reader-surface: var(--brand-600, #0b6059);
+    --reader-line: rgba(255, 255, 255, .7);
+    --reader-accent: #fff;
+}
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+    :root {
+        --ui-button-height: 44px;
+        --ui-button-large-height: 44px;
+        --ui-button-icon-size: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-button, .el-button.el-button, .ui-close-button,
+    .el-dialog .el-dialog__headerbtn, .el-message-box .el-message-box__headerbtn, .el-drawer .el-drawer__close-btn {
+        transition: none;
+    }
+}

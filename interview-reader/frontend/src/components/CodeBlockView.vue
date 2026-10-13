@@ -116,22 +116,22 @@ onBeforeUnmount(() => {
       <span>{{ normalizedLanguage }}</span>
       <div class="ui-action-row ui-action-row--compact ui-action-row--nowrap code-block-actions">
         <template v-if="isMermaid">
-          <button :aria-pressed="displayMode === 'diagram'" :class="{ active: displayMode === 'diagram' }" class="code-copy code-toolbar-button"
+          <button :aria-pressed="displayMode === 'diagram'" :class="{ active: displayMode === 'diagram' }" class="ui-button ui-button--text code-copy code-toolbar-button"
                   type="button" @click="showDiagram">图形
           </button>
-          <button :aria-pressed="displayMode === 'source'" :class="{ active: displayMode === 'source' }" class="code-copy code-toolbar-button"
+          <button :aria-pressed="displayMode === 'source'" :class="{ active: displayMode === 'source' }" class="ui-button ui-button--text code-copy code-toolbar-button"
                   type="button" @click="displayMode = 'source'">源码
           </button>
           <button v-if="displayMode === 'diagram'" :aria-label="fitWidth ? '切换到阅读尺寸' : '使流程图适应正文宽度'" :aria-pressed="fitWidth"
-                  class="code-copy code-toolbar-button" type="button"
+                  class="ui-button ui-button--text code-copy code-toolbar-button" type="button"
                   @click="fitWidth = !fitWidth">{{ fitWidth ? "阅读尺寸" : "适应宽度" }}
           </button>
         </template>
         <button v-if="showWrapToggle && showSource" :aria-label="wrap ? '关闭代码自动换行' : '启用代码自动换行'" :aria-pressed="wrap"
-                :title="wrap ? '关闭自动换行' : '自动换行'" class="code-copy code-toolbar-button"
+                :title="wrap ? '关闭自动换行' : '自动换行'" class="ui-button ui-button--text code-copy code-toolbar-button"
                 type="button" @click="emit('update:wrap', !wrap)">换行
         </button>
-        <button :aria-label="copyLabel" :title="copyLabel" class="code-copy" type="button" @click="copyCode">
+        <button :aria-label="copyLabel" :title="copyLabel" class="ui-button ui-button--text ui-button--icon code-copy" type="button" @click="copyCode">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path
                 d="M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M5 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1 2-2v-8a2 2 0 0 1 2-2Z"/>

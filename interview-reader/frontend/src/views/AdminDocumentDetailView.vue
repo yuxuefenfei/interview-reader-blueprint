@@ -245,7 +245,7 @@ async function publish(version: VersionSummary): Promise<void> {
   try {
     await ElMessageBox.confirm(publishConfirmation(version), `发布 v${version.versionNo}`, {
       type: "warning",
-      confirmButtonText: `发布 v${version.versionNo}`,
+      confirmButtonType: "primary", confirmButtonText: `发布 v${version.versionNo}`,
       cancelButtonText: "取消"
     });
     await adminApi.publish(documentId, version.id);
@@ -263,7 +263,7 @@ async function takeDown(): Promise<void> {
   try {
     await ElMessageBox.confirm("下架后阅读端将立即隐藏该文档；所有版本、阅读进度、书签和笔记都会保留，可随时重新上架。", "下架文档", {
       type: "warning",
-      confirmButtonText: "确认下架",
+      confirmButtonType: "warning", confirmButtonText: "确认下架",
       cancelButtonText: "取消"
     });
     await adminApi.takeDown(documentId);
@@ -297,7 +297,7 @@ async function permanentlyDelete(): Promise<void> {
         `此操作开始后不可撤销。文档、全部版本与草稿、阅读数据、导入记录、原始文件及转换中间产物都会被彻底删除。请输入完整文档标题：${current.title}`,
         "永久删除文档",
         {
-          type: "error", confirmButtonText: "永久删除", cancelButtonText: "取消", inputPlaceholder: current.title,
+          type: "error", confirmButtonType: "danger", confirmButtonText: "永久删除", cancelButtonText: "取消", inputPlaceholder: current.title,
           inputValidator: (value: string) => value === current.title || "输入必须与完整文档标题完全一致"
         }
     );
@@ -336,7 +336,7 @@ async function discard(version: VersionSummary): Promise<void> {
   try {
     await ElMessageBox.confirm(`将永久丢弃草稿 v${version.versionNo}。`, `丢弃草稿 v${version.versionNo}`, {
       type: "warning",
-      confirmButtonText: `丢弃 v${version.versionNo}`,
+      confirmButtonType: "danger", confirmButtonText: `丢弃 v${version.versionNo}`,
       cancelButtonText: "取消"
     });
     await adminApi.deleteDraft(version.id);

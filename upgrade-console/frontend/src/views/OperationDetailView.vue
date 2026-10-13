@@ -42,7 +42,7 @@ async function restorePublished(): Promise<void> {
   try {
     await ElMessageBox.confirm(
         `确认恢复备份 ${current.backupId}？该备份之后的数据库和文件写入可能丢失。控制台会先备份当前状态。`,
-        "确认人工恢复", {type: "warning", confirmButtonText: "确认恢复", cancelButtonText: "取消"}
+        "确认人工恢复", {type: "warning", confirmButtonType: "warning", confirmButtonText: "确认恢复", cancelButtonText: "取消"}
     );
   } catch {
     return;
@@ -70,7 +70,7 @@ async function resolveInterrupted(): Promise<void> {
             ? `确认用同批备份 ${current.backupId} 恢复数据库、数据文件和旧 JAR？当前状态会被覆盖。`
             : "确认检查旧版健康与任务排空，并在条件满足时恢复写入？",
         withBackup ? "确认恢复同批备份" : "确认恢复旧版写入",
-        {type: "warning", confirmButtonText: "继续", cancelButtonText: "取消"}
+        {type: "warning", confirmButtonType: "warning", confirmButtonText: "继续", cancelButtonText: "取消"}
     );
   } catch {
     return;
