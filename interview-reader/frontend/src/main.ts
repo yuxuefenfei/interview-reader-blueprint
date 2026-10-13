@@ -9,6 +9,7 @@ import App from "./App.vue";
 import {registerServiceWorker} from "./offline/serviceWorkerRegistration";
 import router from "./router";
 import "./styles.css";
+import "../../../frontend-shared/typography.css";
 import "../../../frontend-shared/buttons.css";
 
 const app = createApp(App).use(router);

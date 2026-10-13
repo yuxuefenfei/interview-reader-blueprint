@@ -91,6 +91,6 @@ export function comfortStyle(comfort: ReaderComfort): Record<string, string> {
         "--reader-column": `${comfort.columnWidth}px`,
         "--reader-body-font": comfort.fontFamily === "serif"
             ? '"Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, serif'
-            : '"Source Sans 3", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
+            : 'var(--ui-font-family)',
     };
 }

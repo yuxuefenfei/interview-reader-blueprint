@@ -49,7 +49,6 @@
     --el-color-primary-light-9: #e7f7f3;
     --el-color-primary-dark-2: #0b6059;
     --el-border-radius-base: 6px;
-    --el-font-family: inherit;
 }
 
 /* ── 基础样式 ───────────────────────────────────────────────────── */
@@ -67,10 +66,8 @@ html, body, #app {
 
 body {
     margin: 0;
-    font-family: "Source Sans 3", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
     color: var(--ink-900);
     background: var(--surface-0);
-    font-synthesis: none;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -144,7 +141,7 @@ select:focus-visible {
     box-shadow: 0 4px 16px rgba(0, 0, 0, .18);
     transform: translateY(-160%);
     text-decoration: none;
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
 }
 
 .skip-link:focus-visible {
@@ -163,7 +160,7 @@ select:focus-visible {
     background: var(--ink-900);
     color: #fff;
     box-shadow: 0 8px 24px rgba(23, 32, 51, .22);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.5;
 }
 
@@ -217,7 +214,7 @@ select:focus-visible {
 
 .login-card h1 {
     margin: 0 0 6px;
-    font-size: 24px;
+    font-size: var(--ui-font-size-page);
     letter-spacing: 0;
 }
 
@@ -226,7 +223,7 @@ select:focus-visible {
     overflow: hidden;
     color: var(--ink-500);
     line-height: 1.6;
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -289,8 +286,8 @@ select:focus-visible {
     border-bottom: 1px solid rgba(159, 178, 195, .16);
     background: transparent;
     color: var(--admin-sidebar-text-strong);
-    font-size: 15px;
-    font-weight: 750;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-bold);
     text-align: left;
     white-space: nowrap;
     cursor: pointer;
@@ -321,8 +318,8 @@ select:focus-visible {
 .admin-nav-label {
     padding: 0 12px 2px;
     color: #6f879c;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     letter-spacing: .10em;
     white-space: nowrap;
 }
@@ -339,7 +336,7 @@ select:focus-visible {
     border-radius: var(--ui-button-radius);
     background: transparent;
     color: var(--admin-sidebar-text);
-    font-weight: 400;
+    font-weight: var(--ui-font-weight-regular);
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
@@ -398,8 +395,8 @@ select:focus-visible {
     background: #0c2942;
     color: #d9e5ef;
     border-radius: var(--ui-button-radius);
-    font-size: 14px;
-    font-weight: 400;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-regular);
     white-space: nowrap;
     cursor: pointer;
     transition: background-color 160ms ease, color 160ms ease;
@@ -412,7 +409,7 @@ select:focus-visible {
 
 .admin-sidebar-toggle .el-icon {
     flex: 0 0 auto;
-    font-size: 18px;
+    font-size: var(--ui-font-size-section);
 }
 
 .admin-layout.sidebar-collapsed .admin-brand {
@@ -542,7 +539,7 @@ select:focus-visible {
     min-width: 0;
     margin: 0;
     overflow: hidden;
-    font-size: 22px;
+    font-size: var(--ui-font-size-page);
     line-height: 1.25;
     letter-spacing: 0;
     text-overflow: ellipsis;
@@ -551,7 +548,7 @@ select:focus-visible {
 
 .admin-page-meta {
     color: var(--ink-500);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.4;
 }
 
@@ -561,8 +558,8 @@ select:focus-visible {
 
 .admin-page-help-title {
     margin: 0 0 8px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
@@ -570,7 +567,7 @@ select:focus-visible {
 .admin-page-help-description {
     margin: 0;
     color: var(--ink-500);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.6;
     overflow-wrap: anywhere;
 }
@@ -604,8 +601,8 @@ select:focus-visible {
 .eyebrow {
     margin: 0;
     color: var(--brand-500);
-    font-size: 12px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     letter-spacing: .08em;
 }
 
@@ -621,7 +618,7 @@ select:focus-visible {
 
 .document-cell span {
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .import-progress-card .el-card__body {
@@ -646,8 +643,8 @@ select:focus-visible {
 
 .job-status-label {
     color: #758194 !important;
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .job-status strong {
@@ -693,7 +690,7 @@ select:focus-visible {
     gap: 7px;
     min-width: 0;
     color: #8a97a6;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     text-align: center;
 }
 
@@ -718,7 +715,7 @@ select:focus-visible {
     border-radius: 50%;
     background: var(--surface-1);
     color: inherit;
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .job-stage-rail li.completed {
@@ -737,7 +734,7 @@ select:focus-visible {
 
 .job-stage-rail li.active {
     color: var(--brand-600);
-    font-weight: 700;
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .job-stage-rail li.active .job-stage-marker {
@@ -747,7 +744,7 @@ select:focus-visible {
 
 .job-stage-rail li.failed {
     color: var(--danger-600);
-    font-weight: 700;
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .job-stage-rail li.failed .job-stage-marker {
@@ -978,12 +975,12 @@ select:focus-visible {
 }
 
 .reader-heading strong {
-    font-size: 15px;
+    font-size: var(--ui-font-size-body);
 }
 
 .reader-heading span {
     color: var(--reader-muted);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .reader-header-actions {
@@ -1031,7 +1028,7 @@ select:focus-visible {
 
 .reader-desktop-nav-header.document-browser-header > strong {
     justify-self: center;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     white-space: nowrap;
 }
 
@@ -1167,14 +1164,14 @@ select:focus-visible {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    font-size: 13.5px;
+    font-size: var(--ui-font-size-body);
     line-height: 1.5;
     overflow-wrap: break-word;
 }
 
 .toc-node.has-children .toc-title,
 .toc-tree-root > .toc-item > .toc-row .toc-title {
-    font-weight: 600;
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1196,11 +1193,11 @@ select:focus-visible {
 .toc-row.active {
     background: color-mix(in srgb, var(--reader-accent), transparent 88%);
     color: var(--reader-accent);
-    font-weight: 650;
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .toc-row.active .toc-title {
-    font-weight: 650;
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .toc-row.active::before {
@@ -1219,8 +1216,8 @@ select:focus-visible {
     align-self: center;
     padding: 2px 6px;
     border-radius: 999px;
-    font-size: 10px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     line-height: 1.5;
     white-space: nowrap;
 }
@@ -1270,7 +1267,22 @@ select:focus-visible {
     width: min(100%, var(--reader-column));
     margin: 0 auto;
     padding: 48px clamp(24px, 5vw, 64px) 32px;
-    font-family: var(--reader-body-font, "Source Sans 3", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif);
+    font-family: var(--reader-body-font, var(--ui-font-family));
+}
+
+.editor-preview-article, .detached-preview-article {
+    --reader-font-size: 18px;
+    --reader-line-height: 1.85;
+    font-family: var(--ui-font-family);
+}
+
+.reader-drawer header > strong, .reader-search-sheet > header > strong, .reader-mobile-comfort-sheet > header > strong {
+    font-size: var(--ui-font-size-section);
+    font-weight: var(--ui-font-weight-semibold);
+}
+
+.diagram-notice, .mermaid-component-loading, .image-unavailable-message {
+    font-family: var(--ui-font-family);
 }
 
 .reader-article h1 {
@@ -1282,8 +1294,8 @@ select:focus-visible {
 
 .content-block {
     color: var(--reader-text);
-    font-size: var(--reader-font-size);
-    line-height: var(--reader-line-height);
+    font-size: var(--reader-font-size, 18px);
+    line-height: var(--reader-line-height, 1.85);
 }
 
 .paragraph, .heading-note, .content-block blockquote {
@@ -1307,7 +1319,7 @@ select:focus-visible {
 }
 
 .heading-note {
-    font-weight: 700;
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .reader-list {
@@ -1341,9 +1353,10 @@ select:focus-visible {
     padding: 10px 14px;
     border-bottom: 1px solid var(--reader-line, var(--line-200));
     color: var(--reader-muted, var(--ink-500));
-    font-size: 12px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-semibold);
     text-transform: lowercase;
+    font-family: var(--ui-font-family);
 }
 
 .code-toolbar-button {
@@ -1368,7 +1381,7 @@ select:focus-visible {
     border-bottom: 1px solid var(--reader-line, var(--line-200));
     background: color-mix(in srgb, var(--reader-accent, var(--brand-500)), transparent 94%);
     color: var(--reader-muted, var(--ink-500));
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.5;
 }
 
@@ -1378,7 +1391,7 @@ select:focus-visible {
     place-items: center;
     margin: 0;
     color: var(--reader-muted, var(--ink-500));
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 .code-block pre, .table-snapshot pre, .fallback-block {
@@ -1386,8 +1399,8 @@ select:focus-visible {
     overflow-x: auto;
     padding: 18px;
     white-space: pre;
-    font-family: "Cascadia Mono", Consolas, monospace;
-    font-size: 14px;
+    font-family: var(--ui-font-mono);
+    font-size: var(--ui-font-size-body);
     line-height: 1.7;
 }
 
@@ -1406,7 +1419,7 @@ select:focus-visible {
 .code-block .hljs-literal,
 .code-block .hljs-doctag {
     color: var(--code-keyword);
-    font-weight: 650;
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .code-block .hljs-string,
@@ -1460,7 +1473,7 @@ select:focus-visible {
 
 .table-wrap th {
     background: var(--surface-2);
-    font-weight: 650;
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .table-wrap th, .table-wrap td {
@@ -1505,7 +1518,7 @@ select:focus-visible {
 
 .image-block figcaption {
     color: var(--reader-muted);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.55;
 }
 
@@ -1523,13 +1536,13 @@ select:focus-visible {
     justify-items: start;
     gap: 4px;
     color: var(--reader-muted);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.5;
 }
 
 .image-unavailable-message strong {
     color: var(--reader-text);
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
 }
 
 .image-unavailable-message button {
@@ -1549,7 +1562,7 @@ select:focus-visible {
 
 .chapter-position {
     color: var(--reader-muted);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
@@ -1567,7 +1580,7 @@ select:focus-visible {
     place-items: center;
     padding: 8px 0 24px;
     color: var(--reader-muted);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     text-align: center;
 }
 
@@ -1680,8 +1693,8 @@ select:focus-visible {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.5;
     overflow-wrap: break-word;
 }
@@ -1691,7 +1704,7 @@ select:focus-visible {
     align-items: center;
     gap: 8px;
     color: var(--reader-muted);
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
     line-height: 1.4;
 }
 
@@ -1747,7 +1760,7 @@ select:focus-visible {
     place-items: center;
     padding: 24px;
     color: var(--reader-muted);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     text-align: center;
 }
 
@@ -1782,7 +1795,7 @@ select:focus-visible {
     background: var(--reader-code-bg);
     color: var(--reader-text);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
 }
 
 .reader-document-filter input:focus {
@@ -1793,7 +1806,7 @@ select:focus-visible {
 .reader-document-switch-error {
     margin: 0;
     color: #c2410c;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     line-height: 1.5;
 }
 
@@ -1865,7 +1878,7 @@ select:focus-visible {
 .reader-document-option strong {
     min-width: 0;
     overflow: hidden;
-    font-size: 13.5px;
+    font-size: var(--ui-font-size-body);
     line-height: 1.35;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1879,13 +1892,13 @@ select:focus-visible {
     border-radius: 999px;
     background: color-mix(in srgb, var(--reader-accent), transparent 84%);
     color: var(--reader-accent);
-    font-size: 10px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .reader-document-option output {
     color: var(--reader-muted);
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
     font-variant-numeric: tabular-nums;
     line-height: 1;
 }
@@ -1898,7 +1911,7 @@ select:focus-visible {
     gap: 8px;
     padding: 8px 12px;
     color: var(--reader-muted);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     text-align: center;
 }
 
@@ -1934,15 +1947,15 @@ select:focus-visible {
 
 .reader-search-hit span {
     color: var(--reader-muted);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.45;
 }
 
 .reader-search-hit small {
     overflow: hidden;
     color: var(--reader-muted);
-    font-size: 11px;
-    font-weight: 400;
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-regular);
     line-height: 1.4;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1955,7 +1968,7 @@ select:focus-visible {
     justify-content: space-between;
     gap: 12px;
     color: var(--reader-muted);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .reader-search-groups, .reader-search-group {
@@ -1966,12 +1979,12 @@ select:focus-visible {
 .reader-search-group > header {
     padding: 2px 2px 0;
     color: var(--reader-muted);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .reader-search-group > header strong {
     color: var(--reader-text);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 @media (max-width: 760px) {
@@ -2004,7 +2017,7 @@ select:focus-visible {
     }
 
     .reader-heading strong {
-        font-size: 14px;
+        font-size: var(--ui-font-size-body);
     }
 
     .reader-heading span {
@@ -2062,8 +2075,8 @@ select:focus-visible {
         border: 0;
         background: transparent;
         color: var(--reader-accent);
-        font-size: 11px;
-        font-weight: 700;
+        font-size: var(--ui-font-size-caption);
+        font-weight: var(--ui-font-weight-bold);
         font-variant-numeric: tabular-nums;
         line-height: 12px;
         pointer-events: none;
@@ -2075,7 +2088,7 @@ select:focus-visible {
 
     .toc-tree-compact-groups .toc-group-label .toc-title {
         color: var(--reader-muted);
-        font-size: 12px;
+        font-size: var(--ui-font-size-caption);
         letter-spacing: .035em;
     }
 
@@ -2121,7 +2134,7 @@ select:focus-visible {
 
     .code-block pre, .table-snapshot pre {
         padding: 15px;
-        font-size: 13px;
+        font-size: var(--ui-font-size-body);
     }
 
     .chapter-pagination {
@@ -2156,7 +2169,7 @@ select:focus-visible {
 
     .chapter-pagination .chapter-position {
         justify-self: center;
-        font-size: 12px;
+        font-size: var(--ui-font-size-caption);
         letter-spacing: .04em;
         opacity: .62;
     }
@@ -2202,7 +2215,7 @@ select:focus-visible {
     gap: 16px;
     padding-top: 16px;
     color: #667085;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 .version-history-card {
@@ -2223,12 +2236,12 @@ select:focus-visible {
 
 .card-heading h2 {
     margin: 0;
-    font-size: 17px;
+    font-size: var(--ui-font-size-section);
 }
 
 .card-heading span {
     color: #667085;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.5;
 }
 
@@ -2266,19 +2279,19 @@ select:focus-visible {
 
 .current-version-identity > span {
     color: #0f766e;
-    font-size: 12px;
-    font-weight: 750;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     letter-spacing: .04em;
 }
 
 .current-version-identity h3 {
     margin: 0;
-    font-size: 24px;
+    font-size: var(--ui-font-size-page);
 }
 
 .current-version-identity small, .current-version-meta > span {
     color: #536274;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     font-variant-numeric: tabular-nums;
 }
 
@@ -2307,12 +2320,12 @@ select:focus-visible {
 
 .history-section-heading h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
 }
 
 .history-section-heading span {
     color: #667085;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .version-history {
@@ -2348,12 +2361,12 @@ select:focus-visible {
 }
 
 .version-number strong {
-    font-size: 22px;
+    font-size: var(--ui-font-size-page);
 }
 
 .version-number span, .version-meta span {
     color: #667085;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .version-number span {
@@ -2375,7 +2388,7 @@ select:focus-visible {
 }
 
 .version-lineage {
-    font-weight: 600;
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .version-meta .version-branch-warning {
@@ -2413,7 +2426,7 @@ select:focus-visible {
 
 .import-task-form .el-form-item__label {
     margin-bottom: 8px;
-    font-weight: 650;
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.45;
 }
 
@@ -2446,12 +2459,12 @@ select:focus-visible {
 
 .recognized-file > span:first-child {
     color: #536274;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 .muted-text {
     color: #7a8795;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 .issue-list {
@@ -2486,7 +2499,7 @@ select:focus-visible {
 
 .import-document-preview-heading span {
     color: #718096;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 .import-metadata-form .el-select {
@@ -2521,8 +2534,8 @@ select:focus-visible {
     align-items: center;
     gap: 6px;
     color: var(--ink-500);
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-semibold);
     white-space: nowrap;
 }
 
@@ -2584,7 +2597,7 @@ select:focus-visible {
 
 .panel-title span {
     color: #758194;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .panel-title .el-icon {
@@ -2631,7 +2644,7 @@ select:focus-visible {
     flex: 0 0 auto;
     margin-left: auto;
     color: #0f766e;
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .editor-content-panel {
@@ -2660,7 +2673,7 @@ select:focus-visible {
 
 .section-heading h2 {
     margin: 3px 0 0;
-    font-size: 20px;
+    font-size: var(--ui-font-size-section);
     letter-spacing: 0;
 }
 
@@ -2670,7 +2683,7 @@ select:focus-visible {
     margin-top: 5px;
     overflow: hidden;
     color: #758194;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     line-height: 1.45;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2682,7 +2695,7 @@ select:focus-visible {
 
 .block-heading-actions > span {
     color: #758194;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 .drawer-footer {
@@ -2705,8 +2718,8 @@ select:focus-visible {
 }
 
 .node-property-drawer .el-drawer__title {
-    font-size: 18px;
-    font-weight: 650;
+    font-size: var(--ui-font-size-section);
+    font-weight: var(--ui-font-weight-semibold);
     letter-spacing: -.01em;
 }
 
@@ -2742,8 +2755,8 @@ select:focus-visible {
 
 .node-property-context-label {
     color: #0f766e;
-    font-size: 11px;
-    font-weight: 750;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     letter-spacing: .1em;
     text-transform: uppercase;
 }
@@ -2754,7 +2767,7 @@ select:focus-visible {
     border-radius: 999px;
     background: #fff;
     color: #42645f;
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
     line-height: 1.25;
     white-space: nowrap;
 }
@@ -2762,8 +2775,8 @@ select:focus-visible {
 .node-property-context p {
     margin: 0;
     color: #304255;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.55;
     overflow-wrap: anywhere;
 }
@@ -2804,14 +2817,14 @@ select:focus-visible {
 .node-property-section h3 {
     margin: 0;
     color: #1e2d3d;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .node-property-step {
     color: #0f766e;
-    font-size: 10px;
-    font-weight: 800;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     font-variant-numeric: tabular-nums;
     letter-spacing: .06em;
 }
@@ -2829,8 +2842,8 @@ select:focus-visible {
     height: auto;
     margin-bottom: 8px;
     color: #526174;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.4;
 }
 
@@ -2853,7 +2866,7 @@ select:focus-visible {
     display: block;
     margin-top: 7px;
     color: #7a8798;
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.45;
 }
 
@@ -2864,8 +2877,8 @@ select:focus-visible {
     margin: 0 0 22px;
     padding: 0;
     color: #1e2d3d;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .node-type-grid {
@@ -2921,15 +2934,15 @@ select:focus-visible {
 }
 
 .node-type-choice-content strong {
-    font-size: 13px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-bold);
     line-height: 1.35;
 }
 
 .node-type-choice-content small {
     color: #768598;
-    font-size: 11px;
-    font-weight: 400;
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-regular);
     line-height: 1.4;
 }
 
@@ -2972,8 +2985,8 @@ select:focus-visible {
     border-radius: 6px;
     background: #fff;
     color: #4b5b6d;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.3;
     text-align: center;
     transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
@@ -2997,7 +3010,7 @@ select:focus-visible {
     border-left: 2px solid #75aaa4;
     background: #f7fafb;
     color: #607083;
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.5;
 }
 
@@ -3017,7 +3030,7 @@ select:focus-visible {
     align-items: center;
     gap: 7px;
     color: #718095;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     white-space: nowrap;
 }
 
@@ -3108,8 +3121,8 @@ select:focus-visible {
 
 .block-list-item strong {
     overflow: hidden;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.45;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -3124,13 +3137,13 @@ select:focus-visible {
 
 .block-list-meta small {
     color: #7b8796;
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
 }
 
 .block-list-meta i {
     margin-left: auto;
     color: #aa6b00;
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
     font-style: normal;
 }
 
@@ -3177,7 +3190,7 @@ select:focus-visible {
 .block-detail-panel > header > div:first-child > span {
     overflow: hidden;
     color: #758194;
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -3226,7 +3239,7 @@ select:focus-visible {
 .payload-collapse .el-collapse-item__header {
     height: 34px;
     color: #627083;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     border-bottom: 0;
 }
 
@@ -3241,8 +3254,8 @@ select:focus-visible {
 .payload-invalid {
     margin-left: 8px;
     color: #b42318;
-    font-size: 12px;
-    font-weight: 400;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-regular);
 }
 
 .payload-editor textarea {
@@ -3250,8 +3263,8 @@ select:focus-visible {
     min-width: 0;
     max-width: 100%;
     min-height: 180px !important;
-    font-family: "Cascadia Mono", Consolas, monospace;
-    font-size: 12px;
+    font-family: var(--ui-font-mono);
+    font-size: var(--ui-font-size-body);
     line-height: 1.55;
 }
 
@@ -3306,7 +3319,7 @@ select:focus-visible {
 .editor-preview-panel header strong {
     overflow: hidden;
     color: #1e2d3d;
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -3361,8 +3374,8 @@ select:focus-visible {
 .editor-preview-article > h1 {
     margin: 0 0 24px;
     color: #152a40;
-    font-size: 23px;
-    line-height: 1.38;
+    font-size: clamp(26px, 3vw, 34px);
+    line-height: 1.28;
     letter-spacing: 0;
 }
 
@@ -3408,7 +3421,7 @@ select:focus-visible {
 
 .detached-preview-header strong {
     overflow: hidden;
-    font-size: 15px;
+    font-size: var(--ui-font-size-body);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -3419,7 +3432,7 @@ select:focus-visible {
 
 .detached-preview-actions > span {
     color: var(--reader-muted);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     white-space: nowrap;
 }
 
@@ -3454,7 +3467,7 @@ select:focus-visible {
 
 .detached-preview-article h1 {
     margin: 0 0 34px;
-    font-size: clamp(28px, 4vw, 42px);
+    font-size: clamp(26px, 3vw, 34px);
     line-height: 1.28;
     letter-spacing: 0;
 }
@@ -3649,7 +3662,7 @@ select:focus-visible {
 .document-metadata-grid dt {
     padding-top: 6px;
     color: #718096;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.6;
 }
 
@@ -3659,8 +3672,8 @@ select:focus-visible {
     padding: 4px 0;
     color: #27364a;
     font-family: inherit;
-    font-size: 14px;
-    font-weight: 400;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-regular);
     line-height: 1.6;
     overflow-wrap: anywhere;
 }
@@ -3681,8 +3694,8 @@ select:focus-visible {
     --el-tag-border-color: transparent;
     --el-tag-text-color: #475467;
     font-family: inherit;
-    font-size: 14px;
-    font-weight: 400;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-regular);
 }
 
 .document-tag-list .muted-text {
@@ -3694,7 +3707,7 @@ select:focus-visible {
     width: 100%;
     margin-top: 6px;
     color: #8795a8;
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.5;
 }
 
@@ -3749,7 +3762,7 @@ select:focus-visible {
     background: color-mix(in srgb, var(--reader-surface), var(--reader-line) 20%);
     color: var(--reader-muted);
     font-family: inherit;
-    font-size: 10px;
+    font-size: var(--ui-font-size-caption);
     line-height: 1.2;
     white-space: nowrap;
 }
@@ -3774,7 +3787,7 @@ select:focus-visible {
 .el-dropdown-menu__item.is-active {
     background: var(--brand-100);
     color: var(--brand-700);
-    font-weight: 700;
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .reader-comfort-popper.el-popper.is-light {
@@ -3807,12 +3820,12 @@ select:focus-visible {
 }
 
 .reader-comfort-panel > header strong {
-    font-size: 15px;
+    font-size: var(--ui-font-size-body);
 }
 
 .reader-comfort-panel > header span {
     color: var(--reader-muted, var(--ink-500));
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .reader-comfort-panel fieldset {
@@ -3827,8 +3840,8 @@ select:focus-visible {
     width: 100%;
     margin-bottom: 9px;
     color: var(--reader-text, var(--ink-700));
-    font-size: 13px;
-    font-weight: 650;
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .reader-comfort-panel output {

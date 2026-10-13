@@ -129,12 +129,13 @@ onBeforeUnmount(() => {
   padding: 10px 14px;
   border-bottom: 1px solid var(--reader-line);
   background: var(--reader-code-bg, #fbfcfe);
+  font-family: var(--ui-font-family);
 }
 
 .table-toolbar-label {
   color: var(--reader-muted, var(--ink-500));
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--ui-font-size-caption);
+  font-weight: var(--ui-font-weight-semibold);
 }
 
 .table-preview-icon {
@@ -195,6 +196,10 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size-section);
+  font-weight: var(--ui-font-weight-semibold);
+  line-height: 1.4;
 }
 
 .table-preview-scroll {

@@ -84,7 +84,7 @@ function allOperations(): void {
         <el-table v-loading="loading" :data="operations" empty-text="暂无操作记录" row-key="id" @row-click="open">
           <el-table-column label="操作" min-width="190">
             <template #default="{ row }">
-              <div class="document-cell"><strong>{{ shortId(row.id) }}</strong><span>升级包 {{
+              <div class="document-cell"><strong class="mono">{{ shortId(row.id) }}</strong><span>升级包 {{
                   shortId(row.releaseId)
                 }}</span></div>
             </template>

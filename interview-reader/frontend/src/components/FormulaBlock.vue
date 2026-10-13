@@ -78,7 +78,8 @@ onBeforeUnmount(() => {
   gap: 6px;
   margin: 0;
   color: var(--reader-muted);
-  font-size: 13px;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size-small);
 }
 
 .formula-fallback code {

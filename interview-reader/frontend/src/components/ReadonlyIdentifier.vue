@@ -79,9 +79,9 @@ async function copyIdentifier(): Promise<void> {
   min-width: 0;
   flex: 0 1 auto;
   color: #27364a;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-body);
+  font-weight: var(--ui-font-weight-medium);
   font-variant-ligatures: none;
   letter-spacing: 0;
   line-height: 1.6;

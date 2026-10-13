@@ -120,6 +120,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mermaid-diagram {
+  font-family: var(--ui-font-family);
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -161,6 +162,6 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 18px;
   color: var(--reader-muted, var(--ink-500));
-  font-size: 13px;
+  font-size: var(--ui-font-size-small);
 }
 </style>

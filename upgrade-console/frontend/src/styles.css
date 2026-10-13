@@ -34,11 +34,10 @@ body {
     margin: 0;
     color: var(--ink-900);
     background: var(--surface-0);
-    font-family: "Source Sans 3", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 
-button, input {
+button, input, textarea, select {
     font: inherit;
 }
 
@@ -63,7 +62,7 @@ button:focus-visible, a:focus-visible {
 }
 
 .mono {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--ui-font-mono);
     overflow-wrap: anywhere;
 }
 
@@ -108,8 +107,8 @@ button:focus-visible, a:focus-visible {
     color: #fff;
     text-decoration: none;
     white-space: nowrap;
-    font-size: 15px;
-    font-weight: 750;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .brand-mark {
@@ -124,8 +123,8 @@ button:focus-visible, a:focus-visible {
     display: block;
     margin-top: 2px;
     color: var(--admin-sidebar-text);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-medium);
 }
 
 .admin-sidebar nav {
@@ -136,8 +135,8 @@ button:focus-visible, a:focus-visible {
 .admin-nav-label {
     padding: 0 12px 2px;
     color: #6f879c;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     letter-spacing: .1em;
     white-space: nowrap;
 }
@@ -178,7 +177,7 @@ button:focus-visible, a:focus-visible {
     padding-left: 14px;
     border-left: 1px solid rgba(159, 178, 195, .18);
     border-radius: 0 7px 7px 0;
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
 }
 
 .admin-sidebar nav a.admin-nav-child .el-icon {
@@ -193,7 +192,7 @@ button:focus-visible, a:focus-visible {
 
 .connection-indicator {
     color: var(--admin-sidebar-text);
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
     white-space: nowrap;
 }
 
@@ -225,7 +224,7 @@ button:focus-visible, a:focus-visible {
     background: #0c2942;
     color: #d9e5ef;
     border-radius: var(--ui-button-radius);
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
     cursor: pointer;
 }
 
@@ -235,7 +234,7 @@ button:focus-visible, a:focus-visible {
 }
 
 .admin-sidebar-toggle .el-icon {
-    font-size: 18px;
+    font-size: var(--ui-font-size-section);
 }
 
 .sidebar-collapsed .admin-brand {
@@ -330,7 +329,7 @@ button:focus-visible, a:focus-visible {
     min-width: 0;
     margin: 0;
     overflow: hidden;
-    font-size: 22px;
+    font-size: var(--ui-font-size-page);
     line-height: 1.25;
     letter-spacing: 0;
     text-overflow: ellipsis;
@@ -339,7 +338,7 @@ button:focus-visible, a:focus-visible {
 
 .admin-page-meta {
     color: var(--ink-500);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.4;
 }
 
@@ -349,8 +348,8 @@ button:focus-visible, a:focus-visible {
 
 .admin-page-help-title {
     margin: 0 0 8px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
@@ -358,7 +357,7 @@ button:focus-visible, a:focus-visible {
 .admin-page-help-description {
     margin: 0;
     color: var(--ink-500);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.6;
     overflow-wrap: anywhere;
 }
@@ -367,8 +366,8 @@ button:focus-visible, a:focus-visible {
     display: block;
     margin: 0 0 4px;
     color: var(--brand-600);
-    font-size: 11px;
-    font-weight: 750;
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-bold);
     letter-spacing: .06em;
 }
 
@@ -394,12 +393,12 @@ button:focus-visible, a:focus-visible {
 }
 
 .card-heading strong {
-    font-size: 15px;
+    font-size: var(--ui-font-size-body);
 }
 
 .card-heading span, .section-title span {
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .empty-state {
@@ -418,8 +417,8 @@ button:focus-visible, a:focus-visible {
 
 .section-title h2 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 750;
+    font-size: var(--ui-font-size-section);
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .dashboard-stack {
@@ -447,7 +446,7 @@ button:focus-visible, a:focus-visible {
 
 .status-summary strong {
     display: block;
-    font-size: 18px;
+    font-size: var(--ui-font-size-section);
     line-height: 1.3;
 }
 
@@ -457,13 +456,13 @@ button:focus-visible, a:focus-visible {
 
 .status-build {
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .status-build code {
     margin-left: 6px;
     color: var(--ink-700);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .upgrade-condition {
@@ -494,13 +493,13 @@ button:focus-visible, a:focus-visible {
 
 .health-checks span {
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .health-checks b {
     margin-left: 5px;
     color: var(--ink-500);
-    font-weight: 700;
+    font-weight: var(--ui-font-weight-bold);
 }
 
 .health-checks b.good {
@@ -517,7 +516,7 @@ button:focus-visible, a:focus-visible {
 
 .status-blockers, .status-context {
     margin: 8px 0 0;
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.5;
 }
 
@@ -527,7 +526,7 @@ button:focus-visible, a:focus-visible {
 
 .status-checked {
     color: var(--ink-500);
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
 }
 
 .metrics-grid {
@@ -549,7 +548,7 @@ button:focus-visible, a:focus-visible {
 
 .metric-card span {
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.4;
 }
 
@@ -562,13 +561,13 @@ button:focus-visible, a:focus-visible {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 18px;
-    font-weight: 750;
+    font-size: var(--ui-font-size-section);
+    font-weight: var(--ui-font-weight-bold);
     font-variant-numeric: tabular-nums;
 }
 
 .metric-card strong.metric-tasks {
-    font-size: 15px;
+    font-size: var(--ui-font-size-body);
 }
 
 .latest-section {
@@ -616,13 +615,13 @@ button:focus-visible, a:focus-visible {
 }
 
 .latest-summary strong {
-    font-size: 15px;
+    font-size: var(--ui-font-size-body);
 }
 
 .latest-summary p {
     margin: 4px 0 0;
     color: var(--ink-700);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
     overflow-wrap: anywhere;
 }
 
@@ -630,7 +629,7 @@ button:focus-visible, a:focus-visible {
     display: grid;
     gap: 4px;
     color: var(--ink-500);
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
     font-variant-numeric: tabular-nums;
 }
 
@@ -656,12 +655,12 @@ button:focus-visible, a:focus-visible {
 }
 
 .operation-feed-heading strong {
-    font-size: 14px;
+    font-size: var(--ui-font-size-body);
 }
 
 .operation-feed-heading span {
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .operation-feed-grid {
@@ -685,7 +684,7 @@ button:focus-visible, a:focus-visible {
 }
 
 .feed-pane-heading strong {
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .feed-scroll-actions {
@@ -693,7 +692,7 @@ button:focus-visible, a:focus-visible {
     align-items: center;
     gap: 6px;
     color: var(--ink-500);
-    font-size: 11px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .stage-track, .log-terminal {
@@ -778,17 +777,17 @@ button:focus-visible, a:focus-visible {
 
 .stage-track strong {
     color: var(--ink-900);
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
 }
 
 .stage-track p {
     margin: 3px 0;
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.45;
 }
 
 .stage-track time {
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
 }
 
 .stage-empty {
@@ -799,7 +798,7 @@ button:focus-visible, a:focus-visible {
     padding: 12px 0;
     background: #0a2031;
     color: #c8d5df;
-    font: 11px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+    font: var(--ui-font-size-caption)/1.65 var(--ui-font-mono);
     scrollbar-color: #547083 transparent;
 }
 
@@ -869,13 +868,13 @@ button:focus-visible, a:focus-visible {
 }
 
 .document-cell strong {
-    font-size: 13px;
-    font-weight: 700;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .document-cell span {
     color: var(--ink-500);
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
 }
 
 .table-pager {
@@ -886,13 +885,13 @@ button:focus-visible, a:focus-visible {
     padding: 14px 18px;
     border-top: 1px solid var(--line-100);
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .table-help {
     margin: -7px 0 0;
     color: var(--ink-500);
-    font-size: 12px;
+    font-size: var(--ui-font-size-small);
 }
 
 .upload-layout {
@@ -934,13 +933,13 @@ button:focus-visible, a:focus-visible {
     flex-wrap: wrap;
     gap: 6px 12px;
     margin-bottom: 8px;
-    font-size: 12px;
+    font-size: var(--ui-font-size-caption);
     line-height: 1.5;
 }
 
 .upload-progress-state {
     color: var(--ink-700);
-    font-weight: 600;
+    font-weight: var(--ui-font-weight-semibold);
 }
 
 .upload-progress.is-failed .upload-progress-state {
@@ -965,12 +964,12 @@ button:focus-visible, a:focus-visible {
 
 .upload-guide h2 {
     margin: 5px 0 14px;
-    font-size: 19px;
+    font-size: var(--ui-font-size-section);
 }
 
 .upload-guide p {
     color: var(--ink-500);
-    font-size: 13px;
+    font-size: var(--ui-font-size-small);
     line-height: 1.7;
 }
 
@@ -997,17 +996,17 @@ button:focus-visible, a:focus-visible {
 
 .operation-summary-grid span {
     color: var(--ink-500);
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
 }
 
 .operation-summary-grid strong {
-    font-size: 13px;
+    font-size: var(--ui-font-size-body);
     overflow-wrap: anywhere;
 }
 
 .operation-summary-grid small {
     color: var(--ink-500);
-    font-size: 11px;
+    font-size: var(--ui-font-size-small);
 }
 
 .operation-actions {
@@ -1084,7 +1083,7 @@ button:focus-visible, a:focus-visible {
         width: auto;
         min-height: 42px;
         padding: 0 11px;
-        font-size: 12px;
+        font-size: var(--ui-font-size-body);
     }
 
     .admin-sidebar nav a .el-icon {
@@ -1136,7 +1135,7 @@ button:focus-visible, a:focus-visible {
 
     .log-line {
         grid-template-columns: 80px 68px minmax(0, 1fr);
-        font-size: 10px;
+        font-size: var(--ui-font-size-caption);
     }
 
     .log-line time {
