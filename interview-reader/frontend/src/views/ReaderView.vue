@@ -1081,7 +1081,7 @@ function message(value: unknown): string {
       class="reader-page"
   >
     <header class="reader-header">
-      <button :aria-expanded="drawer" aria-label="打开目录" class="ui-button ui-button--icon reader-menu-button" type="button"
+      <button :aria-expanded="drawer" aria-label="打开目录" class="ui-button ui-button--icon reader-tool-button reader-menu-button" type="button"
               @click="drawer = true">
         <el-icon>
           <Tickets/>
@@ -1096,7 +1096,7 @@ function message(value: unknown): string {
       <div class="reader-header-actions ui-action-row ui-action-row--nowrap">
         <button
             aria-label="搜索文档内容"
-            class="ui-button reader-header-search-trigger"
+            class="ui-button reader-tool-button reader-header-search-trigger"
             title="搜索文档内容"
             type="button"
             @click="openSearch"
@@ -1113,7 +1113,7 @@ function message(value: unknown): string {
             <button
                 :aria-expanded="comfortOpen"
                 aria-label="阅读设置"
-                class="ui-button reader-comfort-button reader-comfort-desktop"
+                class="ui-button reader-tool-button reader-comfort-button reader-comfort-desktop"
                 title="阅读设置"
                 type="button"
             >
@@ -1136,7 +1136,7 @@ function message(value: unknown): string {
         <button
             :aria-expanded="mobileComfortOpen"
             aria-label="阅读设置"
-            class="ui-button ui-button--icon reader-comfort-button reader-comfort-mobile"
+            class="ui-button ui-button--icon reader-tool-button reader-comfort-button reader-comfort-mobile"
             title="阅读设置"
             type="button"
             @click="mobileComfortOpen = true"
@@ -1152,7 +1152,7 @@ function message(value: unknown): string {
         </el-button>
         <el-dropdown v-if="props.online !== false" class="reader-account-menu" placement="bottom-end" trigger="click"
                      @command="handleAccountCommand">
-          <button aria-label="账户菜单" class="ui-button reader-theme-trigger" title="账户菜单" type="button">
+          <button aria-label="账户菜单" class="ui-button reader-tool-button reader-theme-trigger" title="账户菜单" type="button">
             <el-icon>
               <User/>
             </el-icon>
@@ -1370,8 +1370,8 @@ function message(value: unknown): string {
           <strong>搜索文档内容</strong>
           <el-button aria-label="关闭搜索" class="ui-close-button" @click="searchOpen = false"><Close aria-hidden="true" /></el-button>
         </header>
-        <div aria-label="搜索范围" class="comfort-option-grid"
-             role="group" style="width:max-content;grid-template-columns:repeat(2,minmax(0,1fr))">
+        <div aria-label="搜索范围" class="comfort-option-grid reader-search-scope"
+             role="group">
           <button class="ui-button" :aria-pressed="searchScope === 'document'" :class="{ active: searchScope === 'document' }"
                   type="button" @click="setSearchScope('document')">当前文档
           </button>

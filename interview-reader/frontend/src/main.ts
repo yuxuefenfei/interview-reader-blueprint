@@ -11,6 +11,7 @@ import router from "./router";
 import "./styles.css";
 import "../../../frontend-shared/typography.css";
 import "../../../frontend-shared/buttons.css";
+import "./reader-controls.css";
 
 const app = createApp(App).use(router);
 app.use(ElLoading);

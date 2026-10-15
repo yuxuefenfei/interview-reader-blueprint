@@ -1,0 +1,215 @@
+/* Hallmark · genre: modern-minimal · theme: existing reader themes
+ * Structure: quiet reading toolbar, grouped settings, paired chapter links.
+ * Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4
+ */
+:is(.reader-page, .reader-comfort-popper, .reader-overlay-drawer) {
+    --reader-control-track: color-mix(in srgb, var(--reader-line) 35%, var(--reader-surface));
+    --reader-control-hover: color-mix(in srgb, var(--reader-accent) 6%, var(--reader-surface));
+    --reader-control-pressed: color-mix(in srgb, var(--reader-accent) 10%, var(--reader-surface));
+    --reader-control-edge: color-mix(in srgb, var(--reader-line) 65%, transparent);
+    --reader-control-shadow: color-mix(in srgb, var(--reader-text) 8%, transparent);
+    --reader-theme-light: #f5f7f8;
+    --reader-theme-sepia: #f3efe6;
+    --reader-theme-dark: #101820;
+    --reader-font-serif: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, serif;
+    --reader-control-radius: 10px;
+    --reader-option-radius: 7px;
+    --reader-option-gap: 2px;
+    --reader-panel-gap: 12px;
+}
+
+/* 工具保留共用尺寸与焦点规范，默认只显示图标或文字。 */
+.reader-page .reader-tool-button.ui-button {
+    border-color: transparent;
+    border-radius: var(--reader-control-radius);
+    background: transparent;
+    color: var(--reader-text);
+    white-space: nowrap;
+}
+
+.reader-page .reader-header-search-trigger.ui-button {
+    background: var(--reader-control-track);
+    color: var(--reader-muted);
+}
+
+.reader-page .chapter-pagination .chapter-nav-button {
+    border-color: transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--reader-muted);
+}
+
+.reader-page .chapter-pagination .chapter-nav-next {
+    color: var(--reader-accent);
+    font-weight: var(--ui-font-weight-semibold);
+}
+
+:is(.reader-page, .reader-comfort-popper) .comfort-option-grid {
+    min-width: 0;
+    gap: var(--reader-option-gap);
+    padding: 4px;
+    border-radius: var(--reader-control-radius);
+    background: var(--reader-control-track);
+}
+
+:is(.reader-page, .reader-comfort-popper) .comfort-option-grid .ui-button {
+    min-width: 0;
+    gap: 4px;
+    padding: 0 6px;
+    border-color: transparent;
+    border-radius: var(--reader-option-radius);
+    background: transparent;
+    color: var(--reader-muted);
+    white-space: nowrap;
+}
+
+:is(.reader-page, .reader-comfort-popper) .comfort-option-grid .ui-button[aria-pressed="true"] {
+    border-color: var(--reader-control-edge);
+    background: var(--reader-surface);
+    box-shadow: 0 1px 3px var(--reader-control-shadow);
+    color: var(--reader-accent);
+    font-weight: var(--ui-font-weight-semibold);
+}
+
+:is(.reader-page, .reader-comfort-popper) .comfort-option-grid .comfort-option-check {
+    width: 12px;
+    height: 12px;
+    color: var(--reader-accent);
+    opacity: 0;
+}
+
+.comfort-option-grid .ui-button[aria-pressed="true"] .comfort-option-check {
+    opacity: 1;
+}
+
+.comfort-theme-swatch {
+    width: 13px;
+    height: 13px;
+    flex: 0 0 auto;
+    border: 1px solid var(--reader-control-edge);
+    border-radius: 50%;
+}
+
+.comfort-theme-swatch--light { background: var(--reader-theme-light); }
+.comfort-theme-swatch--sepia { background: var(--reader-theme-sepia); }
+.comfort-theme-swatch--dark { background: var(--reader-theme-dark); }
+.comfort-option-grid .comfort-font-serif { font-family: var(--reader-font-serif); }
+
+:is(.reader-page, .reader-comfort-popper) .comfort-option-grid.font-options {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+:is(.reader-page, .reader-comfort-popper) .font-options .ui-button {
+    padding: 0 3px;
+    font-variant-numeric: tabular-nums;
+}
+
+.comfort-option-grid.code-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.reader-page .reader-search-scope {
+    width: fit-content;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reader-page .reader-search-scope .ui-button { padding: 0 14px; }
+
+.reader-comfort-panel { gap: var(--reader-panel-gap); }
+.reader-comfort-panel > header { align-items: center; padding-bottom: 6px; }
+.reader-comfort-panel legend { margin-bottom: 4px; line-height: 1.4; }
+.reader-comfort-panel output { color: var(--reader-muted); font-weight: var(--ui-font-weight-regular); }
+.reader-mobile-comfort-sheet .comfort-panel-title { display: none; }
+.reader-comfort-panel > header .ui-button--text { color: var(--reader-muted); padding: 0 6px; }
+
+.reader-page .reader-search-hit {
+    border-color: transparent;
+    border-radius: var(--reader-control-radius);
+    background: var(--reader-control-track);
+}
+
+.reader-page .toc-row.active,
+.reader-page .reader-document-option.active { background: var(--reader-control-hover); }
+.reader-page .reader-document-option.active small { background: transparent; }
+.reader-page .reader-document-selector-chevron { color: var(--reader-muted); }
+
+.reader-page .reader-article h1 { overflow-wrap: anywhere; }
+.reader-page .reader-article .inline-markdown code { font-size: .92em; }
+.reader-page .heading-note { font-weight: var(--ui-font-weight-semibold); }
+
+@media (hover: hover) and (pointer: fine) {
+    .reader-page .reader-tool-button.ui-button:not(:disabled):hover,
+    .reader-page .chapter-pagination .chapter-nav-button:not(.is-disabled):hover {
+        border-color: transparent;
+        background: var(--reader-control-hover);
+        color: var(--reader-accent);
+    }
+    :is(.reader-page, .reader-comfort-popper) .comfort-option-grid .ui-button:not(:disabled):not([aria-pressed="true"]):hover {
+        border-color: transparent;
+        background: var(--reader-control-hover);
+        color: var(--reader-text);
+    }
+    .reader-page .reader-search-hit:hover { border-color: var(--reader-control-edge); }
+}
+
+.reader-page .reader-tool-button.ui-button:not(:disabled):is(:active, [aria-expanded="true"]),
+.reader-page .chapter-pagination .chapter-nav-button:not(.is-disabled):active {
+    border-color: transparent;
+    background: var(--reader-control-pressed);
+    color: var(--reader-accent);
+}
+
+:is(.reader-page, .reader-comfort-popper) .comfort-option-grid .ui-button:not(:disabled):not([aria-pressed="true"]):active {
+    border-color: transparent;
+    background: var(--reader-control-pressed);
+    color: var(--reader-accent);
+}
+
+.reader-page :is(.reader-search-hit, .reader-document-selector, .reader-document-option, .toc-node, .toc-toggle):focus-visible {
+    outline: 2px solid var(--reader-accent);
+    outline-offset: -2px;
+}
+
+.reader-page :is(.reader-document-selector, .reader-search-hit):not(:disabled):active {
+    background: var(--reader-control-pressed);
+}
+
+.reader-page .chapter-pagination .chapter-nav-button.is-disabled {
+    border-color: transparent;
+    background: transparent;
+    color: var(--reader-muted);
+}
+
+.reader-page .reader-overlay-drawer:is(.reader-comfort-drawer, .reader-search-drawer) {
+    border-radius: 18px 18px 0 0;
+    overflow: clip;
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+    .reader-page .reader-theme-trigger { min-width: var(--ui-button-height); padding: 0; }
+}
+
+@media (max-width: 760px) {
+    .reader-page { grid-template-rows: 64px minmax(0, 1fr); }
+    .reader-page .reader-header { height: 64px; gap: 4px; padding: 0 10px 10px; }
+    .reader-page .reader-header-search-trigger.ui-button { background: transparent; color: var(--reader-text); }
+    .reader-page .reader-content { height: calc(var(--reader-viewport-height, 100vh) - 64px); }
+    .reader-page .mobile-chapter-progress:not(.is-loading) { height: 2px; }
+    .reader-page .mobile-progress-label { color: var(--reader-muted); font-weight: var(--ui-font-weight-medium); }
+    .reader-page .reader-article { padding-top: 24px; }
+    .reader-page .reader-article h1 { font-size: clamp(24px, 6vw, 27px); line-height: 1.35; }
+    .reader-page .chapter-pagination .chapter-nav-button { min-width: 88px; padding: 0 12px; }
+    .reader-page .chapter-pagination .chapter-position { opacity: 1; letter-spacing: 0; }
+    .reader-page .reader-comfort-drawer .el-drawer__body,
+    .reader-page .reader-search-drawer .el-drawer__body {
+        padding: 16px max(16px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+    .reader-mobile-comfort-sheet { gap: 8px; }
+}
+
+@media (max-width: 360px) {
+    .reader-page .comfort-option-grid.font-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reader-page :is(.reader-tool-button, .chapter-nav-button, .reader-search-hit),
+    :is(.reader-page, .reader-comfort-popper) .comfort-option-grid .ui-button { transition: none; }
+}
