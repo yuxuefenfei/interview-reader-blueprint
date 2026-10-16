@@ -774,7 +774,7 @@ select:focus-visible {
 }
 
 /* ── 阅读页面 ─────────────────────────────────────────────── */
-.reader-page, .reader-comfort-popper {
+.reader-page, .reader-comfort-popper, .reader-account-popper {
     --reader-bg: #f5f7f8;
     --reader-surface: #fff;
     --reader-text: #182230;
@@ -815,7 +815,7 @@ select:focus-visible {
     --toc-w: 48px;
 }
 
-:is(.reader-page, .reader-comfort-popper).theme-dark {
+:is(.reader-page, .reader-comfort-popper, .reader-account-popper).theme-dark {
     --reader-bg: #101820;
     --reader-surface: #17232e;
     --reader-text: #e9f0f5;
@@ -835,7 +835,7 @@ select:focus-visible {
     --code-symbol: #fda4af;
 }
 
-:is(.reader-page, .reader-comfort-popper).theme-sepia {
+:is(.reader-page, .reader-comfort-popper, .reader-account-popper).theme-sepia {
     --reader-bg: #f3efe6;
     --reader-surface: #faf6ee;
     --reader-text: #2c261c;
@@ -990,7 +990,7 @@ select:focus-visible {
 /* 确保响应式账户菜单的样式优先级高于 Element Plus 延迟加载的
    .el-dropdown { display: inline-flex } 规则。 */
 .reader-header-actions > .reader-account-menu {
-    display: none;
+    display: inline-flex;
 }
 
 .mobile-chapter-progress, .mobile-progress-label {
@@ -2021,10 +2021,6 @@ select:focus-visible {
     }
 
     .reader-heading span {
-        display: none;
-    }
-
-    .reader-header-actions > .el-button, .reader-admin-link {
         display: none;
     }
 
@@ -3767,20 +3763,15 @@ select:focus-visible {
     white-space: nowrap;
 }
 
-.reader-theme-trigger {
-    min-width: 92px;
+.reader-comfort-desktop {
+    display: inline-flex;
 }
 
 .reader-comfort-mobile.ui-button {
     display: none;
 }
 
-.reader-theme-chevron {
-    font-size: 12px !important;
-    color: var(--reader-muted);
-}
-
-:is(.reader-page, .reader-comfort-popper).theme-dark {
+:is(.reader-page, .reader-comfort-popper, .reader-account-popper).theme-dark {
     color-scheme: dark;
 }
 
@@ -3864,18 +3855,6 @@ select:focus-visible {
     grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
-@media (max-width: 1100px) and (min-width: 761px) {
-    .reader-comfort-button > span,
-    .reader-header-actions > .reader-admin-link,
-    .reader-header-actions > .reader-logout-button {
-        display: none;
-    }
-
-    .reader-header-actions > .reader-account-menu {
-        display: inline-flex;
-    }
-}
-
 @media (max-width: 760px) {
     .reader-header-actions > .reader-account-menu {
         display: none;
@@ -3885,7 +3864,7 @@ select:focus-visible {
         display: inline-flex;
     }
 
-    .reader-header-search-trigger.ui-button, .reader-theme-trigger.ui-button, .reader-comfort-mobile.ui-button {
+    .reader-header-search-trigger.ui-button, .reader-comfort-mobile.ui-button {
         width: var(--ui-button-height);
         min-width: var(--ui-button-height);
         justify-content: center;
@@ -3893,9 +3872,7 @@ select:focus-visible {
     }
 
     .reader-header-search-trigger .reader-search-placeholder,
-    .reader-header-search-trigger kbd,
-    .reader-theme-trigger span,
-    .reader-theme-chevron {
+    .reader-header-search-trigger kbd {
         display: none;
     }
 

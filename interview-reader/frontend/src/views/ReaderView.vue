@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import {toUserMessage} from "../utils/errorMessage";
 import {
-  ArrowDown,
   ArrowLeft,
   ArrowLeftBold,
   ArrowRight,
@@ -72,6 +71,10 @@ const pendingDocumentId = ref<string | null>(null);
 const documentSwitchError = ref("");
 const searchOpen = ref(false);
 const comfortOpen = ref(false);
+const accountMenuOpen = ref(false);
+// 提示绑定非聚焦容器，避免覆盖弹层按钮的 ARIA 属性。
+const comfortTrigger = ref<HTMLElement>();
+const accountTrigger = ref<HTMLElement>();
 const mobileComfortOpen = ref(false);
 const tablePreviewOpen = ref(false);
 const query = ref("");
@@ -1045,6 +1048,12 @@ function openSearch(): void {
 
 function handleGlobalShortcut(event: KeyboardEvent): void {
   if (tablePreviewOpen.value) return;
+  if (event.key === "Escape" && comfortOpen.value) {
+    event.preventDefault();
+    comfortOpen.value = false;
+    comfortTrigger.value?.querySelector("button")?.focus();
+    return;
+  }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     openSearch();
@@ -1107,32 +1116,34 @@ function message(value: unknown): string {
             <Search/>
           </el-icon>
         </button>
-        <el-popover v-model:visible="comfortOpen" :width="340" placement="bottom-end" :popper-class="`reader-comfort-popper theme-${theme}`"
-                    trigger="click">
-          <template #reference>
-            <button
-                :aria-expanded="comfortOpen"
-                aria-label="阅读设置"
-                class="ui-button reader-tool-button reader-comfort-button reader-comfort-desktop"
-                title="阅读设置"
-                type="button"
-            >
-              <el-icon>
-                <Reading/>
-              </el-icon>
-              <span>阅读设置</span>
-            </button>
-          </template>
-          <ReaderComfortSettings
-              v-model:code-wrap="comfort.codeWrap"
-              v-model:column-width="comfort.columnWidth"
-              v-model:font-family="comfort.fontFamily"
-              v-model:font-size="comfort.fontSize"
-              v-model:line-height="comfort.lineHeight"
-              v-model:theme="theme"
-              @reset="resetComfort"
-          />
-        </el-popover>
+        <span ref="comfortTrigger" class="reader-comfort-desktop">
+          <el-popover v-model:visible="comfortOpen" :width="340" placement="bottom-end" :popper-class="`reader-comfort-popper theme-${theme}`"
+                      trigger="click">
+            <template #reference>
+              <button
+                  :aria-expanded="comfortOpen"
+                  aria-label="阅读设置"
+                  class="ui-button ui-button--icon reader-tool-button reader-comfort-button"
+                  type="button"
+              >
+                <el-icon aria-hidden="true">
+                  <Reading/>
+                </el-icon>
+              </button>
+            </template>
+            <ReaderComfortSettings
+                v-model:code-wrap="comfort.codeWrap"
+                v-model:column-width="comfort.columnWidth"
+                v-model:font-family="comfort.fontFamily"
+                v-model:font-size="comfort.fontSize"
+                v-model:line-height="comfort.lineHeight"
+                v-model:theme="theme"
+                @reset="resetComfort"
+            />
+          </el-popover>
+        </span>
+        <el-tooltip :disabled="comfortOpen" :show-after="400" :trigger="['hover', 'focus']" :virtual-ref="comfortTrigger"
+                    content="阅读设置" placement="bottom" virtual-triggering />
         <button
             :aria-expanded="mobileComfortOpen"
             aria-label="阅读设置"
@@ -1145,29 +1156,26 @@ function message(value: unknown): string {
             <Reading/>
           </el-icon>
         </button>
-        <el-button v-if="props.online !== false" class="reader-admin-link" text @click="router.push('/admin')">
-          管理后台
-        </el-button>
-        <el-button v-if="props.online !== false" class="reader-logout-button" text @click="emit('logout')">退出
-        </el-button>
-        <el-dropdown v-if="props.online !== false" class="reader-account-menu" placement="bottom-end" trigger="click"
-                     @command="handleAccountCommand">
-          <button aria-label="账户菜单" class="ui-button reader-tool-button reader-theme-trigger" title="账户菜单" type="button">
-            <el-icon>
-              <User/>
-            </el-icon>
-            <span>账户</span>
-            <el-icon class="reader-theme-chevron">
-              <ArrowDown/>
-            </el-icon>
-          </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="admin">管理后台</el-dropdown-item>
-              <el-dropdown-item command="logout">退出</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <span v-if="props.online !== false" ref="accountTrigger" class="reader-account-menu">
+          <el-dropdown :popper-class="`reader-account-popper theme-${theme}`"
+                       placement="bottom-end" trigger="click"
+                       @command="handleAccountCommand" @visible-change="accountMenuOpen = $event">
+            <button :aria-expanded="accountMenuOpen" aria-haspopup="menu" aria-label="账户菜单"
+                    class="ui-button ui-button--icon reader-tool-button reader-account-trigger" type="button">
+              <el-icon aria-hidden="true">
+                <User/>
+              </el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="admin">管理后台</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </span>
+        <el-tooltip v-if="props.online !== false" :disabled="accountMenuOpen" :show-after="400" :trigger="['hover', 'focus']"
+                    :virtual-ref="accountTrigger" content="账户菜单" placement="bottom" virtual-triggering />
       </div>
       <!-- 桌面阅读进度条 -->
       <div :class="{ 'is-loading': chapterTransitioning }" aria-hidden="true" class="reader-header-progress">

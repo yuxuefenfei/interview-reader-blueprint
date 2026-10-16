@@ -2,7 +2,7 @@
  * Structure: quiet reading toolbar, grouped settings, paired chapter links.
  * Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4
  */
-:is(.reader-page, .reader-comfort-popper, .reader-overlay-drawer) {
+:is(.reader-page, .reader-comfort-popper, .reader-overlay-drawer, .reader-account-popper) {
     --reader-control-track: color-mix(in srgb, var(--reader-line) 35%, var(--reader-surface));
     --reader-control-hover: color-mix(in srgb, var(--reader-accent) 6%, var(--reader-surface));
     --reader-control-pressed: color-mix(in srgb, var(--reader-accent) 10%, var(--reader-surface));
@@ -183,8 +183,24 @@
     overflow: clip;
 }
 
-@media (min-width: 761px) and (max-width: 1100px) {
-    .reader-page .reader-theme-trigger { min-width: var(--ui-button-height); padding: 0; }
+/* 账户菜单沿用当前阅读主题，触屏尺寸与共用按钮保持一致。 */
+.reader-account-popper.el-dropdown__popper {
+    --el-bg-color-overlay: var(--reader-surface);
+    --el-text-color-regular: var(--reader-text);
+    --el-border-color-light: var(--reader-line);
+    --el-border-color-lighter: var(--reader-line);
+    --el-dropdown-menuItem-hover-fill: var(--reader-control-hover);
+    --el-dropdown-menuItem-hover-color: var(--reader-accent);
+}
+
+.reader-account-popper .el-dropdown-menu__item {
+    min-width: 128px;
+    min-height: var(--ui-button-height);
+}
+
+.reader-account-popper .el-dropdown-menu__item:focus-visible {
+    outline: 2px solid var(--reader-accent);
+    outline-offset: -2px;
 }
 
 @media (max-width: 760px) {

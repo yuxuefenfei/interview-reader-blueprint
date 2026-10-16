@@ -607,6 +607,32 @@ describe("ReaderView request coordination", () => {
         wrapper.unmount();
     });
 
+    it("closes desktop reading settings with Escape and returns focus to its icon", async () => {
+        const currentDocument = document("document-a", "version-a");
+        const currentNode = node("node-a");
+        api.documents.mockResolvedValue({items: [currentDocument], nextCursor: null});
+        api.toc.mockResolvedValue([currentNode]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockResolvedValue(content(currentNode, "block-a"));
+        api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+        const wrapper = mountReader();
+        await flushPromises();
+        const popover = wrapper.findComponent({name: "ElPopover"});
+        const focus = vi.spyOn(wrapper.get<HTMLButtonElement>(".reader-comfort-desktop button").element, "focus");
+        popover.vm.$emit("update:visible", true);
+        await nextTick();
+        expect(popover.props("visible")).toBe(true);
+
+        const escape = new KeyboardEvent("keydown", {key: "Escape", cancelable: true});
+        window.dispatchEvent(escape);
+        await nextTick();
+
+        expect(popover.props("visible")).toBe(false);
+        expect(escape.defaultPrevented).toBe(true);
+        expect(focus).toHaveBeenCalledOnce();
+        wrapper.unmount();
+    });
     it("keeps the drawer and current content visible when chapter navigation fails", async () => {
         const currentDocument = document("document-a", "version-a");
         const nodeA = node("node-a");
