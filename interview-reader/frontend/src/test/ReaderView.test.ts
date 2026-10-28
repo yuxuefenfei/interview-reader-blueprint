@@ -193,6 +193,61 @@ describe("ReaderView request coordination", () => {
         vi.unstubAllGlobals();
     });
 
+    it("shows the top-level chapter in the header and updates it when crossing chapters", async () => {
+        const currentDocument = document("document-a", "version-a");
+        const problem = section("要解决的问题", []);
+        const usage = section("适用 / 不适用", []);
+        const example = section("Java 示例", []);
+        const creational = section("三、创建型模式（5 种）", [section("01. 单例模式 Singleton", [problem, usage])]);
+        const structural = section("四、结构型模式（7 种）", [section("06. 适配器模式 Adapter", [example])]);
+        api.documents.mockResolvedValue({items: [currentDocument], nextCursor: null});
+        api.toc.mockResolvedValue([creational, structural]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockImplementation((_versionId: string, nodeId: string) =>
+            Promise.resolve(content([problem, usage, example].find((item) => item.id === nodeId)!, `block-${nodeId}`)));
+        api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+        const wrapper = mountReader();
+        await flushPromises();
+        expect(wrapper.get(".reader-heading strong").text()).toBe(creational.title);
+        expect(wrapper.get(".reader-heading strong").attributes("title")).toBe(creational.title);
+        expect(wrapper.get(".reader-heading span").text()).toBe(currentDocument.title);
+        expect(wrapper.get(".reader-content h1").text()).toBe(problem.title);
+
+        await wrapper.get(".chapter-nav-next").trigger("click");
+        await flushPromises();
+        expect(wrapper.get(".reader-heading strong").text()).toBe(creational.title);
+        expect(wrapper.get(".reader-content h1").text()).toBe(usage.title);
+
+        await wrapper.get(".chapter-nav-next").trigger("click");
+        await flushPromises();
+        expect(wrapper.get(".reader-heading strong").text()).toBe(structural.title);
+        expect(wrapper.get(".reader-heading strong").attributes("title")).toBe(structural.title);
+        expect(wrapper.get(".reader-content h1").text()).toBe(example.title);
+        wrapper.unmount();
+    });
+
+    it("falls back to the document title while loading and supports a flat directory", async () => {
+        const currentDocument = document("document-a", "version-a");
+        const currentNode = node("独立章节");
+        const delayedContent = deferred<NodeContent>();
+        api.documents.mockResolvedValue({items: [currentDocument], nextCursor: null});
+        api.toc.mockResolvedValue([currentNode]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockReturnValue(delayedContent.promise);
+        api.saveProgress.mockImplementation(async (_documentId: string, progressValue) => progressValue);
+
+        const wrapper = mountReader();
+        await flushPromises();
+        expect(wrapper.get(".reader-heading strong").text()).toBe(currentDocument.title);
+
+        delayedContent.resolve(content(currentNode, "block-a"));
+        await flushPromises();
+        expect(wrapper.get(".reader-heading strong").text()).toBe(currentNode.title);
+        expect(wrapper.get(".reader-content h1").text()).toBe(currentNode.title);
+        wrapper.unmount();
+    });
+
     it("never saves an old chapter with the newly selected document version", async () => {
         const documentA = document("document-a", "version-a");
         const documentB = document("document-b", "version-b");

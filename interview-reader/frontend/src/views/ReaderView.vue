@@ -133,6 +133,10 @@ function firstReadableDescendant(node: TocNode): TocNode | null {
   return flattenToc(node.children).find(isReadableNode) ?? null;
 }
 
+const readerTitle = computed(() => {
+  const root = activeNode.value ? findTocPath(toc.value, activeNode.value.id)?.[0] : null;
+  return root?.title || activeNode.value?.title || selected.value?.title || "阅读器";
+});
 const readable = computed(() => flattenToc(toc.value).filter(isReadableNode));
 const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));
 const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activeIndex.value - 1] : null);
@@ -1097,9 +1101,7 @@ function message(value: unknown): string {
         </el-icon>
       </button>
       <div class="reader-heading">
-        <strong :title="activeNode?.title || selected?.title || '阅读器'">{{
-            activeNode?.title || selected?.title || "阅读器"
-          }}</strong>
+        <strong :title="readerTitle">{{ readerTitle }}</strong>
         <span :title="selected?.title">{{ selected?.title }}</span>
       </div>
       <div class="reader-header-actions ui-action-row ui-action-row--nowrap">
