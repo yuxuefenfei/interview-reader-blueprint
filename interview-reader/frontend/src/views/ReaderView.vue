@@ -20,7 +20,6 @@ import ContentBlockView from "../components/ContentBlockView.vue";
 import InlineMarkdown from "../components/InlineMarkdown.vue";
 import ReaderComfortSettings from "../components/ReaderComfortSettings.vue";
 import ReaderDocumentList from "../components/ReaderDocumentList.vue";
-import ReaderDocumentSelector from "../components/ReaderDocumentSelector.vue";
 import TocTree from "../components/TocTree.vue";
 import {cacheNodeContent, getCachedNodeContent} from "../offline/contentCache";
 import {
@@ -140,7 +139,6 @@ function firstReadableDescendant(node: TocNode): TocNode | null {
 }
 
 const activeTocPath = computed(() => activeNode.value ? findTocPath(toc.value, activeNode.value.id) ?? [] : []);
-const readerTitle = computed(() => activeTocPath.value[0]?.title || activeNode.value?.title || selected.value?.title || "阅读器");
 const readerContext = computed(() => activeTocPath.value.slice(0, -1).map((node) => node.title).join(" / "));
 const readable = computed(() => flattenToc(toc.value).filter(isReadableNode));
 const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));

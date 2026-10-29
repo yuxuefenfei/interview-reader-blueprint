@@ -65,7 +65,7 @@ describe("TocTree", () => {
 
         const deepestRow = wrapper.get('[data-toc-node-id="level-five"]').element.parentElement;
         expect(deepestRow?.getAttribute("style")).toContain("--toc-depth: 3");
-        expect(deepestRow?.getAttribute("style")).toContain("--toc-indent: 48px");
+        expect(deepestRow?.getAttribute("style")).toContain("--toc-indent: 30px");
     });
 
     it("renders parent nodes as non-selectable group labels in the compact mobile drawer", async () => {

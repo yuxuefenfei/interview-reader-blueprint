@@ -198,7 +198,7 @@ describe("ReaderView request coordination", () => {
         vi.unstubAllGlobals();
     });
 
-    it("shows the top-level chapter in the header and updates it when crossing chapters", async () => {
+    it("updates the collapsed header and chapter context when crossing chapters", async () => {
         const currentDocument = document("document-a", "version-a");
         const problem = section("要解决的问题", []);
         const usage = section("适用 / 不适用", []);
@@ -214,27 +214,30 @@ describe("ReaderView request coordination", () => {
 
         const wrapper = mountReader();
         await flushPromises();
-        expect(wrapper.get(".reader-heading strong").text()).toBe(creational.title);
-        expect(wrapper.get(".reader-heading strong").attributes("title")).toBe(creational.title);
-        expect(wrapper.get(".reader-heading span").text()).toBe(currentDocument.title);
+        expect(wrapper.get(".reader-header-collapsed-doc-title").text()).toBe(currentDocument.title);
+        expect(wrapper.get(".reader-header-collapsed-section").text()).toBe(problem.title);
+        expect(wrapper.get(".reader-header-collapsed-section").attributes("title")).toBe(problem.title);
         expect(wrapper.get(".reader-content h1").text()).toBe(problem.title);
-        expect(wrapper.get(".reader-context").text()).toContain("01. 单例模式 Singleton");
-        expect(wrapper.get(".chapter-nav-next").text()).toContain(usage.title);
+        expect(wrapper.get(".reader-context").text()).toBe(`${creational.title} / 01. 单例模式 Singleton`);
+        expect(wrapper.get(".reader-capsule-btn--next").text()).toContain(usage.title);
 
-        await wrapper.get(".chapter-nav-next").trigger("click");
+        await wrapper.get(".reader-capsule-btn--next").trigger("click");
         await flushPromises();
-        expect(wrapper.get(".reader-heading strong").text()).toBe(creational.title);
+        expect(wrapper.get(".reader-header-collapsed-section").text()).toBe(usage.title);
         expect(wrapper.get(".reader-content h1").text()).toBe(usage.title);
+        expect(wrapper.get(".reader-context").text()).toBe(`${creational.title} / 01. 单例模式 Singleton`);
 
-        await wrapper.get(".chapter-nav-next").trigger("click");
+        await wrapper.get(".reader-capsule-btn--next").trigger("click");
         await flushPromises();
-        expect(wrapper.get(".reader-heading strong").text()).toBe(structural.title);
-        expect(wrapper.get(".reader-heading strong").attributes("title")).toBe(structural.title);
+        expect(wrapper.get(".reader-header-collapsed-section").text()).toBe(example.title);
+        expect(wrapper.get(".reader-header-collapsed-section").attributes("title")).toBe(example.title);
+        expect(wrapper.get(".reader-context").text()).toBe(`${structural.title} / 06. 适配器模式 Adapter`);
         expect(wrapper.get(".reader-content h1").text()).toBe(example.title);
+        expect(wrapper.get(".reader-header-collapsed-doc-title").text()).toBe(currentDocument.title);
         wrapper.unmount();
     });
 
-    it("falls back to the document title while loading and supports a flat directory", async () => {
+    it("keeps the document title while loading and adds a flat section to the collapsed header", async () => {
         const currentDocument = document("document-a", "version-a");
         const currentNode = node("独立章节");
         const delayedContent = deferred<NodeContent>();
@@ -246,11 +249,13 @@ describe("ReaderView request coordination", () => {
 
         const wrapper = mountReader();
         await flushPromises();
-        expect(wrapper.get(".reader-heading strong").text()).toBe(currentDocument.title);
+        expect(wrapper.get(".reader-header-collapsed-doc-title").text()).toBe(currentDocument.title);
+        expect(wrapper.find(".reader-header-collapsed-section").exists()).toBe(false);
 
         delayedContent.resolve(content(currentNode, "block-a"));
         await flushPromises();
-        expect(wrapper.get(".reader-heading strong").text()).toBe(currentNode.title);
+        expect(wrapper.get(".reader-header-collapsed-doc-title").text()).toBe(currentDocument.title);
+        expect(wrapper.get(".reader-header-collapsed-section").text()).toBe(currentNode.title);
         expect(wrapper.get(".reader-content h1").text()).toBe(currentNode.title);
         wrapper.unmount();
     });
@@ -383,7 +388,7 @@ describe("ReaderView request coordination", () => {
             window.history.replaceState({}, "");
             routing.route!.query = target.query;
         });
-        await wrapper.get(".chapter-nav-next").trigger("click");
+        await wrapper.get(".reader-capsule-btn--next").trigger("click");
         await flushPromises();
         expect(area.scrollTop).toBe(0);
         expect(wrapper.get(".reader-content h1").text()).toBe(nodeB.title);
@@ -493,9 +498,9 @@ describe("ReaderView request coordination", () => {
 
         const wrapper = mountReader();
         await flushPromises();
-        await wrapper.get(".reader-desktop-nav-expand").trigger("click");
+        await wrapper.get(".reader-header-desktop-expand").trigger("click");
         await nextTick();
-        await wrapper.get(".reader-document-selector").trigger("click");
+        await wrapper.get(".reader-sidebar-doc-btn").trigger("click");
         await nextTick();
         const filter = wrapper.get('.reader-document-filter input[type="search"]');
         await filter.setValue("并发");
@@ -649,10 +654,9 @@ describe("ReaderView request coordination", () => {
         expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-a");
         expect(wrapper.get(".mock-content").text()).toBe("block-a");
 
-        await wrapper.get(".chapter-nav-next").trigger("click");
+        await wrapper.get(".reader-capsule-btn--next").trigger("click");
         await nextTick();
-        expect(wrapper.get(".chapter-nav-next").attributes("disabled")).toBeDefined();
-        expect(wrapper.get(".chapter-nav-next").attributes("data-loading")).toBe("true");
+        expect(wrapper.get(".reader-capsule-btn--next").attributes("disabled")).toBeDefined();
         expect(wrapper.get(".reader-content").attributes("aria-busy")).toBe("true");
         expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("node-a");
         expect(wrapper.get(".mock-content").text()).toBe("block-a");
@@ -661,7 +665,7 @@ describe("ReaderView request coordination", () => {
         expect(wrapper.find(".mobile-progress-label").exists()).toBe(false);
         expect(wrapper.text()).toContain("正在加载下一节");
 
-        await wrapper.get(".chapter-nav-next").trigger("click");
+        await wrapper.get(".reader-capsule-btn--next").trigger("click");
         expect(api.content.mock.calls.filter((call) => call[1] === "node-b")).toHaveLength(1);
 
         delayedB.resolve(content(nodeB, "block-b"));
@@ -687,11 +691,11 @@ describe("ReaderView request coordination", () => {
 
         const wrapper = mountReader();
         await flushPromises();
-        await wrapper.get(".chapter-nav-next").trigger("pointerenter");
+        await wrapper.get(".reader-capsule-btn--next").trigger("pointerenter");
         await flushPromises();
         expect(api.content.mock.calls.filter((call) => call[1] === nodeB.id)).toHaveLength(1);
 
-        await wrapper.get(".chapter-nav-next").trigger("click");
+        await wrapper.get(".reader-capsule-btn--next").trigger("click");
         await flushPromises();
         expect(api.content.mock.calls.filter((call) => call[1] === nodeB.id)).toHaveLength(1);
         expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe(nodeB.id);
@@ -714,14 +718,14 @@ describe("ReaderView request coordination", () => {
         await flushPromises();
         api.content.mockClear();
 
-        await wrapper.get(".reader-desktop-nav-expand").trigger("click");
+        await wrapper.get(".reader-header-desktop-expand").trigger("click");
         await wrapper.get('.reader-desktop-nav [data-node-id="section"]').trigger("click");
         await flushPromises();
 
         expect(api.content).toHaveBeenCalledWith("version-a", "first", undefined, expect.any(AbortSignal));
         expect(wrapper.get(".reader-article").attributes("data-node-id")).toBe("first");
-        expect(wrapper.get(".chapter-position").text()).toBe("1 / 2");
-        expect(wrapper.get(".chapter-nav-next").attributes("disabled")).toBeUndefined();
+        expect(wrapper.get(".reader-capsule-meta").text()).toBe("1 / 2");
+        expect(wrapper.get(".reader-capsule-btn--next").attributes("disabled")).toBeUndefined();
         wrapper.unmount();
     });
 
@@ -752,11 +756,11 @@ describe("ReaderView request coordination", () => {
 
         await wrapper.get(".reader-menu-button").trigger("click");
         await nextTick();
-        expect(wrapper.get(".reader-document-selector").text()).toContain("Redis");
-        expect(wrapper.get(".reader-document-selector").text()).toContain("46%");
+        expect(wrapper.get(".reader-header-mobile-title").text()).toBe("Redis");
+        expect(wrapper.get(".reader-drawer .reader-toc-header-progress").text()).toBe("46%");
         expect(wrapper.find(".reader-document-list").exists()).toBe(false);
 
-        await wrapper.get(".reader-document-selector").trigger("click");
+        await wrapper.get(".reader-drawer [aria-label='切换文档']").trigger("click");
         await nextTick();
         expect(wrapper.get(".reader-drawer-back").text()).toContain("返回目录");
         expect(wrapper.find('[aria-label="关闭目录"]').exists()).toBe(false);
@@ -774,7 +778,7 @@ describe("ReaderView request coordination", () => {
         await nextTick();
         await flushPromises();
         expect(wrapper.find(".reader-drawer").exists()).toBe(true);
-        expect(wrapper.get(".reader-document-selector").text()).toContain("MongoDB");
+        expect(wrapper.get(".reader-header-mobile-title").text()).toBe("MongoDB");
         wrapper.unmount();
     });
 
@@ -792,10 +796,10 @@ describe("ReaderView request coordination", () => {
         const wrapper = mountReader();
         await flushPromises();
         expect(wrapper.get(".reader-desktop-nav").classes()).not.toContain("collapsed");
-        expect(wrapper.get(".reader-desktop-nav .reader-document-selector").text()).toContain("Redis");
+        expect(wrapper.get(".reader-desktop-nav .reader-sidebar-doc-btn").text()).toContain("Redis");
         expect(wrapper.find(".reader-desktop-nav .reader-document-list").exists()).toBe(false);
 
-        await wrapper.get(".reader-desktop-nav .reader-document-selector").trigger("click");
+        await wrapper.get(".reader-desktop-nav .reader-sidebar-doc-btn").trigger("click");
         await nextTick();
         expect(wrapper.get(".reader-desktop-nav .reader-document-list").text()).toContain("MongoDB");
 
@@ -805,7 +809,7 @@ describe("ReaderView request coordination", () => {
         expect(localStorage.getItem("reader.desktopNav.collapsed")).toBe("true");
         expect(wrapper.get(".reader-desktop-rail-progress").attributes("role")).toBe("progressbar");
 
-        await wrapper.get(".reader-desktop-nav-expand").trigger("click");
+        await wrapper.get(".reader-header-desktop-expand").trigger("click");
         await nextTick();
         expect(wrapper.get(".reader-desktop-nav").classes()).not.toContain("collapsed");
         expect(localStorage.getItem("reader.desktopNav.collapsed")).toBe("false");
