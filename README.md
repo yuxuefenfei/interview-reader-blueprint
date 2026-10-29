@@ -62,7 +62,7 @@ java -jar interview-reader/target/interview-reader-1.0.4.jar --spring.profiles.a
 保留的非独立运行薄包。
 
 前端生产构建会包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器支持 Service Worker 时会缓存应用壳；已成功打开的章节正文会写入
-IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。右侧复习面板提供“清理离线内容”，只清除正文缓存，不删除未同步进度队列。
+IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。
 
 导入任务在 jar/dev 模式默认使用 Java 21 虚拟线程后台 worker，最大并发数由
 `interview-reader.import-worker.max-concurrency` 控制；测试 profile 关闭异步 worker，使用 H2 MySQL 兼容模式做确定性集成测试。

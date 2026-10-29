@@ -1,7 +1,6 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {
     cacheNodeContent,
-    clearNodeContentCache,
     getCachedNodeContent,
     purgeNodeContentForDocument
 } from "../offline/contentCache";
@@ -68,13 +67,5 @@ describe("offline node content cache", () => {
 
         await expect(getCachedNodeContent("version-1", "node-1", 50)).resolves.toBeNull();
         await expect(getCachedNodeContent("version-2", "node-1", 50)).resolves.not.toBeNull();
-    });
-    it("clears cached node content without requiring IndexedDB", async () => {
-        vi.stubGlobal("indexedDB", undefined);
-
-        await cacheNodeContent("document-1", "version-1", "node-1", 50, content);
-        await clearNodeContentCache();
-
-        await expect(getCachedNodeContent("version-1", "node-1", 50)).resolves.toBeNull();
     });
 });

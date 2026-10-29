@@ -63,19 +63,6 @@ export async function purgeNodeContentForDocument(documentId: string): Promise<v
     }
 }
 
-export async function clearNodeContentCache(): Promise<void> {
-    if (!hasIndexedDb()) {
-        writeFallbackCache([]);
-        return;
-    }
-    const db = await openOfflineDatabase();
-    try {
-        await requestTransaction(db, "readwrite", (store) => store.clear());
-    } finally {
-        db.close();
-    }
-}
-
 function cacheKey(versionId: string, nodeId: string, limit: number): string {
     return `${versionId}:${nodeId}:${limit}`;
 }

@@ -13,8 +13,6 @@ import type {
     DocumentInfo as GeneratedDocumentInfo,
     DocumentMetadata as GeneratedDocumentMetadata,
     DocumentPackage as GeneratedDocumentPackage,
-    DocumentPackageBlock as GeneratedDocumentPackageBlock,
-    DocumentPackageSection as GeneratedDocumentPackageSection,
     DocumentPage as GeneratedDocumentPage,
     DocumentStatus as GeneratedDocumentStatus,
     DocumentSummary as GeneratedDocumentSummary,
@@ -66,13 +64,10 @@ export type MasteryState = GeneratedMasteryState;
 export const VERSION_STATUSES = ["DRAFT", "PUBLISHED", "RETIRED"] as const satisfies readonly GeneratedVersionStatus[];
 export type VersionStatus = GeneratedVersionStatus;
 
-export const DOCUMENT_STATUSES = ["DRAFT", "PUBLISHED", "OFFLINE", "DELETING", "DELETE_FAILED"] as const satisfies readonly GeneratedDocumentStatus[];
 export type DocumentStatus = GeneratedDocumentStatus;
 
-export const DELETION_JOB_STATUSES = ["QUEUED", "RUNNING", "FAILED", "COMPLETED"] as const satisfies readonly GeneratedDeletionJobStatus[];
 export type DeletionJobStatus = GeneratedDeletionJobStatus;
 
-export const DELETION_STAGES = ["QUEUED", "CLIENT_SYNC_MARKED", "DELETING_FILES", "DELETING_DATA", "COMPLETED", "FAILED"] as const satisfies readonly GeneratedDeletionStage[];
 export type DeletionStage = GeneratedDeletionStage;
 
 export const IMPORT_STATUSES = ["UPLOADED", "PREFLIGHT", "EXTRACTING", "NORMALIZING", "VALIDATING", "READY", "REVIEW_REQUIRED", "IMPORTED", "FAILED", "CANCELED"] as const satisfies readonly GeneratedImportStatus[];
@@ -102,8 +97,6 @@ export type ImportJob = GeneratedImportJob;
 export type ExistingDocumentMatch = GeneratedExistingDocumentMatch;
 export type ImportDocumentPreview = GeneratedImportDocumentPreview;
 export type ImportIssue = GeneratedImportIssue;
-export type StagedSection = GeneratedDocumentPackageSection;
-export type StagedBlock = GeneratedDocumentPackageBlock;
 export type DocumentInfo = GeneratedDocumentInfo;
 export type VersionInfo = GeneratedVersionInfo;
 export type AssetInfo = GeneratedAssetInfo;
