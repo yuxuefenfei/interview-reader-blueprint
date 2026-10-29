@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import com.mybatisflex.annotation.EnumValue;
 
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,16 +23,10 @@ public enum ImportJobStatus {
     FAILED("FAILED"),
     CANCELED("CANCELED");
 
-    private static final Set<ImportJobStatus> CANCELABLE = EnumSet.of(
-            UPLOADED, PREFLIGHT, EXTRACTING, NORMALIZING, VALIDATING);
     private final String code;
 
     ImportJobStatus(String code) {
         this.code = code;
-    }
-
-    public static boolean isCancelable(ImportJobStatus value) {
-        return CANCELABLE.contains(value);
     }
 
     public static Set<String> codes() {

@@ -49,7 +49,7 @@ import {
 import {firstReadableNode, flattenToc, isQuestionNode} from "../utils/toc";
 import {blockAtViewportAnchor, scrollTopForBlockOffset} from "../utils/readingPosition";
 
-const props = defineProps<{ username?: string | null; online?: boolean }>();
+const props = defineProps<{ online?: boolean }>();
 const emit = defineEmits<{ logout: [] }>();
 const route = useRoute();
 const router = useRouter();
@@ -60,6 +60,7 @@ const activeNode = ref<TocNode | null>(null);
 const content = ref<NodeContent | null>(null);
 const loading = ref(false);
 const error = ref("");
+const progressSaveError = ref("");
 const drawer = ref(false);
 const drawerView = ref<"toc" | "documents">("toc");
 const desktopNavView = ref<"toc" | "documents">("toc");
@@ -117,9 +118,9 @@ let documentListAbortController: AbortController | null = null;
 let loadMoreAbortController: AbortController | null = null;
 let searchAbortController: AbortController | null = null;
 let ignoredRouteDocumentId: string | null = null;
+let internalRouteChange: string | null = null;
 let keepSearchHighlightAfterClose = false;
 let contentLoadObserver: IntersectionObserver | null = null;
-const completedNodes = new Set<string>();
 const contentPrefetches = new Map<string, {
   controller: AbortController;
   promise: Promise<NodeContent>;
@@ -133,10 +134,9 @@ function firstReadableDescendant(node: TocNode): TocNode | null {
   return flattenToc(node.children).find(isReadableNode) ?? null;
 }
 
-const readerTitle = computed(() => {
-  const root = activeNode.value ? findTocPath(toc.value, activeNode.value.id)?.[0] : null;
-  return root?.title || activeNode.value?.title || selected.value?.title || "阅读器";
-});
+const activeTocPath = computed(() => activeNode.value ? findTocPath(toc.value, activeNode.value.id) ?? [] : []);
+const readerTitle = computed(() => activeTocPath.value[0]?.title || activeNode.value?.title || selected.value?.title || "阅读器");
+const readerContext = computed(() => activeTocPath.value.slice(0, -1).map((node) => node.title).join(" / "));
 const readable = computed(() => flattenToc(toc.value).filter(isReadableNode));
 const activeIndex = computed(() => readable.value.findIndex((node) => node.id === activeNode.value?.id));
 const previousNode = computed(() => activeIndex.value > 0 ? readable.value[activeIndex.value - 1] : null);
@@ -190,12 +190,24 @@ watch(theme, (value) => {
   updateThemeColor(value);
 });
 watch(comfort, (value) => persistReaderComfort(value), {deep: true});
-watch(() => route.params.documentId, (documentId) => {
+watch(() => [route.params.documentId, route.query?.section, route.query?.block], async ([documentId, sectionId, blockId], [previousDocumentId]) => {
+  const routeKey = JSON.stringify([documentId, sectionId, blockId]);
+  if (internalRouteChange === routeKey) {
+    internalRouteChange = null;
+    return;
+  }
   if (typeof documentId === "string" && ignoredRouteDocumentId === documentId) {
     ignoredRouteDocumentId = null;
     return;
   }
-  void openFromRoute();
+  if (documentId !== previousDocumentId) {
+    await openFromRoute();
+    return;
+  }
+  const node = flattenToc(toc.value).find((item) => item.id === sectionId);
+  if (!node) return;
+  const restored = historyReadingPosition(node.id);
+  await selectNode(node, !restored, true, restored, restored ? null : typeof blockId === "string" ? blockId : null, "restore");
 });
 watch([query, searchScope], () => scheduleSearch());
 watch(documentQuery, () => scheduleDocumentSearch());
@@ -376,11 +388,15 @@ async function openFromRoute(forceRefresh = false, requestedDocumentId?: string)
     if (requestId !== documentRequestId || !isCurrentDocumentVersion(document.id, versionId)) return;
     toc.value = nextToc;
     expandedTocNodeIds.value = loadExpandedTocNodeIds(document.id, nextToc);
-    const initial = flattenToc(nextToc).find((node) => node.id === saved?.sectionId) || firstReadableNode(nextToc);
+    const requestedSection = typeof route.query?.section === "string" ? route.query.section : null;
+    const initial = flattenToc(nextToc).find((node) => node.id === requestedSection)
+        || flattenToc(nextToc).find((node) => node.id === saved?.sectionId) || firstReadableNode(nextToc);
     if (initial) {
       ensureTocPathExpanded(initial.id, nextToc);
-      const restoredProgress = saved?.sectionId === initial.id ? saved : null;
-      await selectNode(initial, false, !keepDrawerOpen, restoredProgress);
+      const historyPosition = historyReadingPosition(initial.id);
+      const targetBlock = !historyPosition && typeof route.query?.block === "string" ? route.query.block : null;
+      const restoredProgress = historyPosition ?? (saved?.sectionId === initial.id ? saved : null);
+      await selectNode(initial, !!targetBlock, !keepDrawerOpen, restoredProgress, targetBlock, "replace");
     }
   } catch (caught) {
     if (requestId === documentRequestId) error.value = message(caught);
@@ -403,6 +419,7 @@ async function loadTocOfflineAware(documentId: string, versionId: string): Promi
 
 async function selectDocument(document: DocumentSummary, closeDrawer = true): Promise<void> {
   if (closeDrawer) drawer.value = false;
+  rememberCurrentHistoryPosition();
   if (route.params.documentId !== document.id) await router.push(`/reader/documents/${document.id}`);
 }
 
@@ -429,6 +446,7 @@ async function selectNode(
     closeDrawer = true,
     restoredProgress: ReadingProgress | null = null,
     targetBlockId: string | null = null,
+    historyMode: "push" | "replace" | "restore" = "push",
 ): Promise<void> {
   const targetNode = isReadableNode(node) ? node : firstReadableDescendant(node);
   if (!targetNode) return;
@@ -438,6 +456,7 @@ async function selectNode(
   const versionId = selected.value?.currentVersionId;
   if (!documentId || !versionId) return;
   if (chapterLoading.value && pendingNodeId.value === targetNode.id) return;
+  if (historyMode === "push") rememberCurrentHistoryPosition();
   contentAbortController?.abort();
   cancelLoadMore();
   const abortController = new AbortController();
@@ -463,21 +482,29 @@ async function selectNode(
       if (!cached) throw caught;
       nextContent = cached;
     }
-    if (restoredProgress?.blockId
-        && !nextContent.blocks.some((block) => block.id === restoredProgress.blockId)
+    const requestedBlockId = targetBlockId ?? restoredProgress?.blockId;
+    if (requestedBlockId
+        && !nextContent.blocks.some((block) => block.id === requestedBlockId)
         && nextContent.nextAfterSeq
         && navigator.onLine !== false) {
-      nextContent = await loadThroughRestoredBlock(
+      nextContent = await loadThroughTargetBlock(
           versionId,
           targetNode.id,
           nextContent,
-          restoredProgress.blockId,
+          requestedBlockId,
           abortController.signal,
-      ).catch(() => nextContent);
+      ).catch((caught) => {
+        if (targetBlockId) throw caught;
+        return nextContent;
+      });
+    }
+    if (targetBlockId && !nextContent.blocks.some((block) => block.id === targetBlockId)) {
+      throw new Error("暂时无法定位搜索结果，请联网后重试");
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
     activeNode.value = targetNode;
     content.value = nextContent;
+    loading.value = false;
     ensureTocPathExpanded(targetNode.id);
     if (closeDrawer) drawer.value = false;
     chapterProgress.value = clampProgressRatio(targetNode.id === node.id ? restoredProgress?.progressRatio : 0);
@@ -497,7 +524,7 @@ async function selectNode(
       const area = readingArea.value;
       if (area) {
         const restoredBlock = restoredProgress?.blockId
-            ? area.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(restoredProgress.blockId)}"]`)
+            ? [...area.querySelectorAll<HTMLElement>("[data-block-id]")].find((element) => element.dataset.blockId === restoredProgress.blockId)
             : null;
         if (restoredBlock && restoredProgress) {
           const areaTop = area.getBoundingClientRect().top;
@@ -516,8 +543,10 @@ async function selectNode(
       }
     }
     if (!isCurrentContentRequest(requestId, documentId, versionId)) return;
+    if (historyMode !== "restore") await updateChapterRoute(targetNode.id, targetBlockId, historyMode);
     await nextTick();
     syncReadingProgressFromViewport();
+    rememberCurrentHistoryPosition();
     connectContentLoadObserver();
     requestMoreContentIfVisible();
   } catch (caught) {
@@ -538,7 +567,7 @@ async function selectNode(
   }
 }
 
-async function loadThroughRestoredBlock(
+async function loadThroughTargetBlock(
     versionId: string,
     nodeId: string,
     initialContent: NodeContent,
@@ -546,8 +575,10 @@ async function loadThroughRestoredBlock(
     signal: AbortSignal,
 ): Promise<NodeContent> {
   let merged = initialContent;
-  for (let pageNumber = 0; pageNumber < 20 && merged.nextAfterSeq; pageNumber += 1) {
-    const page = await readerApi.content(versionId, nodeId, merged.nextAfterSeq, signal);
+  while (merged.nextAfterSeq) {
+    const cursor = merged.nextAfterSeq;
+    const page = await readerApi.content(versionId, nodeId, cursor, signal);
+    if (page.nextAfterSeq !== null && page.nextAfterSeq <= cursor) throw new Error("正文分页位置未前进，请重试");
     merged = {
       node: initialContent.node,
       blocks: [...merged.blocks, ...page.blocks],
@@ -657,23 +688,18 @@ function syncReadingProgressFromViewport(): void {
         content.value?.nextAfterSeq != null,
     );
   }
-  const nodeId = activeNode.value?.id;
-  if (nodeId && chapterProgress.value >= .995 && !completedNodes.has(nodeId)) {
-    completedNodes.add(nodeId);
-    ElMessage.success({message: "本节已读完", duration: 1600, showClose: false});
-  }
+
   scheduleProgress();
 }
 
-function scheduleProgress(): void {
+function captureReadingProgress(): ReadingProgress | null {
   const document = selected.value;
   const node = activeNode.value;
   const currentContent = content.value;
-  if (!document || !node || !document.currentVersionId || currentContent?.node.id !== node.id) return;
-  if (saveTimer !== null) window.clearTimeout(saveTimer);
+  if (!document || !node || !document.currentVersionId || currentContent?.node.id !== node.id) return null;
   const blockPosition = currentReadingBlockPosition();
   const firstBlock = currentContent.blocks[0] ?? null;
-  const progress: ReadingProgress = {
+  return {
     versionId: document.currentVersionId,
     sectionId: node.id,
     blockId: blockPosition?.id ?? firstBlock?.id ?? null,
@@ -684,9 +710,43 @@ function scheduleProgress(): void {
     deviceId,
     revision: 0
   };
+}
+
+function rememberCurrentHistoryPosition(progress = captureReadingProgress()): void {
+  const documentId = selected.value?.id;
+  if (!progress || route.params.documentId !== documentId || route.query?.section !== progress.sectionId) return;
+  window.history.replaceState({...window.history.state, readerPosition: {documentId, ...progress}}, "");
+}
+
+function historyReadingPosition(sectionId: string): ReadingProgress | null {
+  const position = window.history.state?.readerPosition;
+  if (!position || position.documentId !== selected.value?.id
+      || position.versionId !== selected.value?.currentVersionId || position.sectionId !== sectionId
+      || !Number.isFinite(position.progressRatio) || !Number.isFinite(position.blockViewportOffset)) return null;
+  return position as ReadingProgress;
+}
+
+async function updateChapterRoute(sectionId: string, blockId: string | null, mode: "push" | "replace"): Promise<void> {
+  const documentId = selected.value?.id;
+  if (!documentId) return;
+  if (route.params.documentId === documentId && route.query?.section === sectionId && (route.query?.block ?? null) === blockId) return;
+  internalRouteChange = JSON.stringify([documentId, sectionId, blockId ?? undefined]);
+  try {
+    await router[mode]({path: `/reader/documents/${documentId}`, query: {...route.query, section: sectionId, block: blockId || undefined}});
+  } finally {
+    internalRouteChange = null;
+  }
+}
+
+function scheduleProgress(): void {
+  const documentId = selected.value?.id;
+  const progress = captureReadingProgress();
+  if (!documentId || !progress) return;
+  if (saveTimer !== null) window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     saveTimer = null;
-    void saveProgressOfflineAware(document.id, progress);
+    rememberCurrentHistoryPosition(progress);
+    void saveProgressOfflineAware(documentId, progress);
   }, 700);
 }
 
@@ -710,11 +770,12 @@ function currentReadingBlockPosition(): { id: string; top: number } | null {
 async function saveProgressOfflineAware(documentId: string, progress: ReadingProgress): Promise<void> {
   try {
     await readerApi.saveProgress(documentId, progress);
+    if (isCurrentDocumentVersion(documentId, progress.versionId)) progressSaveError.value = "";
   } catch (caught) {
     if (shouldQueueReadingProgress(caught)) {
       await enqueueReadingProgress(documentId, progress).catch(() => {
         if (isCurrentDocumentVersion(documentId, progress.versionId)) {
-          error.value = "阅读进度暂时无法保存";
+          progressSaveError.value = "阅读位置暂时无法保存，当前内容仍可继续阅读。";
         }
       });
       return;
@@ -724,11 +785,12 @@ async function saveProgressOfflineAware(documentId: string, progress: ReadingPro
       void openFromRoute(true);
       return;
     }
-    error.value = message(caught);
+    progressSaveError.value = `阅读位置暂时无法保存：${message(caught)}`;
   }
 }
 
 function invalidateReadingContext(): void {
+  progressSaveError.value = "";
   contentAbortController?.abort();
   contentAbortController = null;
   chapterLoading.value = false;
@@ -1028,13 +1090,18 @@ function searchHitSource(hit: SearchHit): string {
 
 async function jump(hit: SearchHit): Promise<void> {
   if (hit.documentId !== selected.value?.id) {
+    rememberCurrentHistoryPosition();
     ignoredRouteDocumentId = hit.documentId;
     try {
-      await router.push(`/reader/documents/${hit.documentId}`);
+      searchHighlight.value = query.value.trim();
+      await router.push({path: `/reader/documents/${hit.documentId}`, query: {section: hit.nodeId, block: hit.blockId}});
       await openFromRoute(false, hit.documentId);
+      keepSearchHighlightAfterClose = true;
+      searchOpen.value = false;
     } finally {
       if (ignoredRouteDocumentId === hit.documentId) ignoredRouteDocumentId = null;
     }
+    return;
   }
   const node = flattenToc(toc.value).find((item) => item.id === hit.nodeId);
   if (node) {
@@ -1185,7 +1252,7 @@ function message(value: unknown): string {
         <span v-if="chapterTransitioning" class="chapter-loading-dots"><i/><i/><i/></span>
       </div>
       <!-- 移动端章节进度条 -->
-      <div :class="{ 'is-loading': chapterTransitioning }" aria-label="当前章节阅读进度"
+      <div :class="{ 'is-loading': chapterTransitioning }" aria-label="当前小节阅读位置"
            class="mobile-chapter-progress">
         <span :style="mobileProgressStyle" class="reader-progress-fill"></span>
         <span v-if="chapterTransitioning" aria-hidden="true" class="chapter-loading-dots"><i/><i/><i/></span>
@@ -1272,7 +1339,9 @@ function message(value: unknown): string {
       <div v-if="loading" class="reader-state">正在加载章节…</div>
       <el-alert v-else-if="error" :closable="false" :title="error" show-icon type="error"/>
       <template v-else-if="content">
+        <p v-if="progressSaveError" class="reader-progress-notice" role="status">{{ progressSaveError }}</p>
         <article :key="content.node.id" :data-node-id="content.node.id" class="reader-article">
+          <p v-if="readerContext" class="reader-context">{{ readerContext }}</p>
           <h1>{{ content.node.title }}</h1>
           <ContentBlockView v-for="block in content.blocks" :key="block.id" :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" :block="block"
                             :diagram-theme="theme" :highlight="searchHighlight" :wrap-code="comfort.codeWrap"
@@ -1289,12 +1358,12 @@ function message(value: unknown): string {
           <el-button :disabled="!previousNode || chapterLoading" :icon="ArrowLeft"
                      :loading="pendingNodeId === previousNode?.id" class="chapter-nav-button chapter-nav-previous"
                      @click="previousNode && selectNode(previousNode)" @focus="prefetchNode(previousNode)"
-                     @pointerenter="prefetchNode(previousNode)">上一节
+                     @pointerenter="prefetchNode(previousNode)"><span class="chapter-nav-label"><span>上一节</span><small v-if="previousNode">{{ previousNode.title }}</small></span>
           </el-button>
           <span aria-live="polite" class="chapter-position">{{ chapterPosition }}</span>
           <el-button :disabled="!nextNode || chapterLoading" :loading="pendingNodeId === nextNode?.id" class="chapter-nav-button chapter-nav-next"
                      type="primary" @click="nextNode && selectNode(nextNode)"
-                     @focus="prefetchNode(nextNode)" @pointerenter="prefetchNode(nextNode)">下一节
+                     @focus="prefetchNode(nextNode)" @pointerenter="prefetchNode(nextNode)"><span class="chapter-nav-label"><span>下一节</span><small v-if="nextNode">{{ nextNode.title }}</small></span>
             <el-icon>
               <ArrowRight/>
             </el-icon>
@@ -1415,7 +1484,7 @@ function message(value: unknown): string {
               searchCompletedTerm
             }}”
           </template>
-          <template v-else-if="searchCompletedTerm">找到 {{ searchHits.length }} 条结果</template>
+          <template v-else-if="searchCompletedTerm">{{ searchHits.length >= 12 ? "显示前 12 条结果，可增加关键词缩小范围" : `找到 ${searchHits.length} 条结果` }}</template>
           <template v-else>可搜索章节标题和正文</template>
         </div>
         <div v-if="searchGroups.length" class="reader-search-groups">

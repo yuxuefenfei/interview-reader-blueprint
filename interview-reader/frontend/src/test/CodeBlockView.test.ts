@@ -36,6 +36,18 @@ describe("CodeBlockView", () => {
         expect(wrapper.emitted("update:wrap")).toEqual([[true]]);
     });
 
+    it.each([true, false])("shows visible clipboard feedback when copying succeeds=%s", async (succeeds) => {
+        vi.stubGlobal("navigator", {clipboard: {writeText: succeeds ? vi.fn().mockResolvedValue(undefined) : vi.fn().mockRejectedValue(new Error("denied"))}});
+        const wrapper = mount(CodeBlockView, {props: {blockId: "copy", code: "example", language: "text"}});
+        try {
+            await wrapper.get('[aria-label="复制代码"]').trigger("click");
+            await flushPromises();
+            expect(wrapper.get('[role="status"]').text()).toBe(succeeds ? "已复制" : "复制失败");
+        } finally {
+            wrapper.unmount();
+            vi.unstubAllGlobals();
+        }
+    });
     it("shows Mermaid visually by default and keeps source and sizing controls local", async () => {
         const wrapper = mount(CodeBlockView, {
             ...mermaidStubs,

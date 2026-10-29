@@ -22,7 +22,7 @@ describe("reader document navigation", () => {
         });
 
         expect(wrapper.text()).toContain("Redis 高级面试题");
-        expect(wrapper.get(".reader-document-selector-meta").text()).toContain("阅读进度");
+        expect(wrapper.get(".reader-document-selector-meta").text()).toContain("阅读位置");
         expect(wrapper.get(".reader-document-selector-meta output").text()).toBe("46%");
         expect(wrapper.get(".reader-document-selector-chevron").element.tagName.toLowerCase()).toBe("svg");
         expect(wrapper.get(".reader-document-selector-progress i").attributes("style")).toContain("width: 45.6%");
@@ -66,6 +66,10 @@ describe("reader document navigation", () => {
         await filter.setValue("DOC-9");
         expect(longList.emitted("update:query")?.at(-1)).toEqual(["DOC-9"]);
         await longList.setProps({documents: [document(9)]});
+        expect(longList.get<HTMLInputElement>('input[type="search"]').element.value).toBe("DOC-9");
+        await longList.get('input[type="search"]').setValue("");
+        expect(longList.emitted("update:query")?.at(-1)).toEqual([""]);
+        expect(longList.find('input[type="search"]').exists()).toBe(true);
         expect(longList.findAll(".reader-document-option")).toHaveLength(1);
         expect(longList.get(".reader-document-option").text()).toContain("文档 9");
     });

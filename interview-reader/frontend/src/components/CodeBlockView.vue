@@ -131,6 +131,7 @@ onBeforeUnmount(() => {
                 :title="wrap ? '关闭自动换行' : '自动换行'" class="ui-button ui-button--text code-copy code-toolbar-button"
                 type="button" @click="emit('update:wrap', !wrap)">换行
         </button>
+        <span v-if="copyLabel !== '复制代码'" aria-live="polite" class="code-copy-feedback" role="status">{{ copyLabel }}</span>
         <button :aria-label="copyLabel" :title="copyLabel" class="ui-button ui-button--text ui-button--icon code-copy" type="button" @click="copyCode">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path

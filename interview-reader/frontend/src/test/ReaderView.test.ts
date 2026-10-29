@@ -16,8 +16,9 @@ const api = vi.hoisted(() => ({
     search: vi.fn(),
 }));
 const routing = vi.hoisted(() => ({
-    route: null as { params: { documentId?: string } } | null,
+    route: null as { params: { documentId?: string }; query: Record<string, string | undefined> } | null,
     push: vi.fn(),
+    replace: vi.fn(),
 }));
 const messages = vi.hoisted(() => ({
     success: vi.fn(),
@@ -27,7 +28,7 @@ const messages = vi.hoisted(() => ({
 vi.mock("../api/reader", () => ({readerApi: api}));
 vi.mock("vue-router", () => ({
     useRoute: () => routing.route,
-    useRouter: () => ({push: routing.push}),
+    useRouter: () => ({push: routing.push, replace: routing.replace}),
 }));
 vi.mock("../offline/contentCache", () => ({
     cacheNodeContent: vi.fn(() => Promise.resolve()),
@@ -184,7 +185,11 @@ describe("ReaderView request coordination", () => {
             configurable: true,
             value: vi.fn(),
         });
-        routing.route = reactive({params: {documentId: "document-a"}});
+        routing.route = reactive({params: {documentId: "document-a"}, query: {}});
+        window.history.replaceState({}, "");
+        routing.replace.mockImplementation(async (target: {query: Record<string, string | undefined>}) => {
+            routing.route!.query = target.query;
+        });
         routing.push.mockResolvedValue(undefined);
     });
 
@@ -213,6 +218,8 @@ describe("ReaderView request coordination", () => {
         expect(wrapper.get(".reader-heading strong").attributes("title")).toBe(creational.title);
         expect(wrapper.get(".reader-heading span").text()).toBe(currentDocument.title);
         expect(wrapper.get(".reader-content h1").text()).toBe(problem.title);
+        expect(wrapper.get(".reader-context").text()).toContain("01. 单例模式 Singleton");
+        expect(wrapper.get(".chapter-nav-next").text()).toContain(usage.title);
 
         await wrapper.get(".chapter-nav-next").trigger("click");
         await flushPromises();
@@ -246,6 +253,149 @@ describe("ReaderView request coordination", () => {
         expect(wrapper.get(".reader-heading strong").text()).toBe(currentNode.title);
         expect(wrapper.get(".reader-content h1").text()).toBe(currentNode.title);
         wrapper.unmount();
+    });
+
+    it("keeps readable content visible when saving the reading position fails", async () => {
+        const currentNode = node("node-a");
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([currentNode]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockResolvedValue(content(currentNode, "block-a"));
+        api.saveProgress.mockRejectedValueOnce(new Error("保存被拒绝"))
+            .mockImplementation(async (_documentId: string, progress) => progress);
+        const wrapper = mountReader();
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(701);
+        expect(wrapper.get(".reader-article").text()).toContain("block-a");
+        expect(wrapper.get(".reader-progress-notice").text()).toContain("保存被拒绝");
+        expect(messages.success).not.toHaveBeenCalled();
+
+        await wrapper.get(".reader-content").trigger("scroll");
+        await vi.advanceTimersByTimeAsync(718);
+        expect(wrapper.find(".reader-progress-notice").exists()).toBe(false);
+        expect(wrapper.get(".reader-article").text()).toContain("block-a");
+        wrapper.unmount();
+    });
+
+    it("loads the searched block beyond the first page before positioning the chapter", async () => {
+        const nodeA = node("node-a");
+        const nodeB = node("node-b");
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([nodeA, nodeB]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockImplementation((_versionId: string, nodeId: string, afterSeq?: number) => Promise.resolve(
+            nodeId === nodeA.id ? content(nodeA, "block-a") : afterSeq
+                ? {node: nodeB, blocks: [{...block("searched-block"), seq: 105}], nextAfterSeq: null}
+                : {node: nodeB, blocks: [block("block-b")], nextAfterSeq: 100}));
+        api.search.mockResolvedValue([{documentId: "document-a", documentTitle: "document-a", nodeId: nodeB.id,
+            title: "目标内容", sectionPath: [nodeB.title], blockId: "searched-block", snippet: "单例代码"}]);
+        const wrapper = mountReader();
+        await flushPromises();
+        await wrapper.get(".reader-header-search-trigger").trigger("click");
+        const input = wrapper.get('input[name="reader-search"]');
+        await input.setValue("单例");
+        await input.trigger("keyup", {key: "Enter"});
+        await flushPromises();
+        await wrapper.get(".reader-search-hit").trigger("click");
+        await flushPromises();
+
+        expect(api.content).toHaveBeenCalledWith("version-a", nodeB.id, 100, expect.any(AbortSignal));
+        expect(wrapper.find('[data-block-id="searched-block"]').exists()).toBe(true);
+        expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({block: "center", inline: "nearest", behavior: "auto"});
+        expect(routing.push).toHaveBeenCalledWith(expect.objectContaining({query: {section: nodeB.id, block: "searched-block"}}));
+        wrapper.unmount();
+    });
+
+    it("honors a chapter URL instead of opening the server's latest section", async () => {
+        const nodeA = node("node-a");
+        const nodeB = node("node-b");
+        routing.route!.query = {section: nodeB.id};
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([nodeA, nodeB]);
+        api.progress.mockResolvedValue({sectionId: nodeA.id});
+        api.content.mockResolvedValue(content(nodeB, "block-b"));
+        const wrapper = mountReader();
+        await flushPromises();
+        expect(api.content).toHaveBeenCalledExactlyOnceWith("version-a", nodeB.id, undefined, expect.any(AbortSignal));
+        expect(wrapper.get(".reader-content h1").text()).toBe(nodeB.title);
+        wrapper.unmount();
+    });
+
+    it("renders a cold-open block URL before scrolling to its target", async () => {
+        const currentNode = node("node-a");
+        routing.route!.query = {section: currentNode.id, block: "target-block"};
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([currentNode]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockResolvedValue(content(currentNode, "target-block"));
+        const wrapper = mountReader();
+        await flushPromises();
+        expect(wrapper.get('[data-block-id="target-block"]').text()).toBe("target-block");
+        expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({block: "center", inline: "nearest", behavior: "auto"});
+        wrapper.unmount();
+    });
+
+    it("still reaches and saves 100 percent when the final section fits on one screen", async () => {
+        const first = node("first");
+        const last = node("last");
+        routing.route!.query = {section: last.id};
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([first, last]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockResolvedValue(content(last, "last-block"));
+        api.saveProgress.mockImplementation(async (_documentId: string, progress) => progress);
+        const wrapper = mountReader();
+        Object.defineProperties(wrapper.get(".reader-content").element, {
+            clientHeight: {configurable: true, value: 600},
+            scrollHeight: {configurable: true, value: 480},
+            scrollTop: {configurable: true, value: 0, writable: true},
+        });
+        await flushPromises();
+        expect(wrapper.get(".mobile-progress-label").text()).toBe("100%");
+        expect(wrapper.get(".reader-desktop-rail-progress").attributes("aria-valuenow")).toBe("100");
+        await vi.advanceTimersByTimeAsync(701);
+        expect(api.saveProgress).toHaveBeenLastCalledWith("document-a", expect.objectContaining({sectionId: last.id, progressRatio: 1}));
+        expect(messages.success).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+    it("restores the original block offset when browser history returns to a section", async () => {
+        const nodeA = node("node-a");
+        const nodeB = node("node-b");
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([nodeA, nodeB]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockImplementation((_versionId: string, nodeId: string) =>
+            Promise.resolve(content(nodeId === nodeA.id ? nodeA : nodeB, `block-${nodeId}`)));
+        const wrapper = mountReader();
+        await flushPromises();
+        const area = wrapper.get<HTMLElement>(".reader-content").element;
+        Object.defineProperty(area, "scrollTop", {configurable: true, writable: true, value: 250});
+        const rectangle = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+            const top = this.dataset.blockId ? 100 - area.scrollTop : 0;
+            return {top, bottom: top + 600, left: 0, right: 800, width: 800, height: 600, x: 0, y: top, toJSON() {}};
+        });
+        const scroll = vi.spyOn(area, "scrollTo").mockImplementation((options: ScrollToOptions | number) => {
+            if (typeof options === "object") area.scrollTop = options.top ?? 0;
+        });
+        let previousEntry: unknown;
+        routing.push.mockImplementation(async (target: {query: Record<string, string | undefined>}) => {
+            previousEntry = window.history.state;
+            window.history.replaceState({}, "");
+            routing.route!.query = target.query;
+        });
+        await wrapper.get(".chapter-nav-next").trigger("click");
+        await flushPromises();
+        expect(area.scrollTop).toBe(0);
+        expect(wrapper.get(".reader-content h1").text()).toBe(nodeB.title);
+        expect(previousEntry).toMatchObject({readerPosition: {documentId: "document-a", versionId: "version-a", sectionId: nodeA.id, blockId: "block-node-a", blockViewportOffset: -150}});
+        window.history.replaceState(previousEntry, "");
+        routing.route!.query = {section: nodeA.id};
+        await flushPromises();
+        expect(wrapper.get(".reader-content h1").text()).toBe(nodeA.title);
+        expect(scroll).toHaveBeenLastCalledWith({top: 250, behavior: "auto"});
+        wrapper.unmount();
+        scroll.mockRestore();
+        rectangle.mockRestore();
     });
 
     it("never saves an old chapter with the newly selected document version", async () => {

@@ -11,7 +11,6 @@ import {clearOfflineReaderAccess, offlineReaderAccessHint, rememberOfflineReader
 const router = useRouter();
 const ready = ref(false);
 const authenticated = ref(false);
-const username = ref<string | null>(null);
 const form = ref({username: "", password: ""});
 const error = ref("");
 const submitting = ref(false);
@@ -25,7 +24,6 @@ onMounted(async () => {
   try {
     const session = await readerApi.session();
     authenticated.value = session.authenticated;
-    username.value = session.username;
     if (session.authenticated) {
       rememberOfflineReaderAccess(session.username);
       void syncDeletedDocuments().catch(() => undefined);
@@ -36,7 +34,6 @@ onMounted(async () => {
     const offlineAccess = navigator.onLine === false ? offlineReaderAccessHint() : null;
     if (offlineAccess) {
       authenticated.value = true;
-      username.value = offlineAccess.username;
     }
   } finally {
     ready.value = true;
@@ -55,7 +52,6 @@ async function login(): Promise<void> {
   try {
     const session = await readerApi.login(form.value.username, form.value.password);
     authenticated.value = session.authenticated;
-    username.value = session.username;
     rememberOfflineReaderAccess(session.username);
     void syncDeletedDocuments().catch(() => undefined);
     form.value.password = "";
@@ -71,7 +67,6 @@ async function logout(): Promise<void> {
   if (!online.value) return;
   await readerApi.logout().catch(() => undefined);
   authenticated.value = false;
-  username.value = null;
   clearOfflineReaderAccess();
   await router.replace("/reader");
 }
@@ -121,7 +116,7 @@ function applyUpdate(): void {
     </form>
   </section>
   <div v-else id="main-content" class="route-content" tabindex="-1">
-    <router-view :online="online" :username="username" @logout="logout"/>
+    <router-view :online="online" @logout="logout"/>
   </div>
   <div v-if="!online" class="app-status-banner" role="status">当前处于离线状态；已缓存内容仍可阅读，进度会在联网后同步。
   </div>

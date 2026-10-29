@@ -57,12 +57,6 @@ export interface Dashboard {
     feedCursor: number;
 }
 
-export interface Overview {
-    health: HealthSnapshot;
-    state: { releases: Release[]; operations: Operation[] };
-    feedCursor: number;
-}
-
 export interface Page<T> {
     items: T[];
     page: number;

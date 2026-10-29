@@ -137,10 +137,6 @@ public class ImportPackageService {
         return value == null || value.isBlank() ? null : UUID.fromString(value);
     }
 
-    private static String emptyToNull(String value) {
-        return isBlank(value) ? null : value;
-    }
-
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
@@ -788,7 +784,6 @@ public class ImportPackageService {
     }
 
     private void updateImportStage(UUID jobId, ImportStage stage, int progress, Map<String, Object> statistics) {
-        ensureNotCanceled(jobId);
         var job = requireJob(jobId);
         if (job.getStatus() == ImportJobStatus.CANCELED) {
             throw new ImportCanceledException();

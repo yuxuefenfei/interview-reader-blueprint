@@ -2116,7 +2116,7 @@ select:focus-visible {
     }
 
     .content-block {
-        font-size: max(16px, calc(var(--reader-font-size) - 1px));
+        font-size: var(--reader-font-size, 18px);
         line-height: var(--reader-line-height);
     }
 

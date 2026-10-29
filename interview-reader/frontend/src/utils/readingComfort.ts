@@ -31,7 +31,6 @@ export const FONT_FAMILY_OPTIONS = [
     {label: "阅读宋体", value: "serif" as const},
 ] as const;
 
-const THEME_ORDER: ReaderTheme[] = ["light", "dark", "sepia"];
 const THEME_COLORS: Record<ReaderTheme, string> = {
     light: "#f5f7f8",
     sepia: "#f3efe6",
@@ -71,17 +70,6 @@ export function loadReaderTheme(): ReaderTheme {
 
 export function readerThemeColor(theme: ReaderTheme): string {
     return THEME_COLORS[theme];
-}
-
-export function nextReaderTheme(current: ReaderTheme): ReaderTheme {
-    const index = THEME_ORDER.indexOf(current);
-    return THEME_ORDER[(index + 1) % THEME_ORDER.length];
-}
-
-export function themeActionLabel(theme: ReaderTheme): string {
-    if (theme === "dark") return "护眼";
-    if (theme === "sepia") return "浅色";
-    return "深色";
 }
 
 export function comfortStyle(comfort: ReaderComfort): Record<string, string> {

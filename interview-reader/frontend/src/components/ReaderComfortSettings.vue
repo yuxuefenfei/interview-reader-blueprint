@@ -82,7 +82,7 @@ const emit = defineEmits<{
         </button>
       </div>
     </fieldset>
-    <fieldset>
+    <fieldset class="reader-column-width-setting">
       <legend>正文栏宽</legend>
       <div class="comfort-option-grid">
         <button class="ui-button" v-for="option in COLUMN_WIDTH_OPTIONS" :key="option.value" :aria-pressed="columnWidth === option.value"

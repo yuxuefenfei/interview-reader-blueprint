@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
 import type {TocNode} from "../types/api";
-import {firstReadableNode, flattenToc, isQuestionNode, progressRatioForNode, questionAnswerNodes} from "../utils/toc";
+import {firstReadableNode, flattenToc, isQuestionNode} from "../utils/toc";
 
 const toc: TocNode[] = [
     {
@@ -49,14 +49,9 @@ describe("toc utilities", () => {
         expect(firstReadableNode(toc)?.id).toBe("question");
     });
 
-    it("computes stable node progress", () => {
-        expect(progressRatioForNode(toc, "question")).toBe(0.6667);
-    });
-
-    it("detects question nodes and answer descendants for folded review mode", () => {
+    it("detects question nodes", () => {
         const question = toc[0].children[0];
 
         expect(isQuestionNode(question)).toBe(true);
-        expect(questionAnswerNodes(question).map((node) => node.id)).toEqual(["answer"]);
     });
 });

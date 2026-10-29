@@ -19,6 +19,10 @@ const emit = defineEmits<{
 }>();
 
 const query = defineModel<string>("query", {default: ""});
+const filterVisible = ref(false);
+watch(() => [props.documents.length, props.hasMore, query.value], () => {
+  if (query.value || props.documents.length > 8 || props.hasMore) filterVisible.value = true;
+}, {immediate: true});
 const loadSentinel = ref<HTMLElement | null>(null);
 let loadObserver: IntersectionObserver | null = null;
 
@@ -61,7 +65,7 @@ onBeforeUnmount(() => loadObserver?.disconnect());
 
 <template>
   <div class="reader-document-browser">
-    <label v-if="documents.length > 8" class="reader-document-filter">
+    <label v-if="filterVisible" class="reader-document-filter">
       <span class="sr-only">筛选文档</span>
       <input v-model="query" autocomplete="off" placeholder="筛选文档…" type="search"/>
     </label>

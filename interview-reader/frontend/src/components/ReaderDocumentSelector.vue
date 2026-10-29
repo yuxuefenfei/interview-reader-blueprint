@@ -29,7 +29,7 @@ const progressStyle = computed(() => ({width: progressWidth(props.document?.prog
       <ArrowRight aria-hidden="true" class="reader-document-selector-chevron"/>
     </span>
     <span class="reader-document-selector-meta">
-      <span>阅读进度</span>
+      <span>阅读位置</span>
       <span aria-hidden="true" class="reader-document-selector-progress">
         <i :style="progressStyle"></i>
       </span>
