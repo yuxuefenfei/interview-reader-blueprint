@@ -37,7 +37,12 @@ import {
 } from "../offline/progressQueue";
 import type {DocumentSummary, NodeContent, ReadingProgress, SearchHit, TocNode} from "../types/api";
 import {getOrCreateReadingDeviceId} from "../utils/readingDevice";
-import {clampProgressRatio, documentReadingPositionRatio, viewportReadingProgress,} from "../utils/readingProgress";
+import {
+  clampProgressRatio,
+  documentReadingPositionRatio,
+  formatProgressPercent,
+  viewportReadingProgress,
+} from "../utils/readingProgress";
 import {
   comfortStyle,
   loadReaderComfort,
@@ -964,6 +969,9 @@ async function showMobileTocView(): Promise<void> {
 }
 
 async function showDesktopDocumentsView(): Promise<void> {
+  if (desktopNavCollapsed.value) {
+    desktopNavCollapsed.value = false;
+  }
   desktopNavView.value = "documents";
   documentSwitchError.value = "";
   await nextTick();
@@ -1167,9 +1175,32 @@ function message(value: unknown): string {
           <Tickets/>
         </el-icon>
       </button>
-      <div class="reader-heading">
-        <strong :title="readerTitle">{{ readerTitle }}</strong>
-        <span :title="selected?.title">{{ selected?.title }}</span>
+      <!-- 桌面端侧栏折叠时出现在顶栏最左端的展开按钮 -->
+      <button
+          v-if="desktopNavCollapsed"
+          aria-label="展开文档目录"
+          class="ui-button ui-button--icon reader-tool-button reader-header-desktop-expand"
+          title="展开文档目录"
+          type="button"
+          @click="toggleDesktopNav"
+      >
+        <el-icon>
+          <Expand/>
+        </el-icon>
+      </button>
+      <div class="reader-header-lead">
+        <span class="reader-header-mobile-title" :title="selected?.title">{{ selected?.title }}</span>
+        <!-- 方案 A：桌面端侧栏折叠时的纯净阅读面包屑（彻底移除灰底按钮框与无用特效） -->
+        <div v-if="desktopNavCollapsed" class="reader-header-collapsed-context">
+          <span class="reader-header-collapsed-doc" :title="selected?.title">
+            <el-icon class="reader-header-collapsed-doc-icon" aria-hidden="true"><Reading/></el-icon>
+            <span class="reader-header-collapsed-doc-title">{{ selected?.title }}</span>
+          </span>
+          <span v-if="activeNode?.title" class="reader-header-collapsed-sep" aria-hidden="true">/</span>
+          <span v-if="activeNode?.title" class="reader-header-collapsed-section" :title="activeNode.title">
+            {{ activeNode.title }}
+          </span>
+        </div>
       </div>
       <div class="reader-header-actions ui-action-row ui-action-row--nowrap">
         <button
@@ -1275,10 +1306,27 @@ function message(value: unknown): string {
         </div>
       </template>
       <template v-else-if="desktopNavView === 'toc'">
-        <div class="reader-desktop-nav-header">
-          <ReaderDocumentSelector :document="navigationDocument" @open="showDesktopDocumentsView"/>
-          <button aria-label="收起文档侧栏" class="ui-button ui-button--text ui-button--icon reader-desktop-nav-collapse" title="收起文档侧栏" type="button"
-                  @click="toggleDesktopNav">
+        <div class="reader-desktop-nav-header reader-sidebar-brand-header">
+          <button
+              class="reader-sidebar-doc-btn"
+              type="button"
+              :title="selected?.title ? `当前文档：${selected.title}（点击切换文档）` : '选择文档'"
+              @click="showDesktopDocumentsView"
+          >
+            <el-icon class="reader-sidebar-doc-icon" aria-hidden="true"><Reading/></el-icon>
+            <strong class="reader-sidebar-doc-title">{{ selected?.title || "选择文档" }}</strong>
+            <span v-if="navigationDocument?.progressRatio != null" class="reader-sidebar-doc-tag">
+              {{ formatProgressPercent(navigationDocument.progressRatio) }}
+            </span>
+            <el-icon class="reader-sidebar-doc-arrow" aria-hidden="true"><ArrowRight/></el-icon>
+          </button>
+          <button
+              aria-label="收起文档侧栏"
+              class="ui-button ui-button--text ui-button--icon reader-desktop-nav-collapse"
+              title="收起文档侧栏"
+              type="button"
+              @click="toggleDesktopNav"
+          >
             <Fold aria-hidden="true"/>
           </button>
         </div>
@@ -1354,20 +1402,55 @@ function message(value: unknown): string {
             <span v-else class="sr-only">继续阅读时将自动载入后续内容</span>
           </div>
         </article>
-        <nav aria-label="章节翻页" class="chapter-pagination">
-          <el-button :disabled="!previousNode || chapterLoading" :icon="ArrowLeft"
-                     :loading="pendingNodeId === previousNode?.id" class="chapter-nav-button chapter-nav-previous"
-                     @click="previousNode && selectNode(previousNode)" @focus="prefetchNode(previousNode)"
-                     @pointerenter="prefetchNode(previousNode)"><span class="chapter-nav-label"><span>上一节</span><small v-if="previousNode">{{ previousNode.title }}</small></span>
-          </el-button>
-          <span aria-live="polite" class="chapter-position">{{ chapterPosition }}</span>
-          <el-button :disabled="!nextNode || chapterLoading" :loading="pendingNodeId === nextNode?.id" class="chapter-nav-button chapter-nav-next"
-                     type="primary" @click="nextNode && selectNode(nextNode)"
-                     @focus="prefetchNode(nextNode)" @pointerenter="prefetchNode(nextNode)"><span class="chapter-nav-label"><span>下一节</span><small v-if="nextNode">{{ nextNode.title }}</small></span>
-            <el-icon>
-              <ArrowRight/>
-            </el-icon>
-          </el-button>
+        <!-- 方案 2B：极简流线型居中对称胶囊栏 (Capsule Pager) -->
+        <nav aria-label="章节翻页" class="reader-pager-capsule-wrapper">
+          <div class="reader-pager-capsule">
+            <button
+                v-if="previousNode"
+                :disabled="chapterLoading"
+                class="reader-capsule-btn reader-capsule-btn--prev"
+                type="button"
+                :title="`上一节：${previousNode.title}`"
+                @click="selectNode(previousNode)"
+                @focus="prefetchNode(previousNode)"
+                @pointerenter="prefetchNode(previousNode)"
+            >
+              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowLeft/></el-icon>
+              <span class="reader-capsule-label">上一节</span>
+              <span class="reader-capsule-title">{{ previousNode.title }}</span>
+            </button>
+            <div v-else class="reader-capsule-btn is-disabled reader-capsule-btn--prev">
+              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowLeft/></el-icon>
+              <span class="reader-capsule-label">已是首节</span>
+            </div>
+
+            <span class="reader-capsule-divider" aria-hidden="true"></span>
+
+            <div aria-live="polite" class="reader-capsule-meta" :title="`章节阅读进度：${chapterPosition}`">
+              {{ chapterPosition }}
+            </div>
+
+            <span class="reader-capsule-divider" aria-hidden="true"></span>
+
+            <button
+                v-if="nextNode"
+                :disabled="chapterLoading"
+                class="reader-capsule-btn reader-capsule-btn--next"
+                type="button"
+                :title="`下一节：${nextNode.title}`"
+                @click="selectNode(nextNode)"
+                @focus="prefetchNode(nextNode)"
+                @pointerenter="prefetchNode(nextNode)"
+            >
+              <span class="reader-capsule-title">{{ nextNode.title }}</span>
+              <span class="reader-capsule-label">下一节</span>
+              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowRight/></el-icon>
+            </button>
+            <div v-else class="reader-capsule-btn is-disabled reader-capsule-btn--next">
+              <span class="reader-capsule-label">已是末节</span>
+              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowRight/></el-icon>
+            </div>
+          </div>
         </nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
@@ -1385,10 +1468,25 @@ function message(value: unknown): string {
         <template v-if="drawerView === 'toc'">
           <div class="reader-drawer-sticky">
             <header>
-              <strong>文档目录</strong>
-              <el-button aria-label="关闭目录" class="ui-close-button" @click="drawer = false"><Close aria-hidden="true" /></el-button>
+              <div class="reader-drawer-header-title">
+                <strong>文档目录</strong>
+                <span v-if="navigationDocument?.progressRatio != null" class="reader-toc-header-progress">
+                  {{ formatProgressPercent(navigationDocument.progressRatio) }}
+                </span>
+              </div>
+              <div class="reader-drawer-header-actions">
+                <button
+                    aria-label="切换文档"
+                    class="ui-button ui-button--text ui-button--icon reader-nav-tool-btn"
+                    title="切换文档"
+                    type="button"
+                    @click="showMobileDocumentsView"
+                >
+                  <el-icon><Tickets aria-hidden="true"/></el-icon>
+                </button>
+                <el-button aria-label="关闭目录" class="ui-close-button" @click="drawer = false"><Close aria-hidden="true" /></el-button>
+              </div>
             </header>
-            <ReaderDocumentSelector :document="navigationDocument" @open="showMobileDocumentsView"/>
           </div>
           <div ref="mobileTocArea" aria-label="当前文档章节目录" class="reader-toc-scroll">
             <div v-if="loading && toc.length === 0" class="reader-toc-state" role="status">正在加载目录…</div>

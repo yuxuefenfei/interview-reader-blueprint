@@ -962,6 +962,65 @@ select:focus-visible {
     display: none;
 }
 
+.reader-header-book {
+    min-width: 0;
+    flex: 0 1 460px;
+    display: flex;
+    align-items: center;
+}
+
+.reader-book-badge {
+    max-width: 100%;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--reader-line) 28%, transparent);
+    color: var(--reader-text);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+
+.reader-book-badge:hover {
+    background: color-mix(in srgb, var(--reader-accent) 10%, var(--reader-surface));
+    border-color: color-mix(in srgb, var(--reader-accent) 25%, transparent);
+}
+
+.reader-book-badge:active {
+    transform: scale(0.99);
+}
+
+.reader-book-badge-icon {
+    flex: 0 0 auto;
+    font-size: 16px;
+    color: var(--reader-accent);
+}
+
+.reader-book-badge-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
+    letter-spacing: -0.01em;
+}
+
+.reader-book-badge-tag {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--reader-accent) 14%, transparent);
+    color: var(--reader-accent);
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-medium);
+    font-variant-numeric: tabular-nums;
+}
+
 .reader-heading {
     min-width: 0;
     display: grid;
@@ -1012,6 +1071,81 @@ select:focus-visible {
 }
 
 .reader-desktop-nav-header {
+    min-width: 0;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px 0 16px;
+    border-bottom: 1px solid var(--reader-line);
+}
+
+.reader-toc-header-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.reader-toc-header-title {
+    font-size: var(--ui-font-size-small);
+    font-weight: var(--ui-font-weight-semibold);
+    letter-spacing: 0.02em;
+    color: var(--reader-text);
+}
+
+.reader-toc-header-progress {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--reader-line) 45%, transparent);
+    color: var(--reader-muted);
+    font-size: var(--ui-font-size-caption);
+    font-variant-numeric: tabular-nums;
+}
+
+.reader-toc-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.reader-nav-tool-btn.ui-button {
+    width: 30px;
+    min-height: 30px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: var(--radius-sm);
+    color: var(--reader-muted);
+}
+
+.reader-nav-tool-btn.ui-button:hover {
+    color: var(--reader-accent);
+    background: color-mix(in srgb, var(--reader-accent) 8%, transparent);
+}
+
+.reader-drawer-header {
+    min-height: 48px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--reader-line);
+}
+
+.reader-drawer-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reader-drawer-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.reader-desktop-nav-header-legacy {
     min-width: 0;
     min-height: 56px;
     display: grid;
@@ -1077,10 +1211,14 @@ select:focus-visible {
 }
 
 .toc-tree-root {
-    padding: 10px 8px 28px;
+    padding: 6px 6px 28px;
 }
 
 .toc-tree-root > .toc-item + .toc-item {
+    margin-top: 4px;
+}
+
+.toc-legacy-item-spacing {
     margin-top: 8px;
 }
 
@@ -1098,6 +1236,17 @@ select:focus-visible {
     position: relative;
     display: flex;
     min-width: 0;
+    min-height: 36px;
+    margin: 1px 4px;
+    border-radius: var(--radius-sm);
+    color: var(--reader-text);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.toc-legacy-row {
+    position: relative;
+    display: flex;
+    min-width: 0;
     min-height: 44px;
     border-radius: var(--radius-sm);
     color: var(--reader-text);
@@ -1105,6 +1254,24 @@ select:focus-visible {
 }
 
 .toc-node {
+    position: relative;
+    min-width: 0;
+    min-height: 36px;
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 6px 6px calc(6px + var(--toc-indent, 0px));
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.toc-legacy-node {
     position: relative;
     min-width: 0;
     min-height: 44px;
@@ -1123,6 +1290,20 @@ select:focus-visible {
 }
 
 .toc-toggle {
+    width: 28px;
+    min-height: 36px;
+    flex: 0 0 28px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--reader-muted);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.toc-legacy-toggle {
     width: 44px;
     min-height: 44px;
     flex: 0 0 44px;
@@ -1201,6 +1382,11 @@ select:focus-visible {
 }
 
 .toc-row.active::before {
+    display: none;
+    content: none;
+}
+
+.toc-legacy-active-bar {
     position: absolute;
     z-index: 1;
     top: 8px;
@@ -1236,6 +1422,54 @@ select:focus-visible {
 }
 
 .toc-row.failed {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #c2410c, transparent 58%);
+}
+
+/* ── 目录树现代减噪优化（方案 A） ───────────────────────── */
+.reader-page .toc-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    -webkit-line-clamp: unset;
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+
+.reader-page .toc-depth-0 > .toc-node .toc-title {
+    font-size: 14px;
+    font-weight: var(--ui-font-weight-semibold);
+    color: var(--reader-text);
+}
+
+.reader-page .toc-depth-1 > .toc-node .toc-title {
+    font-size: 13.5px;
+}
+
+.reader-page .toc-depth-2 > .toc-node .toc-title,
+.reader-page .toc-depth-3 > .toc-node .toc-title {
+    font-size: 13px;
+    color: var(--reader-muted);
+}
+
+.reader-page .toc-row.active {
+    background: color-mix(in srgb, var(--reader-accent) 12%, transparent);
+    color: var(--reader-accent);
+    font-weight: var(--ui-font-weight-semibold);
+}
+
+.reader-page .toc-row.active .toc-title {
+    color: var(--reader-accent);
+    font-weight: var(--ui-font-weight-semibold);
+}
+
+.reader-page .toc-guide {
+    left: calc(3px + var(--toc-indent, 0px));
+    background: color-mix(in srgb, var(--reader-line) 45%, transparent);
+}
+
+.toc-row-failed-legacy {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, #c2410c, transparent 58%);
 }
 
@@ -1647,6 +1881,28 @@ select:focus-visible {
     padding-left: 16px;
 }
 
+.legacy-sticky-doc-selector {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    display: grid;
+    align-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--ui-button-radius);
+    background: transparent;
+    color: var(--reader-text);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.reader-legacy-doc-selector {
+    padding-right: 16px;
+    padding-left: 16px;
+}
+
 .reader-drawer-sticky .reader-document-selector-meta output {
     width: 4ch;
     text-align: right;
@@ -1659,6 +1915,23 @@ select:focus-visible {
 }
 
 .reader-document-selector {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    display: grid;
+    align-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--ui-button-radius);
+    background: transparent;
+    color: var(--reader-text);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.reader-legacy-doc-selector {
     width: 100%;
     min-width: 0;
     min-height: 88px;
@@ -2011,7 +2284,66 @@ select:focus-visible {
         flex: 0 0 auto;
     }
 
-    .reader-heading {
+    .reader-header-book {
+    min-width: 0;
+    flex: 0 1 460px;
+    display: flex;
+    align-items: center;
+}
+
+.reader-book-badge {
+    max-width: 100%;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--reader-line) 28%, transparent);
+    color: var(--reader-text);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+
+.reader-book-badge:hover {
+    background: color-mix(in srgb, var(--reader-accent) 10%, var(--reader-surface));
+    border-color: color-mix(in srgb, var(--reader-accent) 25%, transparent);
+}
+
+.reader-book-badge:active {
+    transform: scale(0.99);
+}
+
+.reader-book-badge-icon {
+    flex: 0 0 auto;
+    font-size: 16px;
+    color: var(--reader-accent);
+}
+
+.reader-book-badge-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
+    letter-spacing: -0.01em;
+}
+
+.reader-book-badge-tag {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--reader-accent) 14%, transparent);
+    color: var(--reader-accent);
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-medium);
+    font-variant-numeric: tabular-nums;
+}
+
+.reader-heading {
         min-width: 0;
         flex: 1;
     }
@@ -2090,6 +2422,20 @@ select:focus-visible {
 
     .toc-tree-compact-groups .toc-node:not(.toc-group-label),
     .toc-tree-compact-groups .toc-toggle {
+    width: 28px;
+    min-height: 36px;
+    flex: 0 0 28px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--reader-muted);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.toc-legacy-toggle {
         min-height: 52px;
     }
 

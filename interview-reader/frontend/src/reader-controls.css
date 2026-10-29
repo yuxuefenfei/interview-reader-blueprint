@@ -270,7 +270,423 @@
 }
 .chapter-nav-button > span { min-width: 0; }
 .code-copy-feedback { white-space: nowrap; text-transform: none; }
-.toc-row.active .toc-title { display: block; -webkit-line-clamp: unset; }
+.toc-row.active .toc-title { color: var(--reader-accent); font-weight: var(--ui-font-weight-semibold); }
 @media (max-width: 640px) {
     .reader-comfort-panel .reader-column-width-setting { display: none; }
+}
+
+
+/* ── 方案 1A：全高贯通侧栏（仅桌面端生效） ─────────────────── */
+@media (min-width: 761px) {
+    .reader-page {
+        grid-template-columns: var(--toc-w) minmax(0, 1fr);
+        grid-template-rows: var(--header-h) minmax(0, 1fr);
+        transition: grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    /* 侧栏展开态 */
+    .reader-desktop-nav {
+        grid-column: 1 !important;
+        grid-row: 1 / -1 !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        display: grid !important;
+        grid-template-rows: auto minmax(0, 1fr) !important;
+        overflow: hidden !important;
+        border-right: 1px solid var(--reader-line) !important;
+        background: var(--reader-surface) !important;
+        z-index: 6;
+    }
+
+    .reader-header {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        position: relative;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--reader-line);
+        background: var(--reader-surface);
+        transition: padding 180ms ease;
+    }
+
+    .reader-content {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+    }
+
+    /* ── 核心优化：侧栏折叠时零占用，彻底消灭左侧 48px 竖条空白 ── */
+    .reader-page.desktop-nav-collapsed {
+        --toc-w: 0px !important;
+    }
+
+    .reader-page.desktop-nav-collapsed .reader-desktop-nav {
+        display: none !important;
+        width: 0 !important;
+        border-right: none !important;
+    }
+
+    .reader-page.desktop-nav-collapsed .reader-header {
+        grid-column: 1 / -1 !important;
+        padding-left: 16px;
+    }
+
+    .reader-page.desktop-nav-collapsed .reader-content {
+        grid-column: 1 / -1 !important;
+    }
+
+    /* 顶栏最左侧极简展开按钮 */
+    .reader-header-desktop-expand.ui-button {
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-sm);
+        color: var(--reader-muted);
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+        flex-shrink: 0;
+        margin-right: 4px;
+        transition: color 140ms ease, background-color 140ms ease;
+    }
+
+    .reader-header-desktop-expand.ui-button:hover {
+        color: var(--reader-accent);
+        background: color-mix(in srgb, var(--reader-accent) 8%, var(--reader-surface));
+    }
+
+    /* ── 方案 A：顶栏纯净阅读面包屑（彻底去除灰底方框与无用特效） ── */
+    .reader-header-collapsed-context {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        max-width: 720px;
+        color: var(--reader-muted);
+        font-size: var(--ui-font-size-small);
+        user-select: text;
+    }
+
+    .reader-header-collapsed-doc {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--reader-text);
+        font-weight: var(--ui-font-weight-medium);
+        max-width: 300px;
+        min-width: 0;
+    }
+
+    .reader-header-collapsed-doc-icon {
+        font-size: 15px;
+        color: var(--reader-accent);
+        flex-shrink: 0;
+    }
+
+    .reader-header-collapsed-doc-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .reader-header-collapsed-sep {
+        color: var(--reader-muted);
+        opacity: 0.45;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    .reader-header-collapsed-section {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--reader-muted);
+        min-width: 0;
+    }
+}
+
+/* 侧边栏专属顶层品牌/文档卡片 */
+.reader-sidebar-brand-header {
+    min-width: 0;
+    height: var(--header-h);
+    min-height: var(--header-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px 0 14px;
+    border-bottom: 1px solid var(--reader-line);
+    background: var(--reader-surface);
+}
+
+.reader-sidebar-doc-btn {
+    min-width: 0;
+    flex: 1;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    margin-right: 4px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--reader-text);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 140ms ease, border-color 140ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.reader-sidebar-doc-btn:hover {
+    background: color-mix(in srgb, var(--reader-accent) 8%, var(--reader-surface));
+    border-color: color-mix(in srgb, var(--reader-accent) 22%, transparent);
+}
+
+.reader-sidebar-doc-icon {
+    flex: 0 0 auto;
+    font-size: 17px;
+    color: var(--reader-accent);
+}
+
+.reader-sidebar-doc-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14.5px;
+    font-weight: var(--ui-font-weight-semibold);
+    letter-spacing: -0.01em;
+}
+
+.reader-sidebar-doc-tag {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--reader-accent) 14%, transparent);
+    color: var(--reader-accent);
+    font-size: var(--ui-font-size-caption);
+    font-weight: var(--ui-font-weight-medium);
+    font-variant-numeric: tabular-nums;
+}
+
+.reader-sidebar-doc-arrow {
+    flex: 0 0 auto;
+    font-size: 13px;
+    color: var(--reader-muted);
+    opacity: 0.55;
+    transition: transform 140ms ease;
+}
+
+.reader-sidebar-doc-btn:hover .reader-sidebar-doc-arrow {
+    opacity: 1;
+    transform: translateX(2px);
+    color: var(--reader-accent);
+}
+
+/* 顶栏左侧预留区通用定义 */
+.reader-header-lead {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.reader-header-mobile-title {
+    display: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-semibold);
+}
+
+/* ── 移动端响应式彻底隔离修复 ─────────────────── */
+@media (max-width: 760px) {
+    .reader-page {
+        display: block !important;
+        height: var(--reader-viewport-height, 100vh) !important;
+        min-height: var(--reader-viewport-height, 100vh) !important;
+    }
+
+    /* 绝不让桌面侧边栏泄漏到移动端 */
+    .reader-desktop-nav {
+        display: none !important;
+    }
+
+    .reader-header {
+        position: sticky !important;
+        top: 0 !important;
+        height: 60px !important;
+        padding: 0 12px !important;
+        display: flex !important;
+        align-items: center !important;
+        border-bottom: 1px solid var(--reader-line) !important;
+        background: var(--reader-surface) !important;
+        z-index: 10 !important;
+    }
+
+    .reader-menu-button.ui-button {
+        display: inline-flex !important;
+        flex: 0 0 auto;
+    }
+
+    .reader-header-mobile-title {
+        display: block !important;
+    }
+
+    .reader-header-collapsed-context {
+        display: none !important;
+    }
+
+    .reader-content {
+        height: calc(var(--reader-viewport-height, 100vh) - 60px) !important;
+        overflow: auto !important;
+    }
+}
+
+/* ── 方案 2B：极简流线型居中对称胶囊栏（Capsule Pager） ───────── */
+.reader-pager-capsule-wrapper {
+    width: min(100%, var(--reader-column));
+    margin: 0 auto;
+    padding: 36px clamp(16px, 4vw, 40px) 72px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.reader-pager-capsule {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 5px;
+    background: var(--reader-surface);
+    border: 1px solid var(--reader-line);
+    border-radius: 999px;
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--reader-text) 4%, transparent);
+    gap: 4px;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.reader-pager-capsule:hover {
+    border-color: color-mix(in srgb, var(--reader-accent) 35%, var(--reader-line));
+    box-shadow: 0 4px 18px color-mix(in srgb, var(--reader-accent) 8%, transparent);
+}
+
+.reader-capsule-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 999px;
+    height: 38px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--reader-text);
+    cursor: pointer;
+    font-size: var(--ui-font-size-body);
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+    white-space: nowrap;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.reader-capsule-btn .reader-capsule-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: transform 160ms ease;
+}
+
+.reader-capsule-label {
+    font-size: var(--ui-font-size-body);
+    font-weight: var(--ui-font-weight-medium);
+    flex-shrink: 0;
+}
+
+.reader-capsule-title {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--ui-font-size-small);
+    color: var(--reader-muted);
+    font-weight: normal;
+    transition: color 150ms ease;
+}
+
+.reader-capsule-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--reader-line);
+    margin: 0 2px;
+    flex-shrink: 0;
+}
+
+.reader-capsule-meta {
+    padding: 0 10px;
+    font-size: var(--ui-font-size-caption);
+    color: var(--reader-muted);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .reader-capsule-btn:not(.is-disabled):hover {
+        background: color-mix(in srgb, var(--reader-accent) 8%, var(--reader-surface));
+        color: var(--reader-accent);
+    }
+
+    .reader-capsule-btn:not(.is-disabled):hover .reader-capsule-title {
+        color: var(--reader-accent);
+        opacity: 0.9;
+    }
+
+    .reader-capsule-btn--prev:not(.is-disabled):hover .reader-capsule-icon {
+        transform: translateX(-3px);
+    }
+
+    .reader-capsule-btn--next:not(.is-disabled):hover .reader-capsule-icon {
+        transform: translateX(3px);
+    }
+}
+
+.reader-capsule-btn:not(.is-disabled):active {
+    transform: scale(0.98);
+}
+
+.reader-capsule-btn:focus-visible {
+    outline: 2px solid var(--reader-accent);
+    outline-offset: 1px;
+}
+
+.reader-capsule-btn.is-disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+    color: var(--reader-muted);
+}
+
+@media (max-width: 720px) {
+    .reader-capsule-title {
+        max-width: 110px;
+    }
+}
+
+@media (max-width: 540px) {
+    .reader-capsule-title {
+        display: none;
+    }
+    .reader-capsule-btn {
+        padding: 0 10px;
+        gap: 4px;
+    }
+    .reader-capsule-meta {
+        padding: 0 6px;
+    }
 }

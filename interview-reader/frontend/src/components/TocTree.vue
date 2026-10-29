@@ -53,12 +53,15 @@ function collapseFromKeyboard(node: TocNode): void {
   <ol :class="{ 'toc-tree-root': depth === 0, 'toc-tree-compact-groups': compactGroups }" class="toc-tree">
     <li v-for="node in nodes" :key="node.id" class="toc-item">
       <div
-          :class="{
-          active: node.id === activeNodeId,
-          pending: node.id === pendingNodeId,
-          failed: node.id === failedNodeId,
-        }"
-          :style="{ '--toc-depth': visualDepth(), '--toc-indent': `${visualDepth() * 16}px` }"
+          :class="[
+            `toc-depth-${visualDepth()}`,
+            {
+              active: node.id === activeNodeId,
+              pending: node.id === pendingNodeId,
+              failed: node.id === failedNodeId,
+            }
+          ]"
+          :style="{ '--toc-depth': visualDepth(), '--toc-indent': `${visualDepth() * 10}px` }"
           class="toc-row"
       >
         <div
@@ -104,14 +107,14 @@ function collapseFromKeyboard(node: TocNode): void {
       <TocTree
           v-if="node.children.length && isExpanded(node.id)"
           :id="childListId(node.id)"
-          :active-node-id="activeNodeId"
-          :compact-groups="compactGroups"
+          :activeNodeId="activeNodeId"
+          :compactGroups="compactGroups"
           :depth="depth + 1"
-          :expanded-node-ids="expandedNodeIds"
-          :failed-node-id="failedNodeId"
+          :expandedNodeIds="expandedNodeIds"
+          :failedNodeId="failedNodeId"
           :nodes="node.children"
-          :pending-node-id="pendingNodeId"
-          :tree-id="treeInstanceId"
+          :pendingNodeId="pendingNodeId"
+          :treeId="treeInstanceId"
           @prefetch="emit('prefetch', $event)"
           @select="emit('select', $event)"
           @toggle="emit('toggle', $event)"
