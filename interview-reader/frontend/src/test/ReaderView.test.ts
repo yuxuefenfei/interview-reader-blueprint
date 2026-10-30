@@ -357,7 +357,7 @@ describe("ReaderView request coordination", () => {
         });
         await flushPromises();
         expect(wrapper.get(".mobile-progress-label").text()).toBe("100%");
-        expect(wrapper.get(".reader-desktop-rail-progress").attributes("aria-valuenow")).toBe("100");
+        expect(wrapper.get(".reader-header-progress .reader-progress-fill").attributes("style")).toContain("width: 100%");
         await vi.advanceTimersByTimeAsync(701);
         expect(api.saveProgress).toHaveBeenLastCalledWith("document-a", expect.objectContaining({sectionId: last.id, progressRatio: 1}));
         expect(messages.success).not.toHaveBeenCalled();
@@ -782,7 +782,7 @@ describe("ReaderView request coordination", () => {
         wrapper.unmount();
     });
 
-    it("reuses the compact document navigation on desktop and persists its collapsed state", async () => {
+    it("switches documents from the sidebar and restores navigation from the collapsed header", async () => {
         localStorage.setItem("reader.desktopNav.collapsed", "false");
         const currentDocument = {...document("document-a", "version-a"), title: "Redis", progressRatio: 0.46};
         const otherDocument = {...document("document-b", "version-b"), title: "MongoDB", progressRatio: 0.2};
@@ -807,12 +807,17 @@ describe("ReaderView request coordination", () => {
         await nextTick();
         expect(wrapper.get(".reader-desktop-nav").classes()).toContain("collapsed");
         expect(localStorage.getItem("reader.desktopNav.collapsed")).toBe("true");
-        expect(wrapper.get(".reader-desktop-rail-progress").attributes("role")).toBe("progressbar");
+        expect(wrapper.classes()).toContain("desktop-nav-collapsed");
+        expect(wrapper.get(".reader-header-desktop-expand").attributes("aria-label")).toBe("展开文档目录");
+        expect(wrapper.get(".reader-header-collapsed-doc-title").text()).toBe("Redis");
+        expect(wrapper.get(".reader-header-collapsed-section").text()).toBe(currentNode.title);
+        expect(wrapper.get(".reader-header-collapsed-doc").element.tagName).toBe("SPAN");
 
         await wrapper.get(".reader-header-desktop-expand").trigger("click");
         await nextTick();
         expect(wrapper.get(".reader-desktop-nav").classes()).not.toContain("collapsed");
         expect(localStorage.getItem("reader.desktopNav.collapsed")).toBe("false");
+        expect(wrapper.find(".reader-header-desktop-expand").exists()).toBe(false);
         wrapper.unmount();
     });
 

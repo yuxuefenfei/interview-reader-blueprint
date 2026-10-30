@@ -31,14 +31,23 @@
           "minLength": 1
         },
         "description": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "language": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "default": "zh-CN"
         },
         "tags": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
@@ -67,17 +76,29 @@
           ]
         },
         "sourceFileName": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "sourceSha256": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[0-9a-fA-F]{64}$"
         },
         "converterVersion": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "metadata": {
-          "type": "object"
+          "type": [
+            "object",
+            "null"
+          ]
         }
       },
       "additionalProperties": true
@@ -95,7 +116,8 @@
         ],
         "properties": {
           "sectionKey": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "parentSectionKey": {
             "type": [
@@ -123,10 +145,24 @@
             "type": [
               "string",
               "null"
+            ],
+            "enum": [
+              "QUESTION",
+              "ANSWER",
+              "EXPLANATION",
+              "CONCLUSION",
+              "INTRODUCTION",
+              "DIRECTORY",
+              "PRINCIPLE",
+              "PRACTICE",
+              "PITFALL",
+              "FOLLOW_UP",
+              null
             ]
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "sortOrder": {
             "type": "integer"
@@ -164,7 +200,8 @@
           }
         },
         "additionalProperties": true
-      }
+      },
+      "minItems": 1
     },
     "blocks": {
       "type": "array",
@@ -179,10 +216,12 @@
         ],
         "properties": {
           "blockKey": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "sectionKey": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "seq": {
             "type": "integer",
@@ -208,7 +247,10 @@
             "type": "object"
           },
           "plainText": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "language": {
             "type": [
@@ -258,19 +300,26 @@
         ],
         "properties": {
           "assetKey": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "path": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "mimeType": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "sha256": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
           },
           "alt": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "additionalProperties": true

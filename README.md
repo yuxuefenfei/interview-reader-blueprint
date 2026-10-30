@@ -8,7 +8,7 @@ MyBatis-Flex，常规查询通过 QueryWrapper + APT 表定义完成。
 
 - JDK 21
 - Maven 3.9+（推荐直接使用仓库内 Maven Wrapper）
-- Node.js 20+ / npm 10+
+- Node.js 20.19+ / npm 10+（CI 的 Node 版本以 `.nvmrc` 为准）
 - 不需要 Docker
 
 当前机器如果默认 `JAVA_HOME` 不是 JDK 21，可以在 PowerShell 中临时切换：
@@ -54,12 +54,14 @@ Vite 会把 `/api` 代理到 `http://localhost:28080`。
 $env:JAVA_HOME='C:/Program Files/Java/jdk-21'
 $env:Path="$env:JAVA_HOME/bin;$env:Path"
 .\mvnw.cmd clean package
-java -jar interview-reader/target/interview-reader-1.0.4.jar --spring.profiles.active=dev
+java -jar interview-reader/target/interview-reader-1.0.6.jar --spring.profiles.active=dev
 ```
 
 `mvn package` 会先执行干净的前端依赖安装与生产构建，并把 Vue 产物打进主 JAR。
-`interview-reader/target/interview-reader-1.0.4.jar` 是可直接运行的 Spring Boot JAR；同目录的 `.jar.original` 是 Maven
+`interview-reader/target/interview-reader-1.0.6.jar` 是可直接运行的 Spring Boot JAR；同目录的 `.jar.original` 是 Maven
 保留的非独立运行薄包。
+
+本地 JAR 文件名由父 `pom.xml` 的 `revision` 决定，当前为 `1.0.6`；Git 标签版本可以不同。正式 Release 使用固定附件名 `interview-reader.jar`、`upgrade-console.jar` 和 `SHA256SUMS`。
 
 前端生产构建会包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器支持 Service Worker 时会缓存应用壳；已成功打开的章节正文会写入
 IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进度写入失败会进入本地离线队列，并在恢复网络后按顺序同步。
@@ -67,8 +69,8 @@ IndexedDB 作为最近内容缓存，网络失败时可回退显示；阅读进�
 导入任务在 jar/dev 模式默认使用 Java 21 虚拟线程后台 worker，最大并发数由
 `interview-reader.import-worker.max-concurrency` 控制；测试 profile 关闭异步 worker，使用 H2 MySQL 兼容模式做确定性集成测试。
 
-文档“下架”只切换为 `OFFLINE` 并保留版本与阅读数据；永久删除仅允许用于草稿或已下架文档，采用持久化后台任务删除版本、阅读数据、导入记录和托管文件。删除任务默认自动重试
-3 次，保留 30 天最小墓碑供离线客户端清理缓存；并发数、重试间隔和墓碑期限统一由 `interview-reader.deletion.*` 配置。
+文档“下架”只切换为 `OFFLINE` 并保留版本与阅读数据；永久删除仅允许用于草稿或已下架文档，采用持久化后台任务删除版本、阅读数据、导入记录和托管文件。删除任务默认最多执行
+3 次（首次执行加最多 2 次自动重试），保留 30 天最小墓碑供离线客户端清理缓存；并发数、重试间隔和墓碑期限统一由 `interview-reader.deletion.*` 配置。
 
 PDF raw extraction 会保存预检摘要，包括 MIME、页数、书签深度、文本页估算、页面尺寸和每页 normalized block
 覆盖统计，便于复核页定位未覆盖内容并支持后续转换规则回归。疑似 PDF 表格会先保存为低置信度 `table_snapshot` 并产生复核
@@ -78,6 +80,13 @@ issue，避免误转成高置信正文。
 PDF 样本测试或 jar 运行时产生字体缓存写入告警。
 
 当前代码没有引入服务端缓存，因此未加入 Redis 依赖；后续只有出现跨请求/跨实例缓存需求时再接入单实例 Redis。
+
+## 阅读器操作
+
+- 电脑端在左侧书名处切换文档，用侧栏按钮收起目录；收起后通过顶栏首位按钮展开。折叠态顶栏显示只读的文档名与当前小节，完整上级目录路径位于正文标题上方。
+- 手机端通过顶栏目录按钮打开抽屉，在抽屉的“切换文档”按钮进入文档列表，再用“返回目录”回到当前文档目录。
+- 顶栏横线和手机百分比表示当前小节内的阅读位置，目录中的百分比表示整本文档的位置。它们不统计已读覆盖率；末节一屏可见时仍会到达 100%，不自动弹出完成提示。
+- 正文底部胶囊栏显示上一节、下一节标题和当前序号；首末节显示边界提示。搜索支持 `Ctrl K`（Mac 为 `⌘ K`），每次显示前 12 条结果；章节 URL 的 `section`、搜索定位的 `block` 和浏览器历史共同支持恢复阅读点。
 
 ## 独立系统升级控制台
 
@@ -108,7 +117,7 @@ JAR。
 $env:DATABASE_URL='jdbc:mysql://localhost:3306/interview_reader?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC'
 $env:DATABASE_USERNAME='interview_reader'
 $env:DATABASE_PASSWORD='<从秘密管理系统注入的强密码>'
-java -jar interview-reader/target/interview-reader-1.0.4.jar --spring.profiles.active=prod
+java -jar interview-reader/target/interview-reader-1.0.6.jar --spring.profiles.active=prod
 ```
 
 ## 登录配置
@@ -136,8 +145,8 @@ CSP、禁止嵌入、`nosniff`、Referrer Policy 和 Permissions Policy 安全�
 - Spring 与 Nginx 示例的上传上限统一为 10 MiB；端口、上传值和前端代理默认值由契约脚本交叉校验。
 - `interview-reader/frontend/src/shared/runtimeConfig.ts` 统一维护前端开发端口与代理默认值，`runtimePolicy.ts`
   统一维护轮询和离线缓存策略；`interview-reader/frontend/src/offline/database.ts` 统一维护 IndexedDB 名称、版本和 store。
-- `npm run contract:check` 会比较 OpenAPI、Java Controller、前后端枚举、TypeScript 响应字段、响应式断点和上传限制；前端生产构建与
-  CI 都会自动运行该检查。
+- 在 `interview-reader/frontend` 执行 `npm run contract:check`，会核对 OpenAPI 与 Java Controller、前后端及导入 Schema 的枚举、生成模型、响应式断点、端口和上传限制。
+  CI 会独立运行该检查，并检查生成的 API 文件是否有未提交差异。`npm run build` 会生成 API 类型、检查类型并构建资源，不会执行契约检查、lint 或测试。
 - 父项目 `pom.xml` 会拒绝非 JDK 21 或低于 Maven 3.9 的构建环境，并通过 `npm ci` 使用锁文件安装前端依赖。
 - 生产部署、健康检查、指标、备份恢复与 Flyway 回滚流程见 [生产运行手册](docs/operations/runbook.md)。
 
@@ -145,16 +154,20 @@ CSP、禁止嵌入、`nosniff`、Referrer Policy 和 Permissions Policy 安全�
 
 完整契约位于 `docs/api/openapi.yaml`。除登录和会话查询外，业务 API 均要求 `IR_SESSION` Cookie。
 
-认证：
+认证与基础状态：
 
 - `POST /api/auth/login`
 - `GET /api/auth/session`
 - `POST /api/auth/logout`
+- `GET /api/health`（需要登录；无需登录的进程健康检查使用 `/actuator/health`）
 
 阅读端：
 
+以下 `limit` 为 API 请求示例；正文与搜索接口省略该参数时，服务端分别默认 50 块、20 条。当前阅读器页面主动请求每批 100 块正文、最多 12 条搜索结果。
+
 - `GET /api/reader/documents?query=...&cursor=...&limit=16`
 - `GET /api/reader/documents/{documentId}`
+- `GET /api/reader/document-deletions`
 - `GET /api/reader/versions/{versionId}/toc`
 - `GET /api/reader/versions/{versionId}/nodes/{nodeId}/content?afterSeq=...&limit=50`
 - `GET /api/reader/search?q=...&documentId=...&limit=20`
@@ -173,6 +186,11 @@ CSP、禁止嵌入、`nosniff`、Referrer Policy 和 Permissions Policy 安全�
 - `GET /api/admin/documents/{documentId}`
 - `GET /api/admin/documents/{documentId}/metadata`
 - `PATCH /api/admin/documents/{documentId}/metadata`（标题、描述、标签；`code` 只读，使用 `metadataRevision` 乐观锁）
+- `POST /api/admin/documents/{documentId}/take-down`
+- `POST /api/admin/documents/{documentId}/restore`
+- `POST /api/admin/documents/{documentId}/deletion`
+- `GET /api/admin/document-deletions/{jobId}`
+- `POST /api/admin/document-deletions/{jobId}/retry`
 - `GET /api/admin/documents/{documentId}/versions`
 - `POST /api/admin/documents/{documentId}/versions/{sourceVersionId}/revisions`
 - `POST /api/admin/documents/{documentId}/versions/{versionId}/publish`
@@ -181,8 +199,11 @@ CSP、禁止嵌入、`nosniff`、Referrer Policy 和 Permissions Policy 安全�
 - `GET /api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks?cursor=...&limit=40`
 - `POST /api/admin/versions/{versionId}/editor/nodes/{nodeId}/blocks`
 - `PATCH /api/admin/versions/{versionId}/editor/nodes/{nodeId}`
+- `DELETE /api/admin/versions/{versionId}/editor/nodes/{nodeId}`
 - `PATCH /api/admin/versions/{versionId}/editor/structure`
 - `PATCH /api/admin/versions/{versionId}/editor/blocks/{blockId}`
+- `POST /api/admin/versions/{versionId}/editor/blocks/{blockId}/image`
+- `GET /api/admin/versions/{versionId}/editor/assets/{assetKey}`
 - `DELETE /api/admin/versions/{versionId}/editor/blocks/{blockId}?draftRevision=...`
 - `POST /api/admin/versions/{versionId}/editor/blocks/cleanup-empty`
 
@@ -213,6 +234,8 @@ CSP、禁止嵌入、`nosniff`、Referrer Policy 和 Permissions Policy 安全�
 - PDF（`.pdf`）
 
 PDF 导入会保存原始源文件、raw extraction 和 normalized package，复核页可按 issue/block 定位源页。
+
+导入 JSON 的结构约束见 [Document Package Schema](docs/import/schemas/document-package.schema.json)，可选资料字段允许 `null`。服务端还会检查目录引用、键和序号的唯一性、内容有效性及资源哈希等业务约束；通过 Schema 检查不代表一定能提交入库。
 
 PDF/Markdown 新文档的只读标识由源文件名去扩展名后规范化生成；Markdown 标题优先使用首个一级标题，否则回退源文件名。导入标识与现有文档冲突时必须明确选择“创建带
 `-2`、`-3` 后缀的新文档”或“作为匹配文档的新版本”，不会静默合并或覆盖已有文档资料。指定目标文档及选择新版本导入时，标题、描述和标签保持只读。

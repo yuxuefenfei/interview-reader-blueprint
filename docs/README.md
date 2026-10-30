@@ -18,7 +18,7 @@
 - [JSON Package 示例](import/examples/document-package.example.json)：后端集成测试使用的最小示例包。
 - [Excel 导入模板](import/templates/interview-reader-import-template.xlsx)：人工整理和批量导入模板。
 
-JSON 示例和 Excel 模板也被后端测试使用；移动或重命名时须同步更新测试代码和根目录 README 中的路径。Schema 用于说明导入格式。
+JSON 示例和 Excel 模板也被后端测试使用；移动或重命名时须同步更新测试代码和根目录 README 中的路径。Schema 约束导入 JSON 的结构；契约脚本会核对它与 OpenAPI 的字段、枚举、可空字段和资源哈希格式。目录引用、键与序号唯一性等业务规则仍由服务端校验。
 
 ## 样例资料
 

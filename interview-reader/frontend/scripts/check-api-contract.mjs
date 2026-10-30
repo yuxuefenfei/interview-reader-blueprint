@@ -61,6 +61,39 @@ for (const [constantName, schemaName] of [
     compareSets(`backend ${constantName}`, new Set(readJavaSet(javaContract, constantName)), `OpenAPI ${schemaName}`, schemaValues);
 }
 
+const importSchema = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "docs", "import", "schemas", "document-package.schema.json"), "utf8"));
+const packageFields = importSchema.properties;
+for (const [name, schema] of [
+    ["DocumentPackage", importSchema],
+    ["DocumentInfo", packageFields.document],
+    ["VersionInfo", packageFields.version],
+    ["DocumentPackageSection", packageFields.sections.items],
+    ["DocumentPackageBlock", packageFields.blocks.items],
+    ["AssetInfo", packageFields.assets.items]
+]) {
+    const apiProperties = document.components.schemas[name].properties;
+    compareSets(`import schema ${name} fields`, new Set(Object.keys(schema.properties)), `OpenAPI ${name} fields`, new Set(Object.keys(apiProperties)));
+    for (const [field, definition] of Object.entries(apiProperties)) {
+        const nullable = definition.type?.includes("null") || definition.anyOf?.some((variant) => variant.type === "null");
+        const declared = schema.properties[field];
+        if (nullable && (!declared?.type?.includes("null") || (declared.enum && !declared.enum.includes(null)))) {
+            failures.push(`Import schema ${name}.${field} must accept null emitted by the API`);
+        }
+    }
+}
+for (const [name, schema] of [
+    ["SourceType", packageFields.version.properties.sourceType],
+    ["NodeType", packageFields.sections.items.properties.nodeType],
+    ["SemanticRole", packageFields.sections.items.properties.semanticRole],
+    ["BlockType", packageFields.blocks.items.properties.blockType]
+]) {
+    compareSets(`import schema ${name}`, new Set((schema.enum ?? []).filter((value) => value !== null)), `OpenAPI ${name}`, new Set(document.components.schemas[name].enum));
+}
+if (packageFields.assets.items.properties.sha256.pattern !== document.components.schemas.VersionInfo.properties.sourceSha256.pattern) {
+    failures.push("Import asset SHA-256 must use the same hash format as the API");
+}
+if (packageFields.sections.minItems !== 1) failures.push("Import schema must require at least one section");
+
 const generatedTypesPath = path.join(frontendRoot, "src", "generated", "api", "types.gen.ts");
 if (!fs.existsSync(generatedTypesPath)) {
     failures.push("Generated OpenAPI TypeScript types are missing; run npm run api:generate");
@@ -109,7 +142,7 @@ if (failures.length) {
     console.error(failures.map((failure) => `- ${failure}`).join("\n"));
     process.exit(1);
 }
-console.log(`Contract check passed: ${specEndpoints.size} endpoints, concrete schemas, aligned enums and operational limits.`);
+console.log(`Contract check passed: ${specEndpoints.size} endpoints, concrete schemas, aligned import schema/enums and operational limits.`);
 
 function readEnvironmentDefault(value, variableName) {
     if (typeof value !== "string") return null;
