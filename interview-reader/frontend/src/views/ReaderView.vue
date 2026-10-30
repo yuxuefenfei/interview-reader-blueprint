@@ -82,6 +82,9 @@ const comfortTrigger = ref<HTMLElement>();
 const accountTrigger = ref<HTMLElement>();
 const mobileComfortOpen = ref(false);
 const tablePreviewOpen = ref(false);
+const imagePreviewOpen = ref(false);
+const readerOverlayOpen = computed(() => drawer.value || searchOpen.value || mobileComfortOpen.value || tablePreviewOpen.value || imagePreviewOpen.value);
+const navigationObscured = computed(() => readerOverlayOpen.value || comfortOpen.value || accountMenuOpen.value);
 const query = ref("");
 const searchHits = ref<SearchHit[]>([]);
 const searchScope = ref<"document" | "all">("document");
@@ -164,7 +167,7 @@ const navigationDocuments = computed(() => {
 });
 const mobileProgressStyle = computed(() => ({width: `${Math.round(chapterProgress.value * 100)}%`}));
 const desktopProgressStyle = computed(() => ({width: `${Math.round(chapterProgress.value * 100)}%`}));
-const desktopRailProgressStyle = computed(() => ({height: `${currentDocumentProgressRatio.value * 100}%`}));
+
 const chapterTransitioning = computed(() => chapterLoading.value && content.value !== null);
 const readerPageStyle = computed(() => ({
   ...comfortStyle(comfort),
@@ -286,6 +289,9 @@ function currentViewportHeight(): number {
 
 function syncViewportHeight(): void {
   viewportHeight.value = currentViewportHeight();
+  void nextTick(() => {
+    if (content.value && !loading.value && !chapterLoading.value && !readerOverlayOpen.value) onReadingScroll();
+  });
 }
 
 function scheduleDocumentSearch(): void {
@@ -1124,7 +1130,7 @@ function openSearch(): void {
 }
 
 function handleGlobalShortcut(event: KeyboardEvent): void {
-  if (tablePreviewOpen.value) return;
+  if (tablePreviewOpen.value || imagePreviewOpen.value) return;
   if (event.key === "Escape" && comfortOpen.value) {
     event.preventDefault();
     comfortOpen.value = false;
@@ -1159,12 +1165,13 @@ function message(value: unknown): string {
       :class="[
       `theme-${theme}`,
       {
-        'reader-overlay-open': drawer || searchOpen || mobileComfortOpen || tablePreviewOpen,
+        'reader-overlay-open': readerOverlayOpen,
         'desktop-nav-collapsed': desktopNavCollapsed,
       },
     ]"
       :style="readerPageStyle"
       class="reader-page"
+      @transitionend.self="syncViewportHeight"
   >
     <header class="reader-header">
       <button :aria-expanded="drawer" aria-label="打开目录" class="ui-button ui-button--icon reader-tool-button reader-menu-button" type="button"
@@ -1293,17 +1300,8 @@ function message(value: unknown): string {
       <span v-if="chapterTransitioning" aria-live="polite" class="sr-only" role="status">正在加载下一节</span>
     </header>
 
-    <aside :class="{ collapsed: desktopNavCollapsed }" class="reader-desktop-nav">
-      <template v-if="desktopNavCollapsed">
-        <button aria-label="展开文档目录" class="ui-button ui-button--text ui-button--icon reader-desktop-nav-expand" type="button" @click="toggleDesktopNav">
-          <Expand aria-hidden="true"/>
-        </button>
-        <div :aria-valuenow="Math.round(currentDocumentProgressRatio * 100)" aria-label="文档阅读位置" aria-valuemax="100" aria-valuemin="0"
-             class="reader-desktop-rail-progress" role="progressbar">
-          <span :style="desktopRailProgressStyle"></span>
-        </div>
-      </template>
-      <template v-else-if="desktopNavView === 'toc'">
+    <aside :aria-hidden="desktopNavCollapsed" :inert="desktopNavCollapsed || undefined" :class="{ collapsed: desktopNavCollapsed }" class="reader-desktop-nav">
+      <template v-if="desktopNavView === 'toc'">
         <div class="reader-desktop-nav-header reader-sidebar-brand-header">
           <button
               class="reader-sidebar-doc-btn"
@@ -1392,7 +1390,7 @@ function message(value: unknown): string {
           <ContentBlockView v-for="block in content.blocks" :key="block.id" :asset-base-url="selected ? `/assets/documents/${selected.id}/versions/${selected.currentVersionId}` : undefined" :block="block"
                             :diagram-theme="theme" :highlight="searchHighlight" :wrap-code="comfort.codeWrap"
                             show-code-wrap-toggle show-table-preview
-                            @update:table-preview-open="tablePreviewOpen = $event"
+                            @update:image-preview-open="imagePreviewOpen = $event" @update:table-preview-open="tablePreviewOpen = $event"
                             @update:wrap-code="comfort.codeWrap = $event"/>
           <div v-if="content.nextAfterSeq" :ref="captureContentLoadSentinel" class="reader-load-more">
             <span v-if="loadingMore" role="status">正在载入后续内容…</span>
@@ -1400,59 +1398,59 @@ function message(value: unknown): string {
             <span v-else class="sr-only">继续阅读时将自动载入后续内容</span>
           </div>
         </article>
-        <!-- 方案 2B：极简流线型居中对称胶囊栏 (Capsule Pager) -->
-        <nav aria-label="章节翻页" class="reader-pager-capsule-wrapper">
-          <div class="reader-pager-capsule">
-            <button
-                v-if="previousNode"
-                :disabled="chapterLoading"
-                class="reader-capsule-btn reader-capsule-btn--prev"
-                type="button"
-                :title="`上一节：${previousNode.title}`"
-                @click="selectNode(previousNode)"
-                @focus="prefetchNode(previousNode)"
-                @pointerenter="prefetchNode(previousNode)"
-            >
-              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowLeft/></el-icon>
-              <span class="reader-capsule-label">上一节</span>
-              <span class="reader-capsule-title">{{ previousNode.title }}</span>
-            </button>
-            <div v-else class="reader-capsule-btn is-disabled reader-capsule-btn--prev">
-              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowLeft/></el-icon>
-              <span class="reader-capsule-label">已是首节</span>
-            </div>
-
-            <span class="reader-capsule-divider" aria-hidden="true"></span>
-
-            <div aria-live="polite" class="reader-capsule-meta" :title="`章节阅读进度：${chapterPosition}`">
-              {{ chapterPosition }}
-            </div>
-
-            <span class="reader-capsule-divider" aria-hidden="true"></span>
-
-            <button
-                v-if="nextNode"
-                :disabled="chapterLoading"
-                class="reader-capsule-btn reader-capsule-btn--next"
-                type="button"
-                :title="`下一节：${nextNode.title}`"
-                @click="selectNode(nextNode)"
-                @focus="prefetchNode(nextNode)"
-                @pointerenter="prefetchNode(nextNode)"
-            >
-              <span class="reader-capsule-title">{{ nextNode.title }}</span>
-              <span class="reader-capsule-label">下一节</span>
-              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowRight/></el-icon>
-            </button>
-            <div v-else class="reader-capsule-btn is-disabled reader-capsule-btn--next">
-              <span class="reader-capsule-label">已是末节</span>
-              <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowRight/></el-icon>
-            </div>
-          </div>
-        </nav>
       </template>
       <div v-else class="reader-state">选择一篇文档开始阅读</div>
     </main>
+
+    <nav v-if="content && !loading && !error" :aria-hidden="navigationObscured" :inert="navigationObscured || undefined" :class="{ 'is-obscured': navigationObscured }" :style="readerSurfaceStyle" aria-label="章节翻页" class="reader-pager-capsule-wrapper">
+      <div class="reader-pager-capsule">
+        <button
+            v-if="previousNode"
+            :disabled="chapterLoading"
+            class="reader-capsule-btn reader-capsule-btn--prev"
+            type="button"
+            :title="`上一节：${previousNode.title}`"
+            @click="selectNode(previousNode)"
+            @focus="prefetchNode(previousNode)"
+            @pointerenter="prefetchNode(previousNode)"
+        >
+          <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowLeft/></el-icon>
+          <span class="reader-capsule-label">上一节</span>
+          <span class="reader-capsule-title">{{ previousNode.title }}</span>
+        </button>
+        <div v-else class="reader-capsule-btn is-disabled reader-capsule-btn--prev">
+          <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowLeft/></el-icon>
+          <span class="reader-capsule-label">已是首节</span>
+        </div>
+
+        <span class="reader-capsule-divider" aria-hidden="true"></span>
+
+        <div aria-live="polite" class="reader-capsule-meta" :title="`章节阅读进度：${chapterPosition}`">
+          {{ chapterPosition }}
+        </div>
+
+        <span class="reader-capsule-divider" aria-hidden="true"></span>
+
+        <button
+            v-if="nextNode"
+            :disabled="chapterLoading"
+            class="reader-capsule-btn reader-capsule-btn--next"
+            type="button"
+            :title="`下一节：${nextNode.title}`"
+            @click="selectNode(nextNode)"
+            @focus="prefetchNode(nextNode)"
+            @pointerenter="prefetchNode(nextNode)"
+        >
+          <span class="reader-capsule-title">{{ nextNode.title }}</span>
+          <span class="reader-capsule-label">下一节</span>
+          <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowRight/></el-icon>
+        </button>
+        <div v-else class="reader-capsule-btn is-disabled reader-capsule-btn--next">
+          <span class="reader-capsule-label">已是末节</span>
+          <el-icon class="reader-capsule-icon" aria-hidden="true"><ArrowRight/></el-icon>
+        </div>
+      </div>
+    </nav>
 
     <!-- 移动端目录抽屉 -->
     <el-drawer

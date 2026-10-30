@@ -116,7 +116,11 @@ function applyUpdate(): void {
     </form>
   </section>
   <div v-else id="main-content" class="route-content" tabindex="-1">
-    <router-view :online="online" @logout="logout"/>
+    <router-view v-slot="{ Component }">
+      <Transition name="app-shell" mode="out-in">
+        <component :is="Component" :online="online" @logout="logout"/>
+      </Transition>
+    </router-view>
   </div>
   <div v-if="!online" class="app-status-banner" role="status">当前处于离线状态；已缓存内容仍可阅读，进度会在联网后同步。
   </div>

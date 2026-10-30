@@ -276,12 +276,14 @@
 }
 
 
-/* ── 方案 1A：全高贯通侧栏（仅桌面端生效） ─────────────────── */
+.reader-header-desktop-expand.ui-button { display: none; }
+
+/* 桌面目录贯穿顶栏、正文和翻页区域。 */
 @media (min-width: 761px) {
     .reader-page {
         grid-template-columns: var(--toc-w) minmax(0, 1fr);
-        grid-template-rows: var(--header-h) minmax(0, 1fr);
-        transition: grid-template-columns 200ms cubic-bezier(0.2, 0, 0, 1);
+        grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
+        transition: grid-template-columns var(--motion-layout) var(--motion-ease);
     }
 
     /* 侧栏展开态 */
@@ -296,6 +298,10 @@
         border-right: 1px solid var(--reader-line) !important;
         background: var(--reader-surface) !important;
         z-index: 6;
+        min-width: 0;
+        opacity: 1;
+        visibility: visible;
+        transition: opacity var(--motion-fast) var(--motion-ease), visibility 0s;
     }
 
     .reader-header {
@@ -309,7 +315,7 @@
         padding: 0 24px;
         border-bottom: 1px solid var(--reader-line);
         background: var(--reader-surface);
-        transition: padding 180ms ease;
+        transition: padding var(--motion-layout) var(--motion-ease);
     }
 
     .reader-content {
@@ -323,19 +329,16 @@
     }
 
     .reader-page.desktop-nav-collapsed .reader-desktop-nav {
-        display: none !important;
-        width: 0 !important;
-        border-right: none !important;
+        opacity: 0;
+        visibility: hidden;
+        border-right-color: transparent !important;
+        transition: opacity var(--motion-fast) var(--motion-ease), visibility 0s var(--motion-layout);
     }
 
     .reader-page.desktop-nav-collapsed .reader-header {
-        grid-column: 1 / -1 !important;
         padding-left: 16px;
     }
 
-    .reader-page.desktop-nav-collapsed .reader-content {
-        grid-column: 1 / -1 !important;
-    }
 
     /* 顶栏最左侧极简展开按钮 */
     .reader-header-desktop-expand.ui-button {
@@ -351,7 +354,7 @@
         cursor: pointer;
         flex-shrink: 0;
         margin-right: 4px;
-        transition: color 140ms ease, background-color 140ms ease;
+        transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
     }
 
     .reader-header-desktop-expand.ui-button:hover {
@@ -437,7 +440,7 @@
     color: var(--reader-text);
     cursor: pointer;
     text-align: left;
-    transition: background-color 140ms ease, border-color 140ms ease;
+    transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -478,7 +481,7 @@
     font-size: 13px;
     color: var(--reader-muted);
     opacity: 0.55;
-    transition: transform 140ms ease;
+    transition: transform var(--motion-fast) var(--motion-ease);
 }
 
 .reader-sidebar-doc-btn:hover .reader-sidebar-doc-arrow {
@@ -508,7 +511,10 @@
 /* ── 移动端响应式彻底隔离修复 ─────────────────── */
 @media (max-width: 760px) {
     .reader-page {
-        display: block !important;
+        --header-h: 60px;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
         height: var(--reader-viewport-height, 100vh) !important;
         min-height: var(--reader-viewport-height, 100vh) !important;
     }
@@ -519,7 +525,7 @@
     }
 
     .reader-header {
-        position: sticky !important;
+        position: relative !important;
         top: 0 !important;
         height: 60px !important;
         padding: 0 12px !important;
@@ -544,26 +550,40 @@
     }
 
     .reader-content {
-        height: calc(var(--reader-viewport-height, 100vh) - 60px) !important;
+        min-height: 0;
+        height: auto !important;
         overflow: auto !important;
     }
 }
 
 /* ── 方案 2B：极简流线型居中对称胶囊栏（Capsule Pager） ───────── */
 .reader-pager-capsule-wrapper {
-    width: min(100%, var(--reader-column));
-    margin: 0 auto;
-    padding: 36px clamp(16px, 4vw, 40px) 72px;
+    grid-column: 2;
+    grid-row: 3;
+    min-width: 0;
+    width: 100%;
+    padding: 10px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
     display: flex;
     justify-content: center;
     align-items: center;
     box-sizing: border-box;
+    transition: opacity var(--motion-fast) var(--motion-ease), visibility var(--motion-fast);
+}
+
+.reader-pager-capsule-wrapper.is-obscured {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+@media (max-width: 760px) {
+    .reader-pager-capsule-wrapper { grid-column: 1; }
 }
 
 .reader-pager-capsule {
     display: inline-flex;
     align-items: center;
-    max-width: 100%;
+    max-width: min(100%, var(--reader-column));
     padding: 4px;
     background: var(--reader-surface);
     border: 1px solid var(--reader-line);
@@ -572,7 +592,7 @@
     gap: 4px;
     box-sizing: border-box;
     overflow: hidden; /* 保底：坚决不允许子项圆角背景溢出胶囊外框 */
-    transition: border-color 160ms ease, box-shadow 160ms ease;
+    transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 
 .reader-pager-capsule:hover {
@@ -592,7 +612,7 @@
     color: var(--reader-text);
     cursor: pointer;
     font-size: var(--ui-font-size-body);
-    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+    transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
     white-space: nowrap;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
@@ -604,7 +624,7 @@
 .reader-capsule-btn .reader-capsule-icon {
     font-size: 14px;
     flex-shrink: 0;
-    transition: transform 160ms ease;
+    transition: transform var(--motion-fast) var(--motion-ease);
 }
 
 .reader-capsule-label {
@@ -622,7 +642,7 @@
     font-size: var(--ui-font-size-small);
     color: var(--reader-muted);
     font-weight: normal;
-    transition: color 150ms ease;
+    transition: color var(--motion-fast) var(--motion-ease);
     flex-shrink: 1;
 }
 
@@ -666,7 +686,7 @@
 }
 
 .reader-capsule-btn:not(.is-disabled):active {
-    transform: scale(0.98);
+    background: color-mix(in srgb, var(--reader-accent) 16%, var(--reader-surface));
 }
 
 .reader-capsule-btn:focus-visible {

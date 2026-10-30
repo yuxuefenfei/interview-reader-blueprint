@@ -71,7 +71,11 @@ watch(collapsed, (value) => localStorage.setItem("upgrade.sidebar.collapsed", St
       </button>
     </aside>
     <main aria-label="升级管理工作区" class="admin-main">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <Transition name="app-page" mode="out-in">
+          <component :is="Component"/>
+        </Transition>
+      </router-view>
     </main>
   </div>
 </template>

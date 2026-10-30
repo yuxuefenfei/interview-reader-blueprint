@@ -247,7 +247,9 @@ button:focus-visible, a:focus-visible {
 .sidebar-collapsed .admin-sidebar nav a > span,
 .sidebar-collapsed .admin-sidebar-toggle > span,
 .sidebar-collapsed .admin-sidebar-foot {
-    display: none;
+    max-width: 0;
+    opacity: 0;
+    visibility: hidden;
 }
 
 .sidebar-collapsed .admin-sidebar nav a {

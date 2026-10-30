@@ -11,6 +11,8 @@ import "./styles.css";
 import "../../../frontend-shared/typography.css";
 import "../../../frontend-shared/buttons.css";
 
+import "../../../frontend-shared/motion.css";
+
 const app = createApp(App).use(router);
 app.use(ElLoading);
 provideGlobalConfig({locale: zhCn}, app, true);

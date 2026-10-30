@@ -235,6 +235,21 @@ describe("ContentBlockView", () => {
         expect(wrapper.get("img").attributes("src")).toBe("/diagram.png");
     });
 
+    it("releases the image overlay when its content unmounts", async () => {
+        const notify = vi.fn();
+        const wrapper = mount(ContentBlockView, {
+            props: {
+                block: block({blockType: "image", payload: {src: "/diagram.png", alt: "架构图"}}),
+                "onUpdate:imagePreviewOpen": notify,
+            },
+        });
+        await wrapper.get('[aria-label="查看大图：架构图"]').trigger("click");
+        expect(notify).toHaveBeenLastCalledWith(true);
+        wrapper.unmount();
+        expect(notify).toHaveBeenLastCalledWith(false);
+        expect(document.querySelector(".image-preview-dialog")).toBeNull();
+    });
+
     it("lazy-loads images and restores focus after closing the keyboard-accessible preview", async () => {
         const wrapper = mount(ContentBlockView, {
             attachTo: document.body,
@@ -260,6 +275,7 @@ describe("ContentBlockView", () => {
         await wrapper.vm.$nextTick();
         expect(document.querySelector('[role="dialog"]')).toBeNull();
         expect(document.activeElement).toBe(trigger.element);
+        expect(wrapper.emitted("update:imagePreviewOpen")).toEqual([[true], [false]]);
         wrapper.unmount();
     });
 });

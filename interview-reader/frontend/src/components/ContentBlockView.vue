@@ -20,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:wrapCode": [value: boolean];
   "update:tablePreviewOpen": [value: boolean];
+  "update:imagePreviewOpen": [value: boolean];
 }>();
 
 const imageLoadFailed = ref(false);
@@ -74,6 +75,7 @@ watch(imageUrl, () => {
 });
 onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleImagePreviewKeydown);
+  if (imagePreviewOpen.value) emit("update:imagePreviewOpen", false);
 });
 
 function textFromPayload(payload: Record<string, unknown>, fallback: string): string {
@@ -95,6 +97,7 @@ function openImagePreview(event?: MouseEvent): void {
       : document.activeElement instanceof HTMLElement ? document.activeElement : null;
   imagePreviewScale.value = 1;
   imagePreviewOpen.value = true;
+  emit("update:imagePreviewOpen", true);
   document.addEventListener("keydown", handleImagePreviewKeydown);
   void nextTick(() => imagePreviewClose.value?.focus());
 }
@@ -102,6 +105,7 @@ function openImagePreview(event?: MouseEvent): void {
 function closeImagePreview(): void {
   if (!imagePreviewOpen.value) return;
   imagePreviewOpen.value = false;
+  emit("update:imagePreviewOpen", false);
   document.removeEventListener("keydown", handleImagePreviewKeydown);
   const focusTarget = previousFocus;
   previousFocus = null;
@@ -235,34 +239,36 @@ function codeLanguage(payload: Record<string, unknown>, block: ContentBlock): st
     <pre v-else class="fallback-block">{{ block.plainText || JSON.stringify(block.payload, null, 2) }}</pre>
 
     <Teleport to="body">
-      <div
-          v-if="imagePreviewOpen && imageUrl"
-          :aria-label="`图片预览：${imageAlt || '图片'}`"
-          :style="imageLightboxStyle"
-          class="image-preview-dialog"
-          aria-modal="true"
-          role="dialog"
-          @click.self="closeImagePreview"
-      >
-        <div :style="imageLightboxToolbarStyle" class="ui-action-row ui-action-row--nowrap">
-          <button ref="imagePreviewZoomOut" :disabled="imagePreviewScale <= 1" class="ui-button ui-button--icon"
-                  aria-label="缩小图片" type="button" @click="adjustImagePreviewScale(-0.25)">−
-          </button>
-          <output aria-live="polite"
-                  style="min-width:42px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums">{{ Math.round(imagePreviewScale * 100) }}%
-          </output>
-          <button ref="imagePreviewZoomIn" :disabled="imagePreviewScale >= 3" class="ui-button ui-button--icon"
-                  aria-label="放大图片" type="button" @click="adjustImagePreviewScale(0.25)">＋
-          </button>
-          <button ref="imagePreviewClose" class="ui-button ui-button--icon ui-close-button" aria-label="关闭图片预览" type="button"
-                  @click="closeImagePreview">
-            <Close aria-hidden="true" />
-          </button>
+      <Transition name="app-overlay">
+        <div
+            v-if="imagePreviewOpen && imageUrl"
+            :aria-label="`图片预览：${imageAlt || '图片'}`"
+            :style="imageLightboxStyle"
+            class="image-preview-dialog"
+            aria-modal="true"
+            role="dialog"
+            @click.self="closeImagePreview"
+        >
+          <div :style="imageLightboxToolbarStyle" class="ui-action-row ui-action-row--nowrap">
+            <button ref="imagePreviewZoomOut" :disabled="imagePreviewScale <= 1" class="ui-button ui-button--icon"
+                    aria-label="缩小图片" type="button" @click="adjustImagePreviewScale(-0.25)">−
+            </button>
+            <output aria-live="polite"
+                    style="min-width:42px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums">{{ Math.round(imagePreviewScale * 100) }}%
+            </output>
+            <button ref="imagePreviewZoomIn" :disabled="imagePreviewScale >= 3" class="ui-button ui-button--icon"
+                    aria-label="放大图片" type="button" @click="adjustImagePreviewScale(0.25)">＋
+            </button>
+            <button ref="imagePreviewClose" class="ui-button ui-button--icon ui-close-button" aria-label="关闭图片预览" type="button"
+                    @click="closeImagePreview">
+              <Close aria-hidden="true" />
+            </button>
+          </div>
+          <div :style="imageLightboxStageStyle">
+            <img :alt="imageDecorative ? '' : imageAlt" :src="imageUrl" :style="imageLightboxImageStyle"/>
+          </div>
         </div>
-        <div :style="imageLightboxStageStyle">
-          <img :alt="imageDecorative ? '' : imageAlt" :src="imageUrl" :style="imageLightboxImageStyle"/>
-        </div>
-      </div>
+      </Transition>
     </Teleport>
   </article>
 </template>

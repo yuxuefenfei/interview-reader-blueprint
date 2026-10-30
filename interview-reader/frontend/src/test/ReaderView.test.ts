@@ -45,7 +45,7 @@ vi.mock("element-plus/es/components/message/index", () => ({ElMessage: messages}
 vi.mock("../components/ContentBlockView.vue", () => ({
     default: defineComponent({
         props: {block: {type: Object, required: true}},
-        emits: ["update:tablePreviewOpen"],
+        emits: ["update:tablePreviewOpen", "update:imagePreviewOpen"],
         template: '<div class="mock-content" :data-block-id="block.id">{{ block.plainText }}</div>',
     }),
 }));
@@ -257,6 +257,73 @@ describe("ReaderView request coordination", () => {
         expect(wrapper.get(".reader-header-collapsed-doc-title").text()).toBe(currentDocument.title);
         expect(wrapper.get(".reader-header-collapsed-section").text()).toBe(currentNode.title);
         expect(wrapper.get(".reader-content h1").text()).toBe(currentNode.title);
+        wrapper.unmount();
+    });
+
+    it("keeps navigation outside the scroll area and disables it without removing its space behind overlays", async () => {
+        const first = node("first");
+        const last = node("last");
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([first, last]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockResolvedValue(content(first, "block-a"));
+        api.saveProgress.mockImplementation(async (_documentId: string, value) => value);
+        const wrapper = mountReader();
+        await flushPromises();
+        const navigation = wrapper.get('[aria-label="章节翻页"]');
+        expect(wrapper.get(".reader-content").find('[aria-label="章节翻页"]').exists()).toBe(false);
+        expect(navigation.element.parentElement).toBe(wrapper.element);
+        expect(navigation.attributes("inert")).toBeUndefined();
+
+        await wrapper.get(".reader-menu-button").trigger("click");
+        expect(navigation.classes()).toContain("is-obscured");
+        expect(navigation.attributes("inert")).toBeDefined();
+        wrapper.findComponent(DrawerStub).vm.$emit("update:modelValue", false);
+        await nextTick();
+        expect(navigation.attributes("inert")).toBeUndefined();
+
+        const blockView = wrapper.findComponent(ContentBlockView);
+        for (const previewEvent of ["update:tablePreviewOpen", "update:imagePreviewOpen"] as const) {
+            blockView.vm.$emit(previewEvent, true);
+            await nextTick();
+            expect(wrapper.classes()).toContain("reader-overlay-open");
+            expect(navigation.attributes("aria-hidden")).toBe("true");
+            blockView.vm.$emit(previewEvent, false);
+            await nextTick();
+            expect(navigation.attributes("aria-hidden")).toBe("false");
+        }
+        expect(wrapper.get('[aria-label="章节翻页"]').element).toBe(navigation.element);
+        expect(wrapper.findAll(".reader-article")).toHaveLength(1);
+        wrapper.unmount();
+    });
+
+    it("recomputes the reading position after viewport and sidebar geometry changes", async () => {
+        const current = node("current");
+        api.documents.mockResolvedValue({items: [document("document-a", "version-a")], nextCursor: null});
+        api.toc.mockResolvedValue([current]);
+        api.progress.mockResolvedValue(null);
+        api.content.mockResolvedValue(content(current, "block-a"));
+        api.saveProgress.mockImplementation(async (_documentId: string, value) => value);
+        const wrapper = mountReader();
+        await flushPromises();
+        const area = wrapper.get(".reader-content").element;
+        Object.defineProperties(area, {
+            clientHeight: {configurable: true, value: 600},
+            scrollHeight: {configurable: true, writable: true, value: 1800},
+            scrollTop: {configurable: true, writable: true, value: 300},
+        });
+        window.dispatchEvent(new Event("resize"));
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(20);
+        expect(wrapper.get(".mobile-progress-label").text()).toBe("25%");
+
+        Object.defineProperty(area, "scrollHeight", {configurable: true, value: 2600});
+        await wrapper.trigger("transitionend");
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(20);
+        expect(wrapper.get(".mobile-progress-label").text()).toBe("15%");
+        await vi.advanceTimersByTimeAsync(701);
+        expect(api.saveProgress).toHaveBeenLastCalledWith("document-a", expect.objectContaining({progressRatio: 0.15}));
         wrapper.unmount();
     });
 

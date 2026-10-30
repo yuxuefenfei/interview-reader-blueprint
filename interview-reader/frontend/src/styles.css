@@ -423,7 +423,9 @@ select:focus-visible {
 .admin-layout.sidebar-collapsed .admin-sidebar nav a > span,
 .admin-layout.sidebar-collapsed .admin-sidebar-foot button > span,
 .admin-layout.sidebar-collapsed .admin-sidebar-toggle > span {
-    display: none;
+    max-width: 0;
+    opacity: 0;
+    visibility: hidden;
 }
 
 .admin-layout.sidebar-collapsed .admin-sidebar nav a,
@@ -804,7 +806,7 @@ select:focus-visible {
     min-height: var(--reader-viewport-height, 100vh);
     display: grid;
     grid-template-columns: var(--toc-w) minmax(0, 1fr);
-    grid-template-rows: var(--header-h) minmax(0, calc(var(--reader-viewport-height, 100vh) - var(--header-h)));
+    grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
     overflow: hidden;
     background: var(--reader-bg);
     color: var(--reader-text);
@@ -812,7 +814,7 @@ select:focus-visible {
 }
 
 .reader-page.desktop-nav-collapsed {
-    --toc-w: 48px;
+    --toc-w: 0px;
 }
 
 :is(.reader-page, .reader-comfort-popper, .reader-account-popper).theme-dark {
@@ -1168,27 +1170,6 @@ select:focus-visible {
 
 .reader-desktop-nav-collapse {
     justify-self: center;
-}
-
-.reader-desktop-rail-progress {
-    position: relative;
-    width: 3px;
-    height: min(220px, 46%);
-    align-self: start;
-    margin-top: 14px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: var(--reader-line);
-}
-
-.reader-desktop-rail-progress span {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    border-radius: inherit;
-    background: var(--reader-accent);
-    transition: height 180ms ease-out;
 }
 
 .reader-desktop-toc-scroll, .reader-desktop-document-browser {
@@ -2420,7 +2401,10 @@ select:focus-visible {
         letter-spacing: .035em;
     }
 
-    .toc-tree-compact-groups .toc-node:not(.toc-group-label),
+    .toc-tree-compact-groups .toc-node:not(.toc-group-label) {
+        min-height: 44px;
+    }
+
     .toc-tree-compact-groups .toc-toggle {
     width: 28px;
     min-height: 36px;
@@ -2541,7 +2525,7 @@ select:focus-visible {
     }
 
     .chapter-loading-dots i {
-        animation: chapter-loading-dot-breathe 1.8s ease-in-out infinite !important;
+        animation: none !important;
     }
 }
 

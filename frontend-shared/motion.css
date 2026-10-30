@@ -1,0 +1,113 @@
+/* 两套应用共用节奏；页面外壳不做位移，避免改变固定控件的坐标系。 */
+:root {
+    --motion-fast: 120ms;
+    --motion-content: 160ms;
+    --motion-overlay: 180ms;
+    --motion-layout: 200ms;
+    --motion-exit: 60ms;
+    --motion-ease: cubic-bezier(.2, 0, 0, 1);
+    --el-transition-duration: var(--motion-overlay);
+    --el-transition-duration-fast: var(--motion-overlay);
+}
+
+.app-shell-enter-active,
+.app-page-enter-active {
+    transition: opacity var(--motion-content) var(--motion-ease), transform var(--motion-content) var(--motion-ease);
+}
+
+.app-shell-leave-active,
+.app-page-leave-active {
+    transition: opacity var(--motion-exit) ease-out;
+    pointer-events: none;
+}
+
+/* 保留可读轮廓，避免离入交接时整页淡空。 */
+.app-shell-enter-from,
+.app-shell-leave-to,
+.app-page-enter-from,
+.app-page-leave-to { opacity: .6; }
+
+.app-page-enter-from { transform: translateY(6px); }
+
+.reader-article {
+    animation: reader-content-enter 140ms var(--motion-ease);
+    transition: opacity var(--motion-fast) var(--motion-ease);
+}
+
+@keyframes reader-content-enter {
+    from { opacity: .35; }
+    to { opacity: 1; }
+}
+
+.admin-layout,
+.reader-page { transition: grid-template-columns var(--motion-layout) var(--motion-ease); }
+
+.ui-button,
+.el-button {
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease);
+}
+
+.admin-brand > span,
+.admin-nav-label,
+.admin-sidebar nav a > span,
+.admin-sidebar-foot button > span,
+.admin-sidebar-toggle > span,
+.admin-sidebar-foot {
+    min-width: 0;
+    max-width: 220px;
+    overflow: hidden;
+    transition: opacity var(--motion-fast) var(--motion-ease), max-width var(--motion-layout) var(--motion-ease), visibility var(--motion-fast);
+}
+
+.admin-layout.sidebar-collapsed .admin-brand {
+    justify-content: flex-start;
+    padding-inline: 18px;
+}
+
+.admin-layout.sidebar-collapsed .admin-sidebar nav a,
+.admin-layout.sidebar-collapsed .admin-sidebar-foot button {
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 48px;
+    margin-inline: 0;
+    padding-inline: 14px;
+}
+
+.admin-layout.sidebar-collapsed .admin-sidebar-toggle { justify-content: flex-start; }
+
+.admin-sidebar nav a,
+.admin-sidebar-foot button,
+.admin-brand {
+    transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), padding var(--motion-layout) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+}
+
+.reader-content { min-height: 0; }
+
+/* 离线与更新通知不能占用固定翻页器的点击区域。 */
+.route-content:has(.reader-page) ~ .app-status-banner { bottom: calc(86px + env(safe-area-inset-bottom)); }
+.route-content:has(.reader-page) ~ .app-update-banner { bottom: calc(150px + env(safe-area-inset-bottom)); }
+
+.app-overlay-enter-active { transition: opacity var(--motion-overlay) var(--motion-ease); }
+.app-overlay-leave-active { transition: opacity var(--motion-exit) ease-out; pointer-events: none; }
+.app-overlay-enter-from, .app-overlay-leave-to { opacity: 0; }
+
+.route-content:has(.reader-overlay-open) ~ :is(.app-status-banner, .app-update-banner) { z-index: 1000; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation: none !important;
+        transition-duration: .01ms !important;
+        transition-delay: 0ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .app-shell-enter-from,
+    .app-shell-leave-to,
+    .app-page-enter-from,
+    .app-page-leave-to,
+    .app-overlay-enter-from,
+    .app-overlay-leave-to { opacity: 1; }
+
+    .app-page-enter-from { transform: none; }
+}
