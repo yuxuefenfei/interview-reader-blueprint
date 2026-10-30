@@ -443,10 +443,10 @@ select:focus-visible {
     background: transparent;
 }
 
-.admin-layout.sidebar-collapsed .admin-sidebar nav a.router-link-active::before {
+.admin-layout.sidebar-collapsed .admin-sidebar nav a.router-link-active .el-icon::before {
     content: "";
     position: absolute;
-    z-index: 0;
+    z-index: -1;
     top: 50%;
     left: 50%;
     width: 36px;

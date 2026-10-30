@@ -60,9 +60,34 @@
     transition: opacity var(--motion-fast) var(--motion-ease), max-width var(--motion-layout) var(--motion-ease), visibility var(--motion-fast);
 }
 
+.admin-layout {
+    --admin-nav-icon-size: 19px;
+    --admin-sidebar-inset: 10px;
+    --admin-sidebar-border: 1px;
+}
+
+.admin-sidebar {
+    padding-inline: var(--admin-sidebar-inset);
+    border-right-width: var(--admin-sidebar-border);
+}
+
+.admin-sidebar nav { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+
+.admin-sidebar nav a,
+.admin-sidebar-foot button { min-width: 0; }
+
+.admin-sidebar nav a > .el-icon,
+.admin-sidebar-foot button > .el-icon,
+.admin-sidebar-toggle > .el-icon {
+    position: relative;
+    width: var(--admin-nav-icon-size);
+    flex: 0 0 var(--admin-nav-icon-size);
+}
+
 .admin-layout.sidebar-collapsed .admin-brand {
     justify-content: flex-start;
-    padding-inline: 18px;
+    gap: 0;
+    padding-inline: calc((var(--admin-sidebar-width) - var(--admin-sidebar-border) - 36px) / 2);
 }
 
 .admin-layout.sidebar-collapsed .admin-sidebar nav a,
@@ -71,15 +96,21 @@
     width: 100%;
     min-height: 48px;
     margin-inline: 0;
-    padding-inline: 14px;
+    gap: 0;
+    padding-inline: calc((var(--admin-sidebar-width) - var(--admin-sidebar-border) - 2 * var(--admin-sidebar-inset) - var(--admin-nav-icon-size)) / 2);
 }
 
-.admin-layout.sidebar-collapsed .admin-sidebar-toggle { justify-content: flex-start; }
+.admin-layout.sidebar-collapsed .admin-sidebar-toggle {
+    justify-content: flex-start;
+    gap: 0;
+    padding-inline: calc((var(--admin-sidebar-width) - var(--admin-sidebar-border) - var(--admin-nav-icon-size)) / 2);
+}
 
 .admin-sidebar nav a,
 .admin-sidebar-foot button,
+.admin-sidebar-toggle,
 .admin-brand {
-    transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), padding var(--motion-layout) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+    transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), padding var(--motion-layout) var(--motion-ease), gap var(--motion-layout) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
 }
 
 .reader-content { min-height: 0; }
